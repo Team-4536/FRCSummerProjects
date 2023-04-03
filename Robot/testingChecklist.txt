@@ -1,0 +1,12 @@
+
+
+
+unit:
+speed clamps on sim motors
+RPM set function for sparks, others
+linearity of DCMotor systems
+
+
+
+physical:
+rpm of sparkMax
