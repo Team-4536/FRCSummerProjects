@@ -1,4 +1,5 @@
 import dearpygui.dearpygui as dpg
+import dearpygui_ext.logger
 import os
 
 def createWindow(widgetInits):
@@ -41,6 +42,10 @@ def createWindow(widgetInits):
     dpg.configure_app(docking=True, docking_space=True)
     for x in widgetInits:
         x()
+
+    l = dearpygui_ext.logger.mvLogger()
+    for i in range(0, 100):
+        l.log_info("Hello world!")
 
     dpg.setup_dearpygui()
 
