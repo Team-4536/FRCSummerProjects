@@ -17,20 +17,12 @@ table = ntcore.NetworkTableInstance.getDefault().getTable(testTableName)
 
 class MotorTest:
 
-    """
-    def robotInit(self, motor: DCMotors.DCMotor) -> None:
-        self.__motor: DCMotors.DCMotor = motor
-
-    def robotTick(self) -> None:
-        self.__motor.setRaw(table.getValue("speed", 0)) # type: ignore
-    """
-
 
     __count = 0
     __i = 0
     parent = 0
 
-    def sundialInit(self):
+    def init(self):
 
 
 
@@ -50,7 +42,7 @@ class MotorTest:
                 self.__class__.parent = window
                 def x():
                     m = MotorTest()
-                    m.sundialInit()
+                    m.init()
 
                 dpg.add_button(label="Create new", callback=x)
 
@@ -72,7 +64,7 @@ class MotorTest:
                         dpg.add_theme_style(dpg.mvPlotStyleVar_PlotPadding, 0, 0, category=dpg.mvThemeCat_Plots)
                         dpg.add_theme_style(dpg.mvPlotStyleVar_PlotBorderSize, 1, 1, category=dpg.mvThemeCat_Plots)
 
-                dpg.bind_item_theme(plot, item_theme)
+                dpg.bind_item_theme(plot, item_theme) # type: ignore
                 # REQUIRED: create x and y axes
                 dpg.add_plot_axis(dpg.mvXAxis, lock_min=True, lock_max=True, no_tick_labels=True)
                 dpg.add_plot_axis(dpg.mvYAxis, tag=pref+"/y_axis", no_gridlines=True, no_tick_labels=True, lock_max=True, lock_min=True)
@@ -127,7 +119,7 @@ class MotorTest:
 
 
 
-    def sundialTick(self):
+    def tick(self):
         val = dpg.get_value(self.pref+"/speedVal")
         if val is not None:
             table.putNumber("speed", val)

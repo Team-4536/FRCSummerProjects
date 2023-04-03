@@ -1,8 +1,7 @@
 
 import dearpygui.dearpygui as dpg
 import ui
-from widgets import driveWidget, client
-from tests import tests
+from widgets import driveWidget, client, motorTestWidget
 import os
 
 
@@ -11,12 +10,12 @@ import os
 def runSundial():
 
 
-    m = tests.MotorTest()
+    m = motorTestWidget.MotorTest()
 
     w = [
         driveWidget.create,
         client.create,
-        m.sundialInit
+        m.init
         ]
 
     ui.createWindow(w)
@@ -27,7 +26,7 @@ def runSundial():
     def loop():
         driveWidget.tick()
         client.tick()
-        m.sundialTick()
+        m.tick()
 
 
     dpg.show_style_editor()

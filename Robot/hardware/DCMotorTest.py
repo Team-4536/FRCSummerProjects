@@ -42,10 +42,12 @@ def testMotorClass(t: type[DCMotors.DCMotor]):
 
         x.setRPM(x.__class__.maxRPM / 2)
         assert(x.getRPM() == x.__class__.maxRPM / 2)
+
     except:
         print(f"{bcolors.FAIL}Motor {t.__name__} failed{bcolors.ENDC}")
     else:
         print(f"{bcolors.OKGREEN}Motor {t.__name__} passed{bcolors.ENDC}")
+    # """
 
 if __name__ == "__main__":
     testMotors()

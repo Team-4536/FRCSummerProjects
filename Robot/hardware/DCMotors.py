@@ -47,14 +47,11 @@ class DCMotor:
 class SparkMaxBrushedTempl(DCMotor):
 
     ctor = lambda p: rev.CANSparkMax(p, rev.CANSparkMax.MotorType.kBrushed)
-    setFunction = lambda m, p: m.set(p)
+    setFunction = lambda m, p: m.set(max(min(p, 1), -1))
     getFunction = lambda m: m.get()
 
 class SparkMaxBrushlessTempl(SparkMaxBrushedTempl):
     ctor = lambda p: rev.CANSparkMax(p, rev.CANSparkMax.MotorType.kBrushless)
-
-
-
 
 
 
@@ -67,6 +64,8 @@ class SparkSpec(DCMotor):
     getFunction = lambda m: m.get()
 
 
+class DriveSpec(SparkMaxBrushlessTempl):
+    maxRPM = 40
 
 
 

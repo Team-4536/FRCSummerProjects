@@ -13,10 +13,10 @@
             "justMyCode": true
         },
         {
-            "name": "Python: Current File",
+            "name": "Python: Robot",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
+            "program": "${file} sim",
             "console": "integratedTerminal",
             "justMyCode": true
         }
