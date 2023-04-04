@@ -1,10 +1,13 @@
 import wpilib
 import ntcore
 import robotpy
-from process import *
-import procTest
+from node import *
 
+import hardware.DCMotors
 from typing import Any
+
+import telemetryNode
+import utils.profiling
 
 
 
@@ -18,50 +21,47 @@ class Robot(wpilib.TimedRobot):
         self.joystick = wpilib.Joystick(0)
         self.infoTable: ntcore.NetworkTable = ntcore.NetworkTableInstance.getDefault().getTable("RobotInfo")
 
-
-
         self.ctrls: dict[str, Callable[[str], None]] = { }
 
         self.hardware: dict[str, Any] = {  } # hardware objs
         self.data: dict[str, Any] = { } # continuous data
-        self.temp: dict[str, Any] = { } # inter proc comms
-        self.procs: dict[str, Process] = { } # processes
-
-        self.procs["test log 0"] = procTest.makeLogProc("Hello p0!", PROC_FIRST)
-        self.procs["test log 1"] = procTest.makeLogProc("Hello hardware!", PROC_HARDWARE)
-        self.procs["test log last"] = procTest.makeLogProc("Hello last!", PROC_LAST)
-        self.procs["test log first"] = procTest.makeLogProc("Hello first!", PROC_FIRST)
+        self.procs: list[Node] = [ ] # processes
 
 
 
+        self.hardware.update({"motor 1" : hardware.DCMotors.SparkSpec(0)})
+        self.hardware.update({"motor 2" : hardware.DCMotors.SparkSpec(1)})
 
+        self.procs.append(telemetryNode.TelemNode(self.hardware))
+        self.procs.append(telemetryNode.TimeNode())
+
+        self.frameAvgs = [ 0.0 ]
+
+
+
+
+
+
+
+    # Execute all running proc nodes
     def robotPeriodic(self) -> None:
 
 
-        ordered: dict[int, list[tuple[str, Callable[[], None]]]] = {}
+        ordered: dict[int, list[Node]] = {}
         maxPri = 0
-        for key, val in self.procs.items():
+        for val in self.procs:
 
-            maxPri = max(val[0], maxPri)
+            maxPri = max(val.priority, maxPri)
 
             # execute all first pri procs
-            if val[0] == PROC_FIRST:
-                try:
-                    val[1]()
-                except:
-                    print(f"Exception in process \"{key}\":")
-                    raise
+            if val.priority == NODE_FIRST: self.runProcessNodeSafe(val)
             # store the rest, ordered
             else:
-                try:
-                    if val[0] in ordered:
-                        l = ordered[val[0]]
-                        l.append((key, val[1]))
-                    else:
-                        l = ordered.update({ val[0] : [(key, val[1])] })
+                if val.priority in ordered:
+                    ordered[val.priority].append(val)
+                else:
+                    ordered.update({ val.priority : [val] })
 
-                except KeyError:
-                    pass
 
         # execute other procs, in order
         for i in range(0, maxPri+1):
@@ -69,18 +69,17 @@ class Robot(wpilib.TimedRobot):
             if i in ordered:
                 l = ordered[i]
                 for x in l:
-                    try:
-                        x[1]()
-                    except:
-                        print(f"Exception in process \"{x[0]}\":")
-                        raise
-
-        raise SystemExit()
+                    self.runProcessNodeSafe(x)
 
 
 
 
 
+    def runProcessNodeSafe(self, x: Node):
+        try:
+            x.execute(self.data)
+        except Exception as exception:
+            print(f"Exception in node \"{x.name}\": {repr(exception)}")
 
 
 
@@ -122,7 +121,9 @@ class Robot(wpilib.TimedRobot):
 
 if __name__ == "__main__":
 
+    """
     r = Robot()
     r.robotInit()
     r.robotPeriodic()
-    # wpilib.run(Robot)
+    # """
+    wpilib.run(Robot)
