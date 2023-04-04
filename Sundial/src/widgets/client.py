@@ -4,7 +4,7 @@ import ntcore
 from os.path import basename
 import dearpygui.dearpygui as dpg
 from enum import Enum
-
+import widgets.widget
 import Tags
 
 
@@ -17,30 +17,32 @@ robotInfo = inst.getTable("telemetry")
 
 
 
-def create():
+class clientWidget(widgets.widget.widget):
 
-    with dpg.value_registry():
+    def __init__(self) -> None:
+
+        with dpg.value_registry():
+            for v in Tags.__dict__:
+                if v[0] != '_':
+                    val = Tags.__dict__[v]
+                    dpg.add_double_value(label=val, tag=val, default_value=0)
+
+
+        with dpg.window(label="Client window", tag="Client window"):
+            for v in Tags.__dict__:
+                if v[0] != '_':
+                    val = Tags.__dict__[v]
+                    dpg.add_slider_double(source=val, label=f"{val}: ", min_value=-1, max_value=1)
+
+
+
+
+    def tick(self) -> None:
+
         for v in Tags.__dict__:
             if v[0] != '_':
                 val = Tags.__dict__[v]
-                dpg.add_double_value(label=val, tag=val, default_value=0)
-
-
-    with dpg.window(label="Client window", tag="Client window"):
-        for v in Tags.__dict__:
-            if v[0] != '_':
-                val = Tags.__dict__[v]
-                dpg.add_slider_double(source=val, label=f"{val}: ", min_value=-1, max_value=1)
-
-
-
-
-def tick():
-
-    for v in Tags.__dict__:
-        if v[0] != '_':
-            val = Tags.__dict__[v]
-            ret = robotInfo.getValue(val, None)
-            if ret is not None:
-                dpg.set_value(val, ret)
-    pass
+                ret = robotInfo.getValue(val, None)
+                if ret is not None:
+                    dpg.set_value(val, ret)
+        pass

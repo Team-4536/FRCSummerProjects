@@ -2,6 +2,4 @@
 /simgui-ds.json
 /simgui-window.json
 /simgui.json
-__pycache__
-Sundial/__pycache__
-Robot/__pycache__
+__pycache__/

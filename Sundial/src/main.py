@@ -1,36 +1,42 @@
 
 import dearpygui.dearpygui as dpg
 import ui
-from widgets import driveWidget, client, motorTestWidget
+from widgets import driveWidget
+from widgets import motorTestWidget
+from widgets import ntPlot
+from widgets import client
+
+
 import os
+from widgets.widget import widget
 
 
 
+if __name__ == "__main__":
 
-def runSundial():
 
+    ui.createWindow()
 
-    m = motorTestWidget.MotorTest()
+    widgets: list[widget] = [ ]
 
-    w = [
-        driveWidget.create,
-        client.create,
-        m.init
-        ]
-
-    ui.createWindow(w)
+    widgets.append(driveWidget.driveWidget())
+    widgets.append(client.clientWidget())
+    widgets.append(ntPlot.ntPlot())
+    widgets.append(motorTestWidget.MotorTest())
 
 
 
 
     def loop():
-        driveWidget.tick()
-        client.tick()
-        m.tick()
+
+        for w in widgets:
+            w.tick()
+
+
+
 
 
     dpg.show_style_editor()
     ui.startWindow(loop)
 
-if __name__ == "__main__":
-    runSundial()
+

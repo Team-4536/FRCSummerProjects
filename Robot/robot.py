@@ -8,7 +8,11 @@ import hardware.DCMotors
 from typing import Any
 
 import telemetryNode
+import timeNode
 import utils.profiling
+
+
+
 
 
 class Robot(wpilib.TimedRobot):
@@ -17,9 +21,6 @@ class Robot(wpilib.TimedRobot):
 
 
     def robotInit(self) -> None:
-
-        self.joystick = wpilib.Joystick(0)
-        self.infoTable: ntcore.NetworkTable = ntcore.NetworkTableInstance.getDefault().getTable("RobotInfo")
 
         self.ctrls: dict[str, Callable[[str], None]] = { }
 
@@ -33,9 +34,10 @@ class Robot(wpilib.TimedRobot):
         self.hardware.update({"motor 2" : hardware.DCMotors.SparkImpl(1)})
 
         self.procs.append(telemetryNode.TelemNode(self.hardware))
-        self.procs.append(telemetryNode.TimeNode())
 
-        self.frameAvgs = [ 0.0 ]
+        self.procs.append(timeNode.TimeNode(self.data))
+
+
 
 
 

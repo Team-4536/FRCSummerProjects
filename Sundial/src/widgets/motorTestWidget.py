@@ -3,7 +3,7 @@ import time
 import dearpygui.dearpygui as dpg
 import wpilib
 import ntcore
-
+import widgets.widget
 
 
 
@@ -15,14 +15,13 @@ table = ntcore.NetworkTableInstance.getDefault().getTable(testTableName)
 
 
 
-class MotorTest:
+class MotorTest(widgets.widget.widget):
 
 
     __count = 0
-    __i = 0
     parent = 0
 
-    def init(self):
+    def __init__(self):
 
 
 
@@ -42,7 +41,6 @@ class MotorTest:
                 self.__class__.parent = window
                 def x():
                     m = MotorTest()
-                    m.init()
 
                 dpg.add_button(label="Create new", callback=x)
 
@@ -50,9 +48,6 @@ class MotorTest:
 
 
 
-        # with dpg.window(label="Spark Tester", min_size=[572, 135], max_size=[572, 135], no_resize=True, no_scrollbar=True, user_data=self) as window:
-
-            # dpg.set_item_callback(window, self.sundialTick)
 
 
         with dpg.group(horizontal=True, parent=self.parent, tag=pref+"/group"):
@@ -124,8 +119,9 @@ class MotorTest:
         if val is not None:
             table.putNumber("speed", val)
 
-            self.__datay[(self.__class__.__i%len(self.__datax))] = (val*0.9/2+0.5)
-            self.__class__.__i+=1
+            x = self.__datay[1:len(self.__datay)]
+            x.append(val*0.9/2+0.5)
+            self.__datay = x
 
 
         dpg.set_value(self.pref+'/series_tag', [self.__datax, self.__datay])
