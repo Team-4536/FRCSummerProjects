@@ -1,4 +1,4 @@
-from hardware import DCMotors
+import DCMotors
 import inspect
 
 

@@ -20,8 +20,6 @@ class TelemNode(Node):
         for x in self.__hardware:
             telemTable.putString(x, str(self.__hardware[x].__dict__))
 
-        # raise NotImplementedError()
-
 
 
 

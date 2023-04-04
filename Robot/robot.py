@@ -2,13 +2,13 @@ import wpilib
 import ntcore
 import robotpy
 from node import *
+from node import Node
 
 import hardware.DCMotors
 from typing import Any
 
 import telemetryNode
 import utils.profiling
-
 
 
 class Robot(wpilib.TimedRobot):
@@ -29,8 +29,8 @@ class Robot(wpilib.TimedRobot):
 
 
 
-        self.hardware.update({"motor 1" : hardware.DCMotors.SparkSpec(0)})
-        self.hardware.update({"motor 2" : hardware.DCMotors.SparkSpec(1)})
+        self.hardware.update({"motor 1" : hardware.DCMotors.SparkImpl(0)})
+        self.hardware.update({"motor 2" : hardware.DCMotors.SparkImpl(1)})
 
         self.procs.append(telemetryNode.TelemNode(self.hardware))
         self.procs.append(telemetryNode.TimeNode())
@@ -118,12 +118,24 @@ class Robot(wpilib.TimedRobot):
 
 
 
+if __name__ == "__main__":
+    wpilib.run(Robot)
 
+
+"""
 if __name__ == "__main__":
 
-    """
-    r = Robot()
-    r.robotInit()
-    r.robotPeriodic()
-    # """
+    src = ""
+    with open(__file__, 'r') as file:
+        src = file.read()
+
+    x = compile(src, __file__, mode="exec")
+    exec(x, {"Node" : Node, "wpilib" : wpilib}, {})
+    print("prg ran!")
+
+
+if __name__ == "builtins":
+    print("running!")
     wpilib.run(Robot)
+
+"""

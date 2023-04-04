@@ -56,7 +56,7 @@ class SparkMaxBrushlessTempl(SparkMaxBrushedTempl):
 
 
 
-class SparkSpec(DCMotor):
+class SparkImpl(DCMotor):
     maxRPM = 1
 
     ctor = lambda p: wpilib.Spark(p)
@@ -64,7 +64,7 @@ class SparkSpec(DCMotor):
     getFunction = lambda m: m.get()
 
 
-class DriveSpec(SparkMaxBrushlessTempl):
+class DriveImpl(SparkMaxBrushlessTempl):
     maxRPM = 40
 
 
