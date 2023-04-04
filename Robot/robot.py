@@ -28,7 +28,7 @@ class Robot(wpilib.TimedRobot):
         self.procs: dict[str, Process] = { } # processes
 
         self.procs["test log 0"] = procTest.makeLogProc("Hello p0!", PROC_FIRST)
-        self.procs["test log 1"] = procTest.makeLogProc("Hello p0!", PROC_HARDWARE)
+        self.procs["test log 1"] = procTest.makeLogProc("Hello hardware!", PROC_HARDWARE)
         self.procs["test log last"] = procTest.makeLogProc("Hello last!", PROC_LAST)
         self.procs["test log first"] = procTest.makeLogProc("Hello first!", PROC_FIRST)
 
@@ -56,22 +56,24 @@ class Robot(wpilib.TimedRobot):
                 try:
                     if val[0] in ordered:
                         l = ordered[val[0]]
+                        l.append((key, val[1]))
                     else:
-                        l = ordered.update(val[0], (str, val[1]))
+                        l = ordered.update({ val[0] : [(key, val[1])] })
 
-                    l.append((key, val[1]))
                 except KeyError:
                     pass
 
         # execute other procs, in order
-        for i in range(0, maxPri):
-            l = ordered[i]
-            for x in l:
-                try:
-                    x[1]()
-                except:
-                    print(f"Exception in process \"{x[0]}\":")
-                    raise
+        for i in range(0, maxPri+1):
+
+            if i in ordered:
+                l = ordered[i]
+                for x in l:
+                    try:
+                        x[1]()
+                    except:
+                        print(f"Exception in process \"{x[0]}\":")
+                        raise
 
         raise SystemExit()
 
