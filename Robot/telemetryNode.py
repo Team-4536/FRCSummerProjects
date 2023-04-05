@@ -15,9 +15,10 @@ class TelemNode(Node):
         self.__hardware = hardware
 
 
-    def execute(self, data: dict[str, Any]) -> None:
+    def tick(self, data: dict[str, Any]) -> None:
 
         for x in self.__hardware:
+            utils.tables.telemTable.putNumber(x, self.__hardware[x].getRaw())
             utils.tables.telemTable.putString(x, str(self.__hardware[x].__dict__))
 
 

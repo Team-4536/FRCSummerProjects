@@ -45,19 +45,27 @@ class driveWidget(widget):
 
 
 
-            with dpg.drawlist(width=scWidth, height=scHeight, tag="driveDraw"):
+            with dpg.drawlist(width=scWidth, height=scHeight) as drawList:
+                self.drawListTag: int|str = drawList # type: ignore
 
-                with dpg.draw_node(tag="backgroundNode"):
+                with dpg.draw_node() as backgroundNodeTag:
+                    self.backgroundNodeTag: int|str = backgroundNodeTag # type: ignore
                     dpg.draw_rectangle([-1, -1], [1, 1], color=backColor, fill=backColor)
 
                 with dpg.draw_layer(label="wheel_layer"):
-                    with dpg.draw_node(tag="root node"):
+                    with dpg.draw_node() as root:
+                        self.rootNode: int|str = root # type: ignore
 
+                        self.wheelNodes = [ ]
+                        self.treadNodes = [ ]
+                        self.maskNodes = [ ]
                         for x in range(0, 4):
-                            with dpg.draw_node(tag=("wheelNode" + str(x))):
+                            with dpg.draw_node() as wheelNode:
+                                self.wheelNodes.append(wheelNode)
                                 dpg.draw_rectangle([-wheelWidth/2, wheelHeight/2], [wheelWidth/2, -wheelHeight/2], color=wheelColor, thickness=lineThickness)
 
-                                with dpg.draw_node(tag=("treadNode" + str(x))):
+                                with dpg.draw_node() as treadNode:
+                                    self.treadNodes.append(treadNode)
                                     for y in range(0, 5):
 
                                         flipped = [False, True, True, False][x]
@@ -69,7 +77,8 @@ class driveWidget(widget):
                                             dpg.draw_line([-wheelWidth/2, startY+y*treadSpacing], [wheelWidth/2, startY+y*treadSpacing-wheelWidth], color=wheelColor, thickness=lineThickness)
 
 
-                                with dpg.draw_node(tag=("maskNode" + str(x))):
+                                with dpg.draw_node() as maskNode:
+                                    self.maskNodes.append(maskNode)
                                     # upper mask
                                     dpg.draw_rectangle([-wheelWidth/2-3, (-wheelHeight/2)-2], [wheelWidth/2+3, (-wheelHeight/2)-wheelWidth-5], fill=backColor, color=backColor)
                                     # lower
@@ -77,7 +86,7 @@ class driveWidget(widget):
 
 
 
-        dpg.apply_transform("root node", dpg.create_translation_matrix([scWidth / 2, scHeight / 2]))
+        dpg.apply_transform(self.rootNode, dpg.create_translation_matrix([scWidth / 2, scHeight / 2])) # type: ignore
 
         translations = [
             [-70.0, -70],
@@ -87,13 +96,11 @@ class driveWidget(widget):
         ]
 
         for i in range(0, 4):
-            dpg.apply_transform(("wheelNode" + str(i)), dpg.create_translation_matrix(translations[i]))
+            dpg.apply_transform(self.wheelNodes[i], dpg.create_translation_matrix(translations[i]))
 
-        # dpg.apply_transform("planet node 1", dpg.create_rotation_matrix(math.pi*planet1_angle/180.0 , [0, 0, -1])*dpg.create_translation_matrix([planet1_distance, 0]))
-        # dpg.apply_transform("planet 1, moon node", dpg.create_rotation_matrix(math.pi*planet1_moonangle/180.0 , [0, 0, -1])*dpg.create_translation_matrix([planet1_moondistance, 0]))
-        # dpg.apply_transform("planet node 2", dpg.create_rotation_matrix(math.pi*planet2_angle/180.0 , [0, 0, -1])*dpg.create_translation_matrix([planet2_distance, 0]))
-        # dpg.apply_transform("planet 2, moon 1 node", dpg.create_rotation_matrix(math.pi*planet2_moon1distance/180.0 , [0, 0, -1])*dpg.create_translation_matrix([planet2_moon1distance, 0]))
-        # dpg.apply_transform("planet 2, moon 2 node", dpg.create_rotation_matrix(math.pi*planet2_moon2angle/180.0 , [0, 0, -1])*dpg.create_translation_matrix([planet2_moon2distance, 0]))
+
+
+
 
 
     def tick(self) -> None:
@@ -101,19 +108,19 @@ class driveWidget(widget):
         for i in range(0, 4):
             treadPositions[i] -= dpg.get_value(names[i]) * maxWheelSpeed
             treadPositions[i] = treadPositions[i] % treadSpacing
-            dpg.apply_transform(("treadNode" + str(i)), dpg.create_translation_matrix([0, treadPositions[i]]))
+            dpg.apply_transform(self.treadNodes[i], dpg.create_translation_matrix([0, treadPositions[i]]))
+
 
         width = dpg.get_item_width(driveWindowTag)
         height = dpg.get_item_height(driveWindowTag)
+        if width is None or height is None: return
 
-        if width is None or height is None:
-            return
 
-        dpg.apply_transform("root node", dpg.create_translation_matrix([width / 2, height / 2]))
-        dpg.set_item_width("driveDraw", width=width)
-        dpg.set_item_height("driveDraw", height=height)
+        dpg.apply_transform(self.rootNode, dpg.create_translation_matrix([width / 2, height / 2]))
+        dpg.set_item_width(self.drawListTag, width=width)
+        dpg.set_item_height(self.drawListTag, height=height)
 
-        dpg.apply_transform("backgroundNode", dpg.create_scale_matrix([width, height]))
+        dpg.apply_transform(self.backgroundNodeTag, dpg.create_scale_matrix([width, height]))
 
 
 

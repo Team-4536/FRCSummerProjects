@@ -7,7 +7,7 @@ import widgets.widget
 
 
 
-testTableName = "Testing/"
+testTableName = "telemetry"
 table = ntcore.NetworkTableInstance.getDefault().getTable(testTableName)
 
 
@@ -33,8 +33,6 @@ class MotorTest(widgets.widget.widget):
 
 
 
-        pref = str(self.__class__.__count)
-        self.pref = str(self.__class__.__count)
 
         if self.__class__.__count == 0:
             with dpg.window(label="Motor Testers") as window:
@@ -47,10 +45,14 @@ class MotorTest(widgets.widget.widget):
 
 
 
+        with dpg.value_registry():
+            self.valTag = dpg.add_double_value(default_value=0)
 
 
 
-        with dpg.group(horizontal=True, parent=self.parent, tag=pref+"/group"):
+
+        with dpg.group(horizontal=True, parent=self.parent) as group:
+            self.groupTag: int|str = group # type: ignore
 
             with dpg.plot(no_title=True, no_mouse_pos=True, height=100) as plot:
 
@@ -62,23 +64,23 @@ class MotorTest(widgets.widget.widget):
                 dpg.bind_item_theme(plot, item_theme) # type: ignore
                 # REQUIRED: create x and y axes
                 dpg.add_plot_axis(dpg.mvXAxis, lock_min=True, lock_max=True, no_tick_labels=True)
-                dpg.add_plot_axis(dpg.mvYAxis, tag=pref+"/y_axis", no_gridlines=True, no_tick_labels=True, lock_max=True, lock_min=True)
+                self.yAxisTag = dpg.add_plot_axis(dpg.mvYAxis, no_gridlines=True, no_tick_labels=True, lock_max=True, lock_min=True)
 
                 # series belong to a y axis
-                dpg.add_line_series(self.__datax, self.__datay, parent=pref+"/y_axis", tag=pref+"/series_tag")
+                self.seriesTag = dpg.add_line_series(self.__datax, self.__datay, parent=self.yAxisTag)
 
 
 
 
             def setVal(sender, data):
-                dpg.set_value(pref+"/speedVal", data)
-            dpg.add_slider_double(min_value=-1, max_value=1,  callback=setVal, source=pref+"/speedVal", vertical=True, width=40)
+                dpg.set_value(self.valTag, data)
+            dpg.add_slider_double(min_value=-1, max_value=1, callback=setVal, source=self.valTag, vertical=True, width=40)
 
 
 
 
             def stopMtr(sender, data):
-                dpg.set_value(pref+"/speedVal", 0.0)
+                dpg.set_value(self.valTag, 0.0)
             dpg.add_button(label="Stop motor", callback=stopMtr, height=100, width=100)
 
 
@@ -98,12 +100,9 @@ class MotorTest(widgets.widget.widget):
                     dpg.add_combo(motors, width=100)
 
 
-                # dpg.add_button(label="Start proc", callback=)
-                dpg.add_button(label="End proc", callback=lambda s, d: dpg.delete_item(pref+"/group"))
+                dpg.add_button(label="End proc", callback=lambda s, d: dpg.delete_item(self.groupTag))
 
 
-        with dpg.value_registry():
-            dpg.add_double_value(tag=pref+"/speedVal", default_value=0)
 
 
         self.__class__.__count += 1
@@ -115,7 +114,7 @@ class MotorTest(widgets.widget.widget):
 
 
     def tick(self):
-        val = dpg.get_value(self.pref+"/speedVal")
+        val = dpg.get_value(self.valTag)
         if val is not None:
             table.putNumber("speed", val)
 
@@ -124,5 +123,5 @@ class MotorTest(widgets.widget.widget):
             self.__datay = x
 
 
-        dpg.set_value(self.pref+'/series_tag', [self.__datax, self.__datay])
+        dpg.set_value(self.seriesTag, [self.__datax, self.__datay])
 

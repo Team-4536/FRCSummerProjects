@@ -9,6 +9,7 @@ from typing import Any
 
 import telemetryNode
 import timeNode
+import motorTestNode
 import utils.profiling
 
 
@@ -34,8 +35,8 @@ class Robot(wpilib.TimedRobot):
         self.hardware.update({"motor 2" : hardware.DCMotors.SparkImpl(1)})
 
         self.procs.append(telemetryNode.TelemNode(self.hardware))
-
         self.procs.append(timeNode.TimeNode(self.data))
+        self.procs.append(motorTestNode.motorTestNode("speed", self.hardware["motor 1"]))
 
 
 
@@ -79,7 +80,7 @@ class Robot(wpilib.TimedRobot):
 
     def runProcessNodeSafe(self, x: Node):
         try:
-            x.execute(self.data)
+            x.tick(self.data)
         except Exception as exception:
             print(f"Exception in node \"{x.name}\": {repr(exception)}")
 

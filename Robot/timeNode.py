@@ -16,7 +16,7 @@ class TimeNode(Node):
 
 
 
-    def execute(self, data: dict[str, Any]) -> None:
+    def tick(self, data: dict[str, Any]) -> None:
 
         frameTime = profiling.popProf()
         profiling.pushProf()

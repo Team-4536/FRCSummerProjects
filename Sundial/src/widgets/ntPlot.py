@@ -6,8 +6,6 @@ from widgets.widget import widget
 
 
 
-
-
 class ntPlot(widget):
     table = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
 
@@ -43,13 +41,13 @@ class ntPlot(widget):
 
                 dpg.bind_item_theme(plot, item_theme) # type: ignore
                 # REQUIRED: create x and y axes
-                # dpg.add_plot_axis(dpg.mvXAxis, """, lock_min=True, lock_max=True, no_tick_labels=True""")
                 # dpg.add_plot_axis(dpg.mvYAxis, tag="y_axis" """, no_gridlines=True, no_tick_labels=True, lock_max=True, lock_min=True""")
-                dpg.add_plot_axis(dpg.mvXAxis)
-                dpg.add_plot_axis(dpg.mvYAxis, tag="y_axis")
+                dpg.add_plot_axis(dpg.mvXAxis, lock_min=True, lock_max=True, no_tick_labels=True)
+                self.yAxisTag = dpg.add_plot_axis(dpg.mvYAxis)
 
                 # series belong to a y axis
-                dpg.add_line_series(self.datax, self.datay, parent="y_axis", tag="series_tag")
+                self.seriesTag = dpg.add_line_series(self.datax, self.datay, parent=self.yAxisTag)
+                # dpg.add_shade_series(self.datax, self.datay, parent="y_axis", tag="series_tag")
 
         self.resetPlotData()
 
@@ -65,7 +63,7 @@ class ntPlot(widget):
         for i in range(0, 1000):
             self.datax.append(i / 1000)
             self.datay.append(0.5)
-            dpg.set_value('series_tag', [self.datax, self.datay])
+            dpg.set_value(self.seriesTag, [self.datax, self.datay])
 
 
 
@@ -78,4 +76,4 @@ class ntPlot(widget):
             x.append(val)
             self.datay = x
 
-        dpg.set_value('series_tag', [self.datax, self.datay])
+        dpg.set_value(self.seriesTag, [self.datax, self.datay])

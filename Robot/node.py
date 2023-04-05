@@ -20,7 +20,7 @@ class Node:
         self.name = "untitled"
         raise NotImplementedError()
 
-    def execute(self, data: dict[str, Any]) -> None:
+    def tick(self, data: dict[str, Any]) -> None:
         raise NotImplementedError()
 
 

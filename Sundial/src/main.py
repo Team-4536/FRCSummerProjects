@@ -34,9 +34,12 @@ if __name__ == "__main__":
 
 
 
+    # l = dearpygui_ext.logger.mvLogger()
+    # for i in range(0, 100):
+    #     l.log_info("Hello world!")
 
+    # dpg.show_style_editor()
 
-    dpg.show_style_editor()
     ui.startWindow(loop)
 
 

@@ -1,9 +1,7 @@
 
-import robotpy
 import ntcore
 from os.path import basename
 import dearpygui.dearpygui as dpg
-from enum import Enum
 import widgets.widget
 import Tags
 
@@ -45,4 +43,3 @@ class clientWidget(widgets.widget.widget):
                 ret = robotInfo.getValue(val, None)
                 if ret is not None:
                     dpg.set_value(val, ret)
-        pass
