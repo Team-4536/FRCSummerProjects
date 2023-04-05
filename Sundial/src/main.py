@@ -5,6 +5,7 @@ from widgets import driveWidget
 from widgets import motorTestWidget
 from widgets import ntPlot
 from widgets import client
+from widgets import cmdWidget
 
 
 import os
@@ -23,14 +24,10 @@ if __name__ == "__main__":
     widgets.append(client.clientWidget())
     widgets.append(ntPlot.ntPlot())
     widgets.append(motorTestWidget.MotorTest())
+    widgets.append(motorTestWidget.MotorTest())
+    widgets.append(cmdWidget.cmdWidget())
 
 
-
-
-    def loop():
-
-        for w in widgets:
-            w.tick()
 
 
 
@@ -40,6 +37,6 @@ if __name__ == "__main__":
 
     # dpg.show_style_editor()
 
+    def loop():
+        for w in widgets: w.tick()
     ui.startWindow(loop)
-
-

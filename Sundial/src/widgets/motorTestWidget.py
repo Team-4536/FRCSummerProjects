@@ -100,7 +100,12 @@ class MotorTest(widgets.widget.widget):
                     dpg.add_combo(motors, width=100)
 
 
-                dpg.add_button(label="End proc", callback=lambda s, d: dpg.delete_item(self.groupTag))
+
+                def deleteSelf(s, d) -> None:
+                    from ..main import widgets
+                    widgets.remove(self)
+                    dpg.delete_item(self.groupTag)
+                dpg.add_button(label="End proc", callback=deleteSelf)
 
 
 
