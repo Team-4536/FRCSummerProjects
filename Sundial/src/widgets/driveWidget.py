@@ -1,8 +1,7 @@
 import dearpygui.dearpygui as dpg
-import Tags
 import math
 from widgets.widget import widget
-
+from utils.tables import *
 
 
 
@@ -16,11 +15,11 @@ treadSpacing = 25
 lineThickness = 3
 maxWheelSpeed = 10 # per frame
 
-treadPositions = [
+treadPositions: list[float] = [
     0, 0, 0, 0
 ]
 
-driveWindowTag = "driveWindow"
+halfWheelSpacing: float = 70.0
 
 
 class driveWidget(widget):
@@ -30,10 +29,11 @@ class driveWidget(widget):
     def __init__(self):
 
 
+        self.ntTags = ["motor1", "motor1", "motor1", "motor1"]
 
 
-        with dpg.window(label="Drive", width=scWidth, height=scHeight, tag=driveWindowTag, no_scrollbar=True) as window:
-
+        with dpg.window(label="Drive", width=scWidth, height=scHeight, no_scrollbar=True) as window:
+            self.windowTag: int|str = window # type: ignore
 
 
             with dpg.theme() as item_theme:
@@ -89,10 +89,10 @@ class driveWidget(widget):
         dpg.apply_transform(self.rootNode, dpg.create_translation_matrix([scWidth / 2, scHeight / 2])) # type: ignore
 
         translations = [
-            [-70.0, -70],
-            [ 70, -70],
-            [-70,  70],
-            [ 70,  70]
+            [-halfWheelSpacing, -halfWheelSpacing],
+            [ halfWheelSpacing, -halfWheelSpacing],
+            [-halfWheelSpacing,  halfWheelSpacing],
+            [ halfWheelSpacing,  halfWheelSpacing]
         ]
 
         for i in range(0, 4):
@@ -104,15 +104,18 @@ class driveWidget(widget):
 
 
     def tick(self) -> None:
-        names = [Tags.FLPWR, Tags.FRPWR, Tags.BLPWR, Tags.BRPWR]
         for i in range(0, 4):
-            treadPositions[i] -= dpg.get_value(names[i]) * maxWheelSpeed
+
+            val = telemTable.getValue(self.ntTags[i], None)
+            if type(val) is not float: continue
+
+            treadPositions[i] -= val * maxWheelSpeed
             treadPositions[i] = treadPositions[i] % treadSpacing
             dpg.apply_transform(self.treadNodes[i], dpg.create_translation_matrix([0, treadPositions[i]]))
 
 
-        width = dpg.get_item_width(driveWindowTag)
-        height = dpg.get_item_height(driveWindowTag)
+        width = dpg.get_item_width(self.windowTag)
+        height = dpg.get_item_height(self.windowTag)
         if width is None or height is None: return
 
 

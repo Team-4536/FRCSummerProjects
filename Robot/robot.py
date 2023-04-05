@@ -13,7 +13,6 @@ import timeNode
 import motorTestNode
 import utils.profiling
 from utils.tables import *
-import cmdNode
 
 
 
@@ -77,7 +76,6 @@ class Robot(wpilib.TimedRobot):
             "list" : self.list,
             }
 
-        cmdTable.putNumber("heartbeat", 0.0)
         self.prevTime: float = 0.0
         self.msgTopic = cmdTable.getStringTopic("msg").subscribe("default")
 
@@ -97,7 +95,6 @@ class Robot(wpilib.TimedRobot):
 
         self.procs.append(telemetryNode.TelemNode(self.hardware))
         self.procs.append(timeNode.TimeNode(self.data))
-        # self.procs.append(cmdNode.cmdNode())
 
         self.procs.append(motorTestNode.motorTestNode("speed", self.hardware["motor1"]))
 
@@ -117,7 +114,7 @@ class Robot(wpilib.TimedRobot):
 
         t = time.time()
         if (t - self.prevTime) > HEARTBEAT:
-            cmdTable.putNumber("heartbeat", t)
+            telemTable.putNumber("heartbeat", t)
             self.prevTime = t
 
 
@@ -165,6 +162,17 @@ class Robot(wpilib.TimedRobot):
             print(f"Exception in node \"{x.name}\": {repr(exception)}")
 
 
+
+
+    """
+    Message format:
+
+    <stamp>:<cmd> <space separated args>
+
+    messages stamp is determined by the str before the first colon, and args are space seperated
+
+    badly formatted messages are ignored and not responded to
+    """
 
     # none return type indicates bad message format (no parsable stamp)
     def parseAndRespondMsg(self, msg: str) -> str | None:

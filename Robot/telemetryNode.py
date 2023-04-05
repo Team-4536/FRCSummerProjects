@@ -2,8 +2,8 @@
 from typing import Any
 from node import *
 import utils.tables
-
-
+from utils.tables import cmdTable
+import time
 
 
 
@@ -13,6 +13,7 @@ class TelemNode(Node):
         self.priority = NODE_LAST
         self.name = "telem"
         self.__hardware = hardware
+
 
 
     def tick(self, data: dict[str, Any]) -> None:
