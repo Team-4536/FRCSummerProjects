@@ -10,7 +10,7 @@ import utils.tables
 
 class TimeNode(Node):
 
-    def __init__(self, data: dict[str, Any]) -> None:
+    def __init__(self) -> None:
         self.priority = NODE_FIRST
         self.name = "timing"
 

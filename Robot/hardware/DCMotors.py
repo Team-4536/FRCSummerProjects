@@ -1,6 +1,7 @@
-from typing import Callable
+from typing import Callable, Any
 import wpilib
 import rev
+from node import *
 
 
 
@@ -49,10 +50,13 @@ class VirtualSpec(DCMotorSpec):
 
 
 # composes spec and controller, provides nicer interfacing
-class DCMotor:
-    def __init__(self, spec: type[DCMotorSpec], ctrlr: DCMotorController) -> None:
+class DCMotor(Node):
+    def __init__(self, name: str, spec: type[DCMotorSpec], ctrlr: DCMotorController) -> None:
         self.spec: type[DCMotorSpec] = spec
         self.controller: DCMotorController = ctrlr
+
+        self.name = name
+        self.priority = NODE_HARDWARE
 
     def setRaw(self, v: float) -> None:
         v = min(1, max(-1, v))
@@ -70,3 +74,8 @@ class DCMotor:
     # NTS: CHECK LINEARITY
     def getRPM(self) -> float:
         return self.controller.get() * self.spec.maxRPM
+
+
+
+    def tick(self, data: dict[str, Any]):
+        data.update({ self.name + "RPM" : self.getRPM() })

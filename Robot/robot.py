@@ -31,7 +31,7 @@ class Robot(wpilib.TimedRobot):
     def list(self, args: list[str]) -> str:
 
         if len(args) == 0:
-            return "args missing: [nodes|data|hardware]"
+            return "args missing: [nodes|data]"
 
         if args[0] == "nodes":
 
@@ -51,13 +51,6 @@ class Robot(wpilib.TimedRobot):
                 res += k + ",\n"
             return res
 
-        elif args[0] == "hardware":
-            if len(self.hardware) == 0: return "[There is no hardware on bot]"
-
-            res = ""
-            for k in self.hardware:
-                res += k + ",\n"
-            return res
 
         return "args missing: [nodes|data|hardware]"
 
@@ -79,36 +72,33 @@ class Robot(wpilib.TimedRobot):
 
 
 
-        self.hardware: dict[str, Any] = {  } # hardware objs
         self.data: dict[str, Any] = { } # continuous data
-        self.procs: list[Node] = [ ] # processes
-
-
+        self.procs: list[Node] = [ ] # processes / including hardware
 
 
 
         motors = [
-            DCMotor(VirtualSpec, VirtualController()),
-            DCMotor(VirtualSpec, VirtualController()),
-            DCMotor(VirtualSpec, VirtualController()),
-            DCMotor(VirtualSpec, VirtualController())
+            DCMotor("FLDrive", VirtualSpec, VirtualController()),
+            DCMotor("FRDrive", VirtualSpec, VirtualController()),
+            DCMotor("BLDrive", VirtualSpec, VirtualController()),
+            DCMotor("BRDrive", VirtualSpec, VirtualController())
         ]
-        self.hardware.update({"FLDrive" : motors[0] })
-        self.hardware.update({"FRDrive" : motors[1] })
-        self.hardware.update({"BLDrive" : motors[2] })
-        self.hardware.update({"BRDrive" : motors[3] })
 
-        self.hardware.update({"FLEncoder" : VirtualEncoder() })
-        self.hardware.update({"FREncoder" : VirtualEncoder() })
-        self.hardware.update({"BLEncoder" : VirtualEncoder() })
-        self.hardware.update({"BREncoder" : VirtualEncoder() })
+        for m in motors:
+            self.procs.append(m)
 
+        self.procs.append(VirtualEncoder("FLEncoder"))
+        self.procs.append(VirtualEncoder("FREncoder"))
+        self.procs.append(VirtualEncoder("BLEncoder"))
+        self.procs.append(VirtualEncoder("BREncoder"))
 
 
-        self.procs.append(telemetryNode.TelemNode(self.hardware))
-        self.procs.append(timeNode.TimeNode(self.data))
 
-        self.procs.append(motorTestNode.motorTestNode("speed", self.hardware["FLDrive"]))
+        self.procs.append(telemetryNode.TelemNode())
+        self.procs.append(timeNode.TimeNode())
+
+        self.procs.append(motorTestNode.motorTestNode("motor0", "FLDrive", self.procs))
+        self.procs.append(motorTestNode.motorTestNode("motor1", "FRDrive", self.procs))
 
 
 

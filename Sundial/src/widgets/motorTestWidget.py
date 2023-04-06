@@ -7,8 +7,8 @@ import widgets.widget
 
 
 
-testTableName = "telemetry"
-table = ntcore.NetworkTableInstance.getDefault().getTable(testTableName)
+pubTable = ntcore.NetworkTableInstance.getDefault().getTable( "sundial")
+telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
 
 
 
@@ -47,6 +47,8 @@ class MotorTest(widgets.widget.widget):
 
         with dpg.value_registry():
             self.valTag = dpg.add_double_value(default_value=0)
+            self.NTRecTag = dpg.add_string_value(default_value="")
+            self.NTSendTag = dpg.add_string_value(default_value="motor" + str(self.__class__.__count))
 
 
 
@@ -84,12 +86,19 @@ class MotorTest(widgets.widget.widget):
             dpg.add_button(label="Stop motor", callback=stopMtr, height=100, width=100)
 
 
-            """
+            # """
             with dpg.group():
-                with dpg.group(horizontal=True):
-                    dpg.add_text("NT Tag")
-                    dpg.add_input_text(default_value="motor" + str(self.__class__.__count), width=100)
 
+                with dpg.group(horizontal=True):
+                    dpg.add_text("Send tag")
+                    dpg.add_input_text(source=self.NTSendTag, width=100)
+
+                with dpg.group(horizontal=True):
+                    dpg.add_text("Recieve tag")
+                    dpg.add_input_text(source=self.NTRecTag, width=100)
+
+
+                """
                 motors = [
                     "Spark",
                     "SparkMax",
@@ -101,13 +110,13 @@ class MotorTest(widgets.widget.widget):
                     dpg.add_combo(motors, width=100)
 
 
-
                 def deleteSelf(s, d) -> None:
                     from ..main import widgets
                     widgets.remove(self)
                     dpg.delete_item(self.groupTag)
                 dpg.add_button(label="End proc", callback=deleteSelf)
-            """
+                """
+            # """
 
 
 
@@ -121,13 +130,17 @@ class MotorTest(widgets.widget.widget):
 
 
     def tick(self):
-        val = dpg.get_value(self.valTag)
-        if val is not None:
-            table.putNumber("speed", val)
 
-            x = self.__datay[1:len(self.__datay)]
-            x.append(val*0.9/2+0.5)
-            self.__datay = x
+        recieved = telemTable.getValue(dpg.get_value(self.NTRecTag), None)
+        val: float = 0
+        if type(recieved) is float: val = recieved
+
+
+        pubTable.putNumber(dpg.get_value(self.NTSendTag), dpg.get_value(self.valTag))
+
+        x = self.__datay[1:len(self.__datay)]
+        x.append(val*0.9/2+0.5)
+        self.__datay = x
 
 
         dpg.set_value(self.seriesTag, [self.__datax, self.__datay])

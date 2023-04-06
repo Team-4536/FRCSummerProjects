@@ -13,7 +13,7 @@ scWidth = 500
 scHeight = 300
 treadSpacing = 25
 lineThickness = 3
-maxWheelSpeed = 10 # per frame
+maxWheelSpeed = 1 # per frame
 
 treadPositions: list[float] = [
     0, 0, 0, 0
@@ -29,7 +29,7 @@ class driveWidget(widget):
     def __init__(self):
 
 
-        self.ntTags = [ "", "", "", "" ]
+        self.ntTags = [ "FLDriveRPM", "FRDriveRPM", "BLDriveRPM", "BRDriveRPM" ]
 
 
         with dpg.window(label="Drive", width=scWidth, height=scHeight, no_scrollbar=True) as window:

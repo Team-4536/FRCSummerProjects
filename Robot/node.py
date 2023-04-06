@@ -9,7 +9,7 @@ NODE_SIM: int =         1 # simulation processses
 NODE_BACKGROUND: int =  2 # procs that use sensor data to come up w stuff
 NODE_PROF: int =        3 # profile nodes, what should be doing high-ish level control
 NODE_CTRL: int =        4 # hardware controllers, use output from prof.
-NODE_HARDWARE: int =    5 # actual data table to hardware transfer, safties
+NODE_HARDWARE: int =    5 # hardware obj tick
 NODE_LAST: int =        6 # anything that needs to happen after, telemetry, file logging, etc.
 
 NodeFunction = Callable[[dict[str, Any]], None]
