@@ -39,11 +39,11 @@ class SparkMaxController(DCMotorController):
 
 
 class DCMotorSpec:
-    maxRPM: float = 0.0
+    maxRPS: float = 0.0
 
 # override members
 class VirtualSpec(DCMotorSpec):
-    maxRPM = 30.0
+    maxRPS = 7.0
 
 
 
@@ -67,15 +67,15 @@ class DCMotor(Node):
 
 
     # NTS: CHECK LINEARITY
-    def setRPM(self, v: float) -> None:
-        v = min(self.spec.maxRPM, max(-self.spec.maxRPM, v))
-        self.controller.set(v / self.spec.maxRPM)
+    def setRPS(self, v: float) -> None:
+        v = min(self.spec.maxRPS, max(-self.spec.maxRPS, v))
+        self.controller.set(v / self.spec.maxRPS)
 
     # NTS: CHECK LINEARITY
-    def getRPM(self) -> float:
-        return self.controller.get() * self.spec.maxRPM
+    def getRPS(self) -> float:
+        return self.controller.get() * self.spec.maxRPS
 
 
 
     def tick(self, data: dict[str, Any]):
-        data.update({ self.name + "RPM" : self.getRPM() })
+        data.update({ self.name + "RPS" : self.getRPS() })

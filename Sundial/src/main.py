@@ -29,6 +29,10 @@ if __name__ == "__main__":
 
 
 
+    with dpg.viewport_menu_bar():
+        with dpg.menu(label="Add widgets"):
+            dpg.add_menu_item(label="NT Plot", callback=lambda s,d: widgets.append(ntPlot.ntPlot()))
+
 
 
     # l = dearpygui_ext.logger.mvLogger()

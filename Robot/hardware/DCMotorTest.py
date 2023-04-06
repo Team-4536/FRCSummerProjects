@@ -37,7 +37,7 @@ def testMotors():
             else:
                 controller = c()
 
-            motor = DCMotors.DCMotor(s, controller)
+            motor = DCMotors.DCMotor("motor", s, controller)
             testMotorConfig(motor)
             i+=1
 
@@ -57,8 +57,8 @@ def testMotorConfig(x: DCMotors.DCMotor):
         x.setRaw(-4)
         assert(x.getRaw() == -1)
 
-        x.setRPM(x.spec.maxRPM / 2)
-        assert(x.getRPM() == x.spec.maxRPM / 2)
+        x.setRPS(x.spec.maxRPS / 2)
+        assert(x.getRPS() == x.spec.maxRPS / 2)
 
     #"""
     except:

@@ -14,14 +14,17 @@ class TimeNode(Node):
         self.priority = NODE_FIRST
         self.name = "timing"
 
+        self.prevTime: float = 0.0
+
 
 
     def tick(self, data: dict[str, Any]) -> None:
 
+        data.update({ "dt" : time.time() - self.prevTime })
+        self.prevTime = time.time()
+
         frameTime = profiling.popProf()
         profiling.pushProf()
         utils.tables.telemTable.putNumber("Frame time ms", frameTime / 1000000)
-
-
 
 

@@ -9,7 +9,7 @@ from node import *
 import telemetryNode
 import timeNode
 import motorTestNode
-
+import motorSimNode
 
 
 
@@ -28,7 +28,7 @@ class Robot(wpilib.TimedRobot):
     def returnPing(self, args: list[str]) -> str:
         return "ping response!"
 
-    def list(self, args: list[str]) -> str:
+    def lis(self, args: list[str]) -> str:
 
         if len(args) == 0:
             return "args missing: [nodes|data]"
@@ -55,6 +55,9 @@ class Robot(wpilib.TimedRobot):
         return "args missing: [nodes|data|hardware]"
 
 
+    def kill(self, args: list[str]) -> str:
+        raise SystemExit()
+
 
 
 
@@ -62,7 +65,8 @@ class Robot(wpilib.TimedRobot):
 
         self.ctrls: dict[str, Callable[[list[str]], str]] = {
             "ping" : self.returnPing,
-            "list" : self.list,
+            "list" : self.lis,
+            "kill" : self.kill
             }
 
         self.prevTime: float = 0.0
@@ -87,10 +91,17 @@ class Robot(wpilib.TimedRobot):
         for m in motors:
             self.procs.append(m)
 
-        self.procs.append(VirtualEncoder("FLEncoder"))
-        self.procs.append(VirtualEncoder("FREncoder"))
-        self.procs.append(VirtualEncoder("BLEncoder"))
-        self.procs.append(VirtualEncoder("BREncoder"))
+        encoders = [
+            VirtualEncoder("FLEncoder"),
+            VirtualEncoder("FREncoder"),
+            VirtualEncoder("BLEncoder"),
+            VirtualEncoder("BREncoder")
+        ]
+
+        for e in encoders:
+            self.procs.append(e)
+
+        self.procs.append(motorSimNode.motorSimNode(motors[0], encoders[0]))
 
 
 
