@@ -3,69 +3,70 @@ import wpilib
 import rev
 
 
-def _throwUninplemented(*args) -> None:
-    raise NotImplementedError()
+
+
+# stores state needed to operate, along with get and set interface
+class DCMotorController:
+
+    def get(self) -> float:
+        raise NotImplementedError()
+
+    def set(self, pwr: float) -> None:
+        raise NotImplementedError()
+
+
+# power set vals are assumed to be clamped
+class VirtualController(DCMotorController):
+    def __init__(self) -> None:
+        self.speed: float = 0.0
+
+    def get(self) -> float: return self.speed
+    def set(self, pwr: float) -> None: self.speed = pwr
+
+
+class SparkMaxController(DCMotorController):
+    def __init__(self, ctrlr: rev.CANSparkMax) -> None:
+        self.controller = ctrlr
+
+    def get(self) -> float: return self.controller.get()
+    def set(self, pwr: float) -> None: self.controller.set(pwr)
 
 
 
 
+
+
+
+class DCMotorSpec:
+    maxRPM: float = 0.0
+
+# override members
+class VirtualSpec(DCMotorSpec):
+    maxRPM = 30.0
+
+
+
+
+
+# composes spec and controller, provides nicer interfacing
 class DCMotor:
+    def __init__(self, spec: type[DCMotorSpec], ctrlr: DCMotorController) -> None:
+        self.spec: type[DCMotorSpec] = spec
+        self.controller: DCMotorController = ctrlr
 
-    # inheriting motors should not override the functions in this class,
-    # other than get, set, and ctor
-    maxRPM: float = 0
-
-    # get and set are expected to be -1 to 1 range
-    setFunction: Callable[[any, float], None] = _throwUninplemented #type: ignore
-    getFunction: Callable[[any], float] = _throwUninplemented # type: ignore
-    ctor: Callable[[int], any] = _throwUninplemented # type: ignore
-
-
-
-    def __init__(self, port: int) -> None:
-        self.__motor = self.__class__.ctor(port)
-
+    def setRaw(self, v: float) -> None:
+        v = min(1, max(-1, v))
+        self.controller.set(v)
 
     def getRaw(self) -> float:
-        return self.__class__.getFunction(self.__motor)
-
-    def setRaw(self, power: float):
-        self.__class__.setFunction(self.__motor, power)
+        return self.controller.get()
 
 
+    # NTS: CHECK LINEARITY
+    def setRPM(self, v: float) -> None:
+        v = min(self.spec.maxRPM, max(-self.spec.maxRPM, v))
+        self.controller.set(v / self.spec.maxRPM)
 
-    def setRPM(self, rpm: float) -> None:
-        self.__class__.setFunction(self.__motor, rpm / self.maxRPM)
-
+    # NTS: CHECK LINEARITY
     def getRPM(self) -> float:
-        return self.__class__.getFunction(self.__motor) * self.maxRPM
-
-
-
-
-
-class SparkMaxBrushedTempl(DCMotor):
-
-    ctor = lambda p: rev.CANSparkMax(p, rev.CANSparkMax.MotorType.kBrushed)
-    setFunction = lambda m, p: m.set(max(min(p, 1), -1))
-    getFunction = lambda m: m.get()
-
-class SparkMaxBrushlessTempl(SparkMaxBrushedTempl):
-    ctor = lambda p: rev.CANSparkMax(p, rev.CANSparkMax.MotorType.kBrushless)
-
-
-
-
-class SparkImpl(DCMotor):
-    maxRPM = 1
-
-    ctor = lambda p: wpilib.Spark(p)
-    setFunction = lambda m, p: m.set(p)
-    getFunction = lambda m: m.get()
-
-
-class DriveImpl(SparkMaxBrushlessTempl):
-    maxRPM = 40
-
-
-
+        return self.controller.get() * self.spec.maxRPM

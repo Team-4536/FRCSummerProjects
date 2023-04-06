@@ -29,7 +29,7 @@ class driveWidget(widget):
     def __init__(self):
 
 
-        self.ntTags = ["motor1", "motor1", "motor1", "motor1"]
+        self.ntTags = [ ]
 
 
         with dpg.window(label="Drive", width=scWidth, height=scHeight, no_scrollbar=True) as window:

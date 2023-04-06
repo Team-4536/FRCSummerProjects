@@ -23,11 +23,11 @@ class clientWidget(widgets.widget.widget):
 
 
 
-        with dpg.window(label="Client window", tag="Client window"):
+        with dpg.window(label="Client window"):
 
             with dpg.group(horizontal=True):
 
-                dpg.add_text("comms: ")
+                dpg.add_text("heartbeat: ")
 
                 with dpg.drawlist(width=30, height=13):
                     dpg.draw_rectangle([-100, -100], [100, 100], fill=[255, 0, 0])

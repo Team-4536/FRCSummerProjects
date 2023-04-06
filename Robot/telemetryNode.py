@@ -19,7 +19,7 @@ class TelemNode(Node):
     def tick(self, data: dict[str, Any]) -> None:
 
         for x in self.__hardware:
-            utils.tables.telemTable.putNumber(x, self.__hardware[x].getRaw())
+            # utils.tables.telemTable.putNumber(x, self.__hardware[x].getRaw())
             utils.tables.telemTable.putString(x, str(self.__hardware[x].__dict__))
 
     def command(self, args: list[str], data: dict[str, Any]) -> str:

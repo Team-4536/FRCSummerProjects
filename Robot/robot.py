@@ -1,18 +1,14 @@
 import wpilib
-import ntcore
-import robotpy
-from node import *
-from node import Node
-
-import hardware.DCMotors
 from typing import Any
 import time
 
+from hardware.DCMotors import *
+from hardware.Encoders import *
+from utils.tables import *
+from node import *
 import telemetryNode
 import timeNode
 import motorTestNode
-import utils.profiling
-from utils.tables import *
 
 
 
@@ -89,14 +85,30 @@ class Robot(wpilib.TimedRobot):
 
 
 
-        self.hardware.update({"motor1" : hardware.DCMotors.SparkImpl(0)})
-        self.hardware.update({"motor2" : hardware.DCMotors.SparkImpl(1)})
+
+
+        motors = [
+            DCMotor(VirtualSpec, VirtualController()),
+            DCMotor(VirtualSpec, VirtualController()),
+            DCMotor(VirtualSpec, VirtualController()),
+            DCMotor(VirtualSpec, VirtualController())
+        ]
+        self.hardware.update({"FLDrive" : motors[0] })
+        self.hardware.update({"FRDrive" : motors[1] })
+        self.hardware.update({"BLDrive" : motors[2] })
+        self.hardware.update({"BRDrive" : motors[3] })
+
+        self.hardware.update({"FLEncoder" : VirtualEncoder() })
+        self.hardware.update({"FREncoder" : VirtualEncoder() })
+        self.hardware.update({"BLEncoder" : VirtualEncoder() })
+        self.hardware.update({"BREncoder" : VirtualEncoder() })
+
 
 
         self.procs.append(telemetryNode.TelemNode(self.hardware))
         self.procs.append(timeNode.TimeNode(self.data))
 
-        self.procs.append(motorTestNode.motorTestNode("speed", self.hardware["motor1"]))
+        self.procs.append(motorTestNode.motorTestNode("speed", self.hardware["FLDrive"]))
 
 
 

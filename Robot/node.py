@@ -4,13 +4,13 @@ from typing import Callable, Any
 
 
 # Note: beacause the node execution is just awful, keep these numbers adjacent (no jumps from like 4 to 10)
-NODE_FIRST: int =       0
-NODE_SIM: int =         1
-NODE_BACKGROUND: int =  2
-NODE_PROF: int =        3
-NODE_CTRL: int =        4
-NODE_HARDWARE: int =    5
-NODE_LAST: int =        6
+NODE_FIRST: int =       0 # robot system shit, commands, telemetry, etc.
+NODE_SIM: int =         1 # simulation processses
+NODE_BACKGROUND: int =  2 # procs that use sensor data to come up w stuff
+NODE_PROF: int =        3 # profile nodes, what should be doing high-ish level control
+NODE_CTRL: int =        4 # hardware controllers, use output from prof.
+NODE_HARDWARE: int =    5 # actual data table to hardware transfer, safties
+NODE_LAST: int =        6 # anything that needs to happen after, telemetry, file logging, etc.
 
 NodeFunction = Callable[[dict[str, Any]], None]
 

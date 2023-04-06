@@ -8,11 +8,6 @@ def createWindow():
 
 
 
-    """
-    import dearpygui_ext.themes as themes
-    LIGHT_IMGUI_THEME = themes.create_theme_imgui_light()
-    dpg.bind_theme(LIGHT_IMGUI_THEME)
-    # """
 
     with dpg.font_registry():
         resDirectory = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', "res/consolab.ttf"))

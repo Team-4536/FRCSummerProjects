@@ -35,7 +35,13 @@ if __name__ == "__main__":
     # for i in range(0, 100):
     #     l.log_info("Hello world!")
 
-    # dpg.show_style_editor()
+    """
+    import dearpygui_ext.themes as themes
+    LIGHT_IMGUI_THEME = themes.create_theme_imgui_light()
+    dpg.bind_theme(LIGHT_IMGUI_THEME)
+    """
+
+    dpg.show_style_editor()
 
     def loop():
         for w in widgets: w.tick()

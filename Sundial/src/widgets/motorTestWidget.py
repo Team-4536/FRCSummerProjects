@@ -84,6 +84,7 @@ class MotorTest(widgets.widget.widget):
             dpg.add_button(label="Stop motor", callback=stopMtr, height=100, width=100)
 
 
+            """
             with dpg.group():
                 with dpg.group(horizontal=True):
                     dpg.add_text("NT Tag")
@@ -106,6 +107,7 @@ class MotorTest(widgets.widget.widget):
                     widgets.remove(self)
                     dpg.delete_item(self.groupTag)
                 dpg.add_button(label="End proc", callback=deleteSelf)
+            """
 
 
 

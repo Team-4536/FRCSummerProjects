@@ -1,5 +1,7 @@
 import DCMotors
 import inspect
+import rev
+
 
 
 
@@ -11,24 +13,39 @@ class bcolors:
     ENDC = '\033[0m'
 
 
-
 def testMotors():
+
+    motorControllers = []
+    specs = []
 
     for x in DCMotors.__dict__:
         val = DCMotors.__dict__[x]
         if isinstance(val, type):
-            if issubclass(val, DCMotors.DCMotor) and val is not DCMotors.DCMotor:
-                if val.__name__.find("Templ") != len(val.__name__) - 5:
-                    testMotorClass(val)
+            if issubclass(val, DCMotors.DCMotorController) and val is not DCMotors.DCMotorController:
+                motorControllers.append(val)
+            elif issubclass(val, DCMotors.DCMotorSpec) and val is not DCMotors.DCMotorSpec:
+                specs.append(val)
+
+
+    i = 0
+    for c in motorControllers:
+        for s in specs:
+            controller = None
+
+            if c is DCMotors.SparkMaxController:
+                controller = c(rev.CANSparkMax(i, rev.CANSparkMax.MotorType.kBrushless))
+            else:
+                controller = c()
+
+            motor = DCMotors.DCMotor(s, controller)
+            testMotorConfig(motor)
+            i+=1
 
 
 
-
-def testMotorClass(t: type[DCMotors.DCMotor]):
-
+def testMotorConfig(x: DCMotors.DCMotor):
 
     try:
-        x = t(0)
         assert(x is not None)
 
         x.setRaw(1)
@@ -40,14 +57,15 @@ def testMotorClass(t: type[DCMotors.DCMotor]):
         x.setRaw(-4)
         assert(x.getRaw() == -1)
 
-        x.setRPM(x.__class__.maxRPM / 2)
-        assert(x.getRPM() == x.__class__.maxRPM / 2)
+        x.setRPM(x.spec.maxRPM / 2)
+        assert(x.getRPM() == x.spec.maxRPM / 2)
 
+    #"""
     except:
-        print(f"{bcolors.FAIL}Motor {t.__name__} failed{bcolors.ENDC}")
+        print(f"{bcolors.FAIL}Config {x.controller.__class__.__name__}, {x.spec.__name__} failed{bcolors.ENDC}")
     else:
-        print(f"{bcolors.OKGREEN}Motor {t.__name__} passed{bcolors.ENDC}")
-    # """
+        print(f"{bcolors.OKGREEN}Config {x.controller.__class__.__name__}, {x.spec.__name__} passed{bcolors.ENDC}")
+    #"""
 
 if __name__ == "__main__":
     testMotors()
