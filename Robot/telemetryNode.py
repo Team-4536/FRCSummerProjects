@@ -40,8 +40,19 @@ class TelemNode(Node):
 
     def command(self, args: list[str], data: dict[str, Any]) -> str:
 
+        if len(args) < 1:
+            return "missing args: [publish|remove|list], [dataTags]"
+
+        if args[0] == "list":
+            if len(self.published) == 0: return "[no published values]"
+            s: str = ""
+            for x in self.published:
+                s += x + "\n"
+            return s
+
         if len(args) < 2:
             return "missing args: [publish|remove], dataTags"
+
 
         ret: str = ""
         for i in range(1, len(args)):

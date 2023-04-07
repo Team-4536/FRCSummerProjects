@@ -81,6 +81,14 @@ class Robot(wpilib.TimedRobot):
 
 
 
+
+
+        self.procs.append(telemetryNode.TelemNode())
+        self.procs.append(timeNode.TimeNode())
+
+
+
+
         motors = [
             DCMotor("FLDrive", VirtualSpec, VirtualController()),
             DCMotor("FRDrive", VirtualSpec, VirtualController()),
@@ -101,15 +109,18 @@ class Robot(wpilib.TimedRobot):
         for e in encoders:
             self.procs.append(e)
 
-        self.procs.append(motorSimNode.motorSimNode(motors[0], encoders[0]))
 
 
 
-        self.procs.append(telemetryNode.TelemNode())
-        self.procs.append(timeNode.TimeNode())
+
+
+        for i in range(0, 1):
+            self.procs.append(motorSimNode.motorSimNode(motors[i], encoders[i]))
 
         self.procs.append(motorTestNode.motorTestNode("motor0", "FLDrive", self.procs))
         self.procs.append(motorTestNode.motorTestNode("motor1", "FRDrive", self.procs))
+        self.procs.append(motorTestNode.motorTestNode("motor2", "BLDrive", self.procs))
+        self.procs.append(motorTestNode.motorTestNode("motor3", "BRDrive", self.procs))
 
 
 
