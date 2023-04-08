@@ -50,7 +50,7 @@ class VirtualSpec(DCMotorSpec):
 
 
 # composes spec and controller, provides nicer interfacing
-class DCMotor(Node):
+class DCMotorNode(Node):
     def __init__(self, name: str, spec: type[DCMotorSpec], ctrlr: DCMotorController) -> None:
         self.spec: type[DCMotorSpec] = spec
         self.controller: DCMotorController = ctrlr

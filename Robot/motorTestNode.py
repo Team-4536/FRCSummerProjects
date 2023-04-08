@@ -1,6 +1,6 @@
 from node import *
 from typing import Any
-from hardware.DCMotors import DCMotor
+from hardware.DCMotors import DCMotorNode
 import utils.tables
 
 
@@ -23,7 +23,7 @@ class motorTestNode(Node):
             if x.name == self.motor:
                 m = x
 
-        assert(type(m) ==  DCMotor)
+        assert(type(m) ==  DCMotorNode)
 
         self.name = "MotorTester" + self.motor
 

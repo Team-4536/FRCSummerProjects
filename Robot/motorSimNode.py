@@ -1,5 +1,5 @@
 from node import *
-from hardware.DCMotors import DCMotor
+from hardware.DCMotors import DCMotorNode
 from hardware.Encoders import *
 import random
 
@@ -13,7 +13,7 @@ import random
 class motorSimNode(Node):
 
 
-    def __init__(self, motor: DCMotor, encoder: VirtualEncoder) -> None:
+    def __init__(self, motor: DCMotorNode, encoder: VirtualEncoder) -> None:
 
         self.name = "motorSim"
         self.priority = NODE_SIM

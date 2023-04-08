@@ -10,10 +10,10 @@ import hardware.DCMotors
 
 class TelemNode(Node):
 
-    def __init__(self) -> None:
+    def __init__(self, defaultPublished: list[str]) -> None:
         self.priority = NODE_LAST
         self.name = "telem"
-        self.published: list[str] = []
+        self.published: list[str] = defaultPublished
 
 
 

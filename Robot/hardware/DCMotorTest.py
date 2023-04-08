@@ -37,13 +37,13 @@ def testMotors():
             else:
                 controller = c()
 
-            motor = DCMotors.DCMotor("motor", s, controller)
+            motor = DCMotors.DCMotorNode("motor", s, controller)
             testMotorConfig(motor)
             i+=1
 
 
 
-def testMotorConfig(x: DCMotors.DCMotor):
+def testMotorConfig(x: DCMotors.DCMotorNode):
 
     try:
         assert(x is not None)

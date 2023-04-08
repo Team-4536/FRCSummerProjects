@@ -2,16 +2,15 @@ import wpilib
 from typing import Any
 import time
 
+import inits
+
 from hardware.DCMotors import *
 from hardware.Encoders import *
 from utils.tables import *
 from node import *
+
 import telemetryNode
 import timeNode
-import motorTestNode
-import motorSimNode
-
-
 
 
 
@@ -80,50 +79,19 @@ class Robot(wpilib.TimedRobot):
         self.procs: list[Node] = [ ] # processes / including hardware
 
 
+        inits.makeSimMechDrive(self.procs)
 
+        found = False
+        for x in self.procs:
+            found = x.__class__ == telemetryNode.TelemNode
+            if found: break
+        assert(found)
 
-
-        self.procs.append(telemetryNode.TelemNode())
-        self.procs.append(timeNode.TimeNode())
-
-
-
-
-        motors = [
-            DCMotor("FLDrive", VirtualSpec, VirtualController()),
-            DCMotor("FRDrive", VirtualSpec, VirtualController()),
-            DCMotor("BLDrive", VirtualSpec, VirtualController()),
-            DCMotor("BRDrive", VirtualSpec, VirtualController())
-        ]
-
-        for m in motors:
-            self.procs.append(m)
-
-        encoders = [
-            VirtualEncoder("FLEncoder"),
-            VirtualEncoder("FREncoder"),
-            VirtualEncoder("BLEncoder"),
-            VirtualEncoder("BREncoder")
-        ]
-
-        for e in encoders:
-            self.procs.append(e)
-
-
-
-
-
-
-        for i in range(0, 1):
-            self.procs.append(motorSimNode.motorSimNode(motors[i], encoders[i]))
-
-        self.procs.append(motorTestNode.motorTestNode("motor0", "FLDrive", self.procs))
-        self.procs.append(motorTestNode.motorTestNode("motor1", "FRDrive", self.procs))
-        self.procs.append(motorTestNode.motorTestNode("motor2", "BLDrive", self.procs))
-        self.procs.append(motorTestNode.motorTestNode("motor3", "BRDrive", self.procs))
-
-
-
+        found = False
+        for x in self.procs:
+            found = x.__class__ == timeNode.TimeNode
+            if found: break
+        assert(found)
 
 
 
@@ -287,6 +255,10 @@ class Robot(wpilib.TimedRobot):
 
 if __name__ == "__main__":
     wpilib.run(Robot)
+
+    # uncomment these for debugging the init func
+    # x = Robot()
+    # x.robotInit()
 
 
 """
