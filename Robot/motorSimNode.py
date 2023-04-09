@@ -37,7 +37,7 @@ class motorSimNode(Node):
         self.velocity += speedDelta
         # self.velocity += (self.motor.getRPM() / 60) * dt
         self.position += self.velocity * dt
-        self.encoder.position = self.position
+        self.encoder.realPosition = self.position
 
         data.update({ "simVelocity" : self.velocity })
         data.update({ "simPosition" : self.position })

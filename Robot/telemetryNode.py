@@ -33,7 +33,7 @@ class TelemNode(Node):
             if type(d) == float:
                 utils.tables.telemTable.putNumber(x, data[x])
             if callable(getattr(d, "publish", None)):
-                d.publish(x, utils.tables.telemTable)
+                d.publish(x, utils.tables.telemTable) # type: ignore
             else:
                 utils.tables.telemTable.putNumber(x, d)
 

@@ -1,5 +1,6 @@
 import rev
 from node import *
+import random
 
 
 
@@ -24,8 +25,7 @@ class Encoder(Node):
 
 class RelativeEncoder(Encoder):
 
-    # it's like this because I'm lazy. :).
-    def __init__(self, name: str, encObj: rev.RelativeEncoder, inverted: bool) -> None:
+    def __init__(self, name: str, encObj: rev.RelativeEncoder) -> None:
         self.__encoder: rev.RelativeEncoder = encObj
         self.name = name
         self.priority = NODE_HARDWARE
@@ -38,13 +38,15 @@ class RelativeEncoder(Encoder):
 # output will move with motor output, so reversal doesnt need to happen if the motors are all reversed correctly
 class VirtualEncoder(Encoder):
 
+    NOISE = 0.005
+
     def __init__(self, name: str) -> None:
-        self.position: float = 0.0
+        self.realPosition: float = 0.0
 
         self.priority = NODE_HARDWARE
         self.name = name
 
     def getRotations(self) -> float:
-        return self.position
+        return self.realPosition + random.normalvariate(0, VirtualEncoder.NOISE)
 
 
