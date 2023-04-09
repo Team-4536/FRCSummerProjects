@@ -7,13 +7,12 @@ import motorTestNode
 import motorSimNode
 from hardware.DCMotors import *
 from hardware.Encoders import *
-
-
-
+import hardware.Input
 
 def makeSimMechDrive(nodes: list[Node]):
 
     nodes.append(timeNode.TimeNode())
+
     nodes.append(telemetryNode.TelemNode([
         "FLDriveRPS",
         "FRDriveRPS",
@@ -48,5 +47,7 @@ def makeSimMechDrive(nodes: list[Node]):
 
     for i in range(0, 1):
         nodes.append(motorSimNode.motorSimNode(motors[i], encoders[i]))
+
+    nodes.append(hardware.Input.FlymerInputNode())
 
 
