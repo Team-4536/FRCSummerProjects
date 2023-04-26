@@ -6,8 +6,8 @@ import timeNode
 import motorTestNode
 import encoderSimNode
 from hardware.DCMotors import *
-from hardware.encoders import *
-import hardware.input
+from hardware.Encoders import *
+import hardware.Input
 
 def makeSimMechDrive(nodes: list[Node]):
 
@@ -46,6 +46,6 @@ def makeSimMechDrive(nodes: list[Node]):
         nodes.append(encoderSimNode.EncoderSimNode(pref, motors[i], encoders[i]))
         i += 1
 
-    nodes.append(hardware.input.FlymerInputNode())
+    nodes.append(hardware.Input.FlymerInputNode())
 
 

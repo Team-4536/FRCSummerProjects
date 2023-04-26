@@ -1,6 +1,6 @@
 from node import *
 from hardware.DCMotors import DCMotorNode
-from hardware.encoders import *
+from hardware.Encoders import *
 import random
 import utils.tags as tags
 
