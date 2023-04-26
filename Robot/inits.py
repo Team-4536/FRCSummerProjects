@@ -4,30 +4,31 @@ from node import Node
 import telemetryNode
 import timeNode
 import motorTestNode
-import motorSimNode
+import encoderSimNode
 from hardware.DCMotors import *
-from hardware.Encoders import *
-import hardware.Input
+from hardware.encoders import *
+import hardware.input
 
 def makeSimMechDrive(nodes: list[Node]):
 
     nodes.append(timeNode.TimeNode())
 
     nodes.append(telemetryNode.TelemNode([
-        "FLDriveRPS",
-        "FRDriveRPS",
-        "BLDriveRPS",
-        "BRDriveRPS",
-        "FLEncoderPos",
-        "FREncoderPos",
-        "BLEncoderPos",
-        "BREncoderPos",
+        tags.FL + tags.ENCODER_READING,
+        tags.FR + tags.ENCODER_READING,
+        tags.BL + tags.ENCODER_READING,
+        tags.BR + tags.ENCODER_READING,
+
+        tags.FL + tags.MOTOR_SPEED_CONTROL,
+        tags.FR + tags.MOTOR_SPEED_CONTROL,
+        tags.BL + tags.MOTOR_SPEED_CONTROL,
+        tags.BR + tags.MOTOR_SPEED_CONTROL
     ]))
 
 
 
 
-    prefixes = [ "FL", "FR", 'BL', "BR" ]
+    prefixes = [ tags.FL, tags.FR, tags.BL, tags.BR ]
     motors = []
     encoders = []
 
@@ -35,19 +36,16 @@ def makeSimMechDrive(nodes: list[Node]):
     i = 0
     for pref in prefixes:
 
-        motors.append(DCMotorNode(pref+"Drive", VirtualSpec, VirtualController()))
+        motors.append(DCMotorNode(pref, NEOSpec, VirtualController()))
         nodes.append(motors[-1])
 
-        encoders.append(VirtualEncoder(pref+"Encoder"))
+        encoders.append(VirtualEncoderNode(pref))
         nodes.append(encoders[-1])
 
-        nodes.append(motorTestNode.motorTestNode("motor"+str(i), pref+"Drive", nodes))
+        nodes.append(motorTestNode.MotorTestNode("motor"+str(i), pref))
+        nodes.append(encoderSimNode.EncoderSimNode(pref, motors[i], encoders[i]))
         i += 1
 
-
-    for i in range(0, 1):
-        nodes.append(motorSimNode.motorSimNode(motors[i], encoders[i]))
-
-    nodes.append(hardware.Input.FlymerInputNode())
+    nodes.append(hardware.input.FlymerInputNode())
 
 

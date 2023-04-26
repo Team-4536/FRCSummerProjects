@@ -5,7 +5,7 @@ import time
 import inits
 
 from hardware.DCMotors import *
-from hardware.Encoders import *
+from hardware.encoders import *
 from utils.tables import *
 from node import *
 

@@ -1,10 +1,9 @@
 
 from typing import Callable, Any
 import wpilib
-import rev
 from node import *
-from enum import Enum
 import ntcore
+import utils.tags as tags
 
 
 
@@ -45,7 +44,7 @@ class FlymerInputNode(Node):
         self.buttonPanel = wpilib.Joystick(2)
 
         self.priority = NODE_FIRST
-        self.name = "input"
+        self.name = tags.INPUT
 
 
     def tick(self, data: dict[str, Any]) -> None:
@@ -62,4 +61,4 @@ class FlymerInputNode(Node):
         input.grabToggle = self.armController.getAButtonPressed()
 
 
-        data.update({ "input":input })
+        data.update({ tags.INPUT : input })
