@@ -51,7 +51,7 @@ class FlymerInputNode(Node):
 
         input = FlymerInputProfile()
 
-        input.drive = (self.driveController.getLeftX(), self.driveController.getLeftY())
+        input.drive = (self.driveController.getLeftX(), -self.driveController.getLeftY())
         input.turning = self.driveController.getRightX()
         input.brakeToggle = self.driveController.getAButtonPressed()
 

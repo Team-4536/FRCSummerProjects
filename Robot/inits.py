@@ -8,6 +8,7 @@ import encoderSimNode
 from hardware.DCMotors import *
 from hardware.Encoders import *
 import hardware.Input
+import mechController
 
 def makeSimMechDrive(nodes: list[Node]):
 
@@ -32,6 +33,7 @@ def makeSimMechDrive(nodes: list[Node]):
     motors = []
     encoders = []
 
+    nodes.append(mechController.MechProf())
 
     i = 0
     for pref in prefixes:
@@ -42,7 +44,7 @@ def makeSimMechDrive(nodes: list[Node]):
         encoders.append(VirtualEncoderNode(pref))
         nodes.append(encoders[-1])
 
-        nodes.append(motorTestNode.MotorTestNode("motor"+str(i), pref))
+        # nodes.append(motorTestNode.MotorTestNode("motor"+str(i), pref))
         nodes.append(encoderSimNode.EncoderSimNode(pref, motors[i], encoders[i]))
         i += 1
 
