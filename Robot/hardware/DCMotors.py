@@ -2,6 +2,7 @@ from typing import Callable, Any
 import wpilib
 import rev
 from node import *
+import utils.tags as tags
 
 
 
@@ -39,43 +40,49 @@ class SparkMaxController(DCMotorController):
 
 
 class DCMotorSpec:
-    maxRPS: float = 0.0
+    stallTorque = 0.0
+    stallCurrent = 0.0
+    freeSpeed = 0.0
+    freeCurrent = 0.0
 
-# override members
-class VirtualSpec(DCMotorSpec):
-    maxRPS = 7.0
 
+class NEOSpec(DCMotorSpec):
+    stallTorque = 3.28
+    stallCurrent = 181
+    freeSpeed = 5820
+    freeCurrent = 1.7
+
+class FalconSpec(DCMotorSpec):
+    stallTorque = 4.69
+    stallCurrent = 257
+    freeSpeed = 6380
+    freeCurrent = 1.5
 
 
 
 
 # composes spec and controller, provides nicer interfacing
 class DCMotorNode(Node):
-    def __init__(self, name: str, spec: type[DCMotorSpec], ctrlr: DCMotorController) -> None:
+    def __init__(self, pref: tags.Tag, spec: type[DCMotorSpec], ctrlr: DCMotorController) -> None:
         self.spec: type[DCMotorSpec] = spec
         self.controller: DCMotorController = ctrlr
 
-        self.name = name
+        self.pref = pref
+        self.name = self.pref + tags.MOTOR_NAME
         self.priority = NODE_HARDWARE
 
-    def setRaw(self, v: float) -> None:
-        v = min(1, max(-1, v))
-        self.controller.set(v)
-
-    def getRaw(self) -> float:
-        return self.controller.get()
 
 
-    # NTS: CHECK LINEARITY
-    def setRPS(self, v: float) -> None:
-        v = min(self.spec.maxRPS, max(-self.spec.maxRPS, v))
-        self.controller.set(v / self.spec.maxRPS)
 
-    # NTS: CHECK LINEARITY
-    def getRPS(self) -> float:
-        return self.controller.get() * self.spec.maxRPS
 
 
 
     def tick(self, data: dict[str, Any]):
-        data.update({ self.name + "RPS" : self.getRPS() })
+
+        val = data.get(self.pref + tags.MOTOR_SPEED_CONTROL)
+
+        if type(val) == float:
+            val = min(1, max(-1, val))
+            self.controller.set(val)
+        else:
+            data.update({ self.pref + tags.MOTOR_SPEED_CONTROL : self.controller.get() })

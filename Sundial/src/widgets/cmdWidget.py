@@ -3,11 +3,9 @@ import ntcore
 import dearpygui.dearpygui as dpg
 import time
 
-
+from utils.tables import cmdTable
 
 class cmdWidget(widget):
-
-    table = ntcore.NetworkTableInstance.getDefault().getTable("cmd")
 
     def __init__(self) -> None:
 
@@ -25,7 +23,7 @@ class cmdWidget(widget):
 
             def buttonCallback(s, d):
                 msg = dpg.get_value(self.msgTag)
-                self.__class__.table.putString("msg", f"{time.time()}:{msg}")
+                cmdTable.putString("msg", f"{time.time()}:{msg}")
 
                 dpg.set_value(self.msgTag, "")
             buttonTag = dpg.add_button(label="Send!", callback=buttonCallback)
@@ -47,7 +45,7 @@ class cmdWidget(widget):
 
     def tick(self) -> None:
 
-        ntVal = self.__class__.table.getString("res", None)
+        ntVal = cmdTable.getString("res", None)
         if type(ntVal) is not str: return
 
         split = ntVal.split(':', 1)

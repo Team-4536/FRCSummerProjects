@@ -1,17 +1,7 @@
 from math import cos
-import time
 import dearpygui.dearpygui as dpg
-import wpilib
-import ntcore
 import widgets.widget
-
-
-
-pubTable = ntcore.NetworkTableInstance.getDefault().getTable( "sundial")
-telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
-
-
-
+from utils.tables import telemTable, sundialTable
 
 
 
@@ -136,7 +126,7 @@ class MotorTest(widgets.widget.widget):
         if type(recieved) is float: val = recieved
 
 
-        pubTable.putNumber(dpg.get_value(self.NTSendTag), dpg.get_value(self.valTag))
+        sundialTable.putNumber(dpg.get_value(self.NTSendTag), dpg.get_value(self.valTag))
 
         x = self.__datay[1:len(self.__datay)]
         x.append(val*0.9/2+0.5)

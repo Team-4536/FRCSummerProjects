@@ -2,35 +2,26 @@ from node import *
 from typing import Any
 from hardware.DCMotors import DCMotorNode
 import utils.tables
+import utils.tags as tags
 
 
-class motorTestNode(Node):
+class MotorTestNode(Node):
 
-    def __init__(self, powerTag: str, motor: str, nodes: list[Node]) -> None:
+    def __init__(self, srcTag: str, motorPrefix: str) -> None:
         self.priority = NODE_HARDWARE
         self.name = "motorTestNode"
-        self.pwrTag = powerTag
-        self.motor = motor
-        self.nodes = nodes
+        self.srcTag = srcTag
+        self.motorPrefix = motorPrefix
 
 
     def tick(self, data: dict[str, Any]) -> None:
 
+        self.name = self.motorPrefix + tags.TESTER_NAME
 
-        # yuck
-        m = None
-        for x in self.nodes:
-            if x.name == self.motor:
-                m = x
-
-        assert(type(m) ==  DCMotorNode)
-
-        self.name = "MotorTester" + self.motor
-
-        val = utils.tables.sundialTable.getValue(self.pwrTag, None)
+        val = utils.tables.sundialTable.getValue(self.srcTag, None)
         if type(val) is not float: return
 
-        m.setRaw(val)
+        data.update({ self.motorPrefix + tags.MOTOR_SPEED_CONTROL : val })
 
     def command(self, args: list[str], data: dict[str, Any]) -> str:
 
@@ -38,7 +29,7 @@ class motorTestNode(Node):
             return "missing args [info]"
 
         if args[0] == "info":
-            return f"Motor tag: {self.motor}, Recieving tag: {self.pwrTag}"
+            return f"Tag being set: {self.motorPrefix + tags.MOTOR_SPEED_CONTROL}, Source tag: {self.srcTag}"
 
         return "missing args [info]"
 

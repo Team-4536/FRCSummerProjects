@@ -29,7 +29,7 @@ class driveWidget(widget):
     def __init__(self):
 
 
-        self.ntTags = [ "FLDriveRPS", "FRDriveRPS", "BLDriveRPS", "BRDriveRPS" ]
+        self.ntTags = [ "FLSpeed", "FRSpeed", "BLSpeed", "BRSpeed" ]
 
 
         with dpg.window(label="Drive", width=scWidth, height=scHeight, no_scrollbar=True) as window:

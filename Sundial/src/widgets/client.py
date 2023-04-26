@@ -9,8 +9,7 @@ inst = ntcore.NetworkTableInstance.getDefault()
 inst.startClient4(basename(__file__))
 # inst.setServer("10.45.36.2")
 inst.setServer("localhost")
-telemTable = inst.getTable("telemetry")
-
+from utils.tables import telemTable
 
 
 

@@ -53,7 +53,7 @@ class TelemNode(Node):
             return s
 
         if len(args) < 2:
-            return "missing args: [publish|remove], dataTags"
+            return "missing args: [publish|remove|list], dataTags"
 
 
         ret: str = ""
@@ -69,7 +69,7 @@ class TelemNode(Node):
             elif args[0] == "remove":
                 self.published.remove(args[i])
             else:
-                return "incorrect args. actual: [publish|remove], dataTags"
+                return "incorrect args. actual: [publish|remove|list], dataTags"
 
 
             ret += f"value \"{args[i]}\" published\n"

@@ -1,21 +1,18 @@
 from node import *
 from hardware.DCMotors import DCMotorNode
-from hardware.Encoders import *
+from hardware.encoders import *
 import random
+import utils.tags as tags
 
 
+class EncoderSimNode(Node):
 
 
+    def __init__(self, pref: tags.Tag, motor: DCMotorNode, encoder: VirtualEncoderNode) -> None:
 
+        self.pref = pref
 
-
-
-class motorSimNode(Node):
-
-
-    def __init__(self, motor: DCMotorNode, encoder: VirtualEncoder) -> None:
-
-        self.name = "motorSim"
+        self.name = pref + tags.ENCODER_SIM_NAME
         self.priority = NODE_SIM
 
         self.motor = motor
@@ -32,17 +29,13 @@ class motorSimNode(Node):
         dt = data["dt"]
         assert(type(dt) == float)
 
-        speedDelta = (self.motor.getRPS() - self.velocity) * 0.8 # targeted speed relative to last
+        speedDelta = (self.motor.controller.get() - self.velocity) * 0.8 # targeted speed relative to last
 
         self.velocity += speedDelta
-        # self.velocity += (self.motor.getRPM() / 60) * dt
         self.position += self.velocity * dt
         self.encoder.realPosition = self.position
 
-        data.update({ "simVelocity" : self.velocity })
-        data.update({ "simPosition" : self.position })
-        data.update({ "speedDelta" : speedDelta })
-
+        data.update({ self.pref + tags.ENCODER_SIM_VELOCITY : self.velocity })
 
 
 
