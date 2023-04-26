@@ -9,6 +9,7 @@ from hardware.DCMotors import *
 from hardware.Encoders import *
 import hardware.Input
 import mechController
+import hardware.pneumatics as pneumatics
 
 def makeSimMechDrive(nodes: list[Node]):
 
@@ -23,7 +24,9 @@ def makeSimMechDrive(nodes: list[Node]):
         tags.FL + tags.MOTOR_SPEED_CONTROL,
         tags.FR + tags.MOTOR_SPEED_CONTROL,
         tags.BL + tags.MOTOR_SPEED_CONTROL,
-        tags.BR + tags.MOTOR_SPEED_CONTROL
+        tags.BR + tags.MOTOR_SPEED_CONTROL,
+
+        tags.GRABBER + tags.DBLSOLENOID_STATE
     ]))
 
 

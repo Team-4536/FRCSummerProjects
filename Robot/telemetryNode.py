@@ -7,6 +7,8 @@ import time
 import hardware.DCMotors
 
 
+# Note: if you have a class that needs to be sent over telemetry, implement the "publish" method.
+# example can be found in Input.py
 
 class TelemNode(Node):
 
@@ -19,19 +21,15 @@ class TelemNode(Node):
 
     def tick(self, data: dict[str, Any]) -> None:
 
-        """
-        for x in self.__hardware:
-            # utils.tables.telemTable.putString(x, str(self.__hardware[x].__dict__))
-
-            motor = self.__hardware[x]
-            if type(motor) == hardware.DCMotors.DCMotor:
-                utils.tables.telemTable.putValue(x+"Speed", motor.getRaw())
-        """
         for x in self.published:
             d = data[x]
 
             if type(d) == float:
                 utils.tables.telemTable.putNumber(x, data[x])
+            elif type(d) == bool:
+                val = data[x]
+                utils.tables.telemTable.putNumber(x, 1 if val else 0)
+
             if callable(getattr(d, "publish", None)):
                 d.publish(x, utils.tables.telemTable) # type: ignore
             else:

@@ -88,5 +88,10 @@ class ntPlot(widget):
                 x = self.datay[i][1:len(self.datay[i])]
                 x.append(val)
                 self.datay[i] = x
+            # so sorry, ik this is bad, im too tired to make it good
+            if type(val) is bool:
+                x = self.datay[i][1:len(self.datay[i])]
+                x.append(1 if val else 0)
+                self.datay[i] = x
 
             dpg.set_value(self.seriesTags[i], [self.datax[i], self.datay[i]])

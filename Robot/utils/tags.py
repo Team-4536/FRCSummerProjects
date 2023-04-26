@@ -14,6 +14,7 @@ FR = "FR"
 BL = "BL"
 BR = "BR"
 
+GRABBER = "Grab"
 
 
 
@@ -21,6 +22,7 @@ BR = "BR"
 
 MOTOR_SPEED_CONTROL = "Speed"
 ENCODER_READING = "Pos"
+DBLSOLENOID_STATE = "Extended"
 
 ENCODER_SIM_VELOCITY = "Simvel"
 
@@ -28,6 +30,7 @@ ENCODER_NAME = "Encoder"
 MOTOR_NAME = "Motor"
 ENCODER_SIM_NAME = "Encodersim"
 TESTER_NAME = "Tester"
+DBLSOLENOID_NAME = "DBLSolenoid"
 
 
 

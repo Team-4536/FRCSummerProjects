@@ -26,7 +26,6 @@ class MechProf(Node):
         y = input.drive[1]
         t = input.turning
 
-
         speeds = [
             (y + x + t), # FL
             (y - x - t), # FR
@@ -46,6 +45,7 @@ class MechProf(Node):
         prefs = [ tags.FL, tags.FR, tags.BL, tags.BR ]
         for i in range(0, 4):
             data[prefs[i] + tags.MOTOR_SPEED_CONTROL]  = speeds[i]
+
 
 
 
