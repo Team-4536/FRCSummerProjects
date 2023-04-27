@@ -37,6 +37,7 @@ def makeSimMechDrive(nodes: list[Node]):
     encoders = []
 
     nodes.append(mechController.MechProf())
+    nodes.append(pneumatics.PneumaticsNode(tags.GRABBER, wpilib.PneumaticsControlModule(0).makeDoubleSolenoid(0, 1)))
 
     i = 0
     for pref in prefixes:

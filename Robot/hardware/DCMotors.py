@@ -77,7 +77,7 @@ class DCMotorNode(Node):
 
         val = data.get(self.pref + tags.MOTOR_SPEED_CONTROL)
 
-        if type(val) == float:
+        if type(val) == float or type(val) == int:
             val = min(1, max(-1, val))
             self.controller.set(val)
         else:

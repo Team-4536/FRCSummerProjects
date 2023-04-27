@@ -4,9 +4,14 @@ import wpilib
 from node import *
 import ntcore
 import utils.tags as tags
+import math
 
 
-
+def deadZone(input: float) -> float:
+        if(abs(input) < 0.1):
+            return 0.0
+        else:
+            return float(input)
 
 class FlymerInputProfile:
 
@@ -51,13 +56,14 @@ class FlymerInputNode(Node):
 
         input = FlymerInputProfile()
 
-        input.drive = (self.driveController.getLeftX(), -self.driveController.getLeftY())
-        input.turning = self.driveController.getRightX()
+        input.drive = (deadZone(self.driveController.getLeftX()), deadZone((-self.driveController.getLeftY())))
+        input.turning = deadZone(self.driveController.getRightX())
+        #print(deadZone(self.driveController.getRightX()))
         input.brakeToggle = self.driveController.getAButtonPressed()
 
-        input.lift = self.armController.getLeftY()
-        input.turret = self.armController.getLeftX()
-        input.retract = self.armController.getRightY()
+        input.lift = deadZone(self.armController.getLeftY())
+        input.turret = deadZone(self.armController.getLeftX())
+        input.retract = deadZone(self.armController.getRightY())
         input.grabToggle = self.armController.getAButtonPressed()
 
 
