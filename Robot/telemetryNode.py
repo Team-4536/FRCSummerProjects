@@ -24,8 +24,8 @@ class TelemNode(Node):
         for x in self.published:
             d = data[x]
 
-            if type(d) == float:
-                utils.tables.telemTable.putNumber(x, data[x])
+            if type(d) == float or type(d) == int:
+                utils.tables.telemTable.putNumber(x, float(data[x]))
             elif type(d) == bool:
                 val = data[x]
                 utils.tables.telemTable.putNumber(x, 1 if val else 0)

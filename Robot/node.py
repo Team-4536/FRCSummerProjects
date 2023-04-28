@@ -1,5 +1,11 @@
 from typing import Callable, Any
 
+"""
+NOTE: this file is like the only one that you are good to import * on.
+global constants have been prefixed.
+
+Please do not import * on anything else.
+"""
 
 
 

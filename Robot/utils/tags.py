@@ -47,8 +47,7 @@ Use tag prefixes and suffixes to keep your tags organized.
 
 Prefixes are used to differentiate the outputs of multiple nodes doing the same thing.
 Like simulations for each wheel, motors, encoders
-Ex. Each encoder node would write to (Some prefix) + TagSuffs.ENCODER_READING
-
+Ex. Each encoder node would write to (Some prefix) + tags.ENCODER_READING
 """
 
 

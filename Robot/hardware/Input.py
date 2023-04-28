@@ -28,6 +28,7 @@ class FlymerInputProfile:
 
     def publish(self, name: str, table: ntcore.NetworkTable) -> None:
 
+        # CLEANUP: these should probs be in the tags file
         table.putNumber(name + "/driveX", self.drive[0])
         table.putNumber(name + "/driveY", self.drive[1])
         table.putNumber(name + "/turning", self.turning)
@@ -58,7 +59,6 @@ class FlymerInputNode(Node):
 
         input.drive = (deadZone(self.driveController.getLeftX()), deadZone((-self.driveController.getLeftY())))
         input.turning = deadZone(self.driveController.getRightX())
-        #print(deadZone(self.driveController.getRightX()))
         input.brakeToggle = self.driveController.getAButtonPressed()
 
         input.lift = deadZone(self.armController.getLeftY())
