@@ -5,6 +5,7 @@ from widgets import motorTestWidget
 from widgets import ntPlot
 from widgets import client
 from widgets import cmdWidget
+from widgets import botLog
 
 
 import os
@@ -46,6 +47,7 @@ if __name__ == "__main__":
     widgets.append(motorTestWidget.MotorTest())
     widgets.append(motorTestWidget.MotorTest())
     widgets.append(cmdWidget.cmdWidget())
+    widgets.append(botLog.botLogWidget())
 
 
 
@@ -60,9 +62,6 @@ if __name__ == "__main__":
 
 
     """
-    l = dearpygui_ext.logger.mvLogger()
-    for i in range(0, 100):
-        l.log_info("Hello world!")
 
     import dearpygui_ext.themes as themes
     LIGHT_IMGUI_THEME = themes.create_theme_imgui_light()

@@ -15,9 +15,23 @@ import timeNode
 
 
 HEARTBEAT: float = 1.0
-MSG_CUTOFF: float = 2.0
 RES = 'res'
 UNKNOWN_RES = 'unknown cmd'
+
+
+
+
+logCount: int = 0
+
+# NOTE: please do not write directly to the log table value, it reuires formatting and bad messages are ignored
+def reportErr(message: str) -> None:
+    global logCount # CLEANUP: this entire system is a hack, but messages aren't a thing in networktables and making a socket system is very difficult
+    cmdTable.putString(tags.LOG_TAG, f"{logCount}:ERR:" + message)
+    logCount+=1
+def reportMsg(message: str) -> None:
+    global logCount
+    cmdTable.putString(tags.LOG_TAG, f"{logCount}:MSG:" + message)
+    logCount+=1
 
 
 class Robot(wpilib.TimedRobot):
@@ -61,6 +75,7 @@ class Robot(wpilib.TimedRobot):
 
 
     def robotInit(self) -> None:
+        self._logCount = 0 # to uniquely identify log messages sent from the robot, cause apperently that has to be required
 
         self.ctrls: dict[str, Callable[[list[str]], str]] = {
             "ping" : self.returnPing,
@@ -151,8 +166,9 @@ class Robot(wpilib.TimedRobot):
         try:
             x.tick(self.data)
         except Exception as exception:
-            print(f"Exception in node \"{x.name}\": {repr(exception)}")
-
+            err = f"Exception in node \"{x.name}\": {repr(exception)}"
+            reportErr(err)
+            print(err) # NOTE: this is a litte redundant, and probably tanks performance, but NT tables are too slow to actually catch every error and I don't want some slipping
 
 
 
@@ -165,6 +181,7 @@ class Robot(wpilib.TimedRobot):
 
     badly formatted messages are ignored and not responded to
     """
+
 
     # none return type indicates bad message format (no parsable stamp)
     def parseAndRespondMsg(self, msg: str) -> str | None:
@@ -188,6 +205,7 @@ class Robot(wpilib.TimedRobot):
                     response = v(args[1:])
                 except Exception as e:
                     response = "Exception in command: " + repr(e)
+                    reportErr(f"Exception in command \'{k}\': " + repr(e))
 
                 found = True
                 break
@@ -201,6 +219,7 @@ class Robot(wpilib.TimedRobot):
                         response = n.command(args[1:], self.data)
                     except Exception as e:
                         response = "Exception in command: " + repr(e)
+                        reportErr(f"Exception in command \'{n.name}\': " + repr(e))
 
                     found  = True
                     break
@@ -244,10 +263,6 @@ class Robot(wpilib.TimedRobot):
 
     def disabledPeriodic(self) -> None:
         pass
-
-
-
-
 
 
 

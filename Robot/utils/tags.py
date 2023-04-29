@@ -40,6 +40,9 @@ DT = "dt"
 INPUT = "input"
 
 
+LOG_TAG = "logs"
+
+
 
 
 """

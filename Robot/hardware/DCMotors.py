@@ -3,6 +3,7 @@ import wpilib
 import rev
 from node import *
 import utils.tags as tags
+from robot import reportErr, reportMsg
 
 
 
@@ -82,3 +83,4 @@ class DCMotorNode(Node):
             self.controller.set(val)
         else:
             data.update({ self.pref + tags.MOTOR_SPEED_CONTROL : self.controller.get() })
+
