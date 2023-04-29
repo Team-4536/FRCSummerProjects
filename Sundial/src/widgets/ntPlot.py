@@ -23,6 +23,7 @@ class ntPlot(widget):
 
             # plot
             with dpg.plot(no_title=True, no_mouse_pos=True, height=200) as plot:
+                self.plot = plot
 
                 with dpg.theme() as item_theme:
                     with dpg.theme_component(dpg.mvAll):
@@ -35,6 +36,7 @@ class ntPlot(widget):
                 self.yAxisTag = dpg.add_plot_axis(dpg.mvYAxis)
 
                 # self.seriesTag = dpg.add_line_series(self.datax[0], self.datay[0], parent=self.yAxisTag)
+
 
 
 

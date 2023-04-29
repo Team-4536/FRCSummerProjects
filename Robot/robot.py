@@ -94,7 +94,7 @@ class Robot(wpilib.TimedRobot):
         self.procs: list[Node] = [ ] # processes / including hardware
 
 
-        inits.makeSimMechDrive(self.procs)
+        inits.makeFlymer(self.procs)
 
         found = False
         for x in self.procs:

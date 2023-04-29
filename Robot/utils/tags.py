@@ -17,7 +17,6 @@ BR = "BR"
 GRABBER = "Grab"
 
 
-
 # Suffixes are for what each node is doing
 
 MOTOR_SPEED_CONTROL = "Speed"
@@ -41,6 +40,10 @@ INPUT = "input"
 
 
 LOG_TAG = "logs"
+
+GYRO_PITCH = "pitch"
+GYRO_YAW = "yaw"
+GYRO_ROLL = "roll"
 
 
 

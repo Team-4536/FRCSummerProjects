@@ -1,17 +1,19 @@
 
 from node import Node
 
+import navx
 import telemetryNode
 import timeNode
 import motorTestNode
-import encoderSimNode
+import simulationNodes.encoderSimNode as encoderSimNode
 from hardware.DCMotors import *
 from hardware.Encoders import *
 import hardware.Input
 import mechController
 import hardware.pneumatics as pneumatics
+import hardware.gyros as gyros
 
-def makeSimMechDrive(nodes: list[Node]):
+def makeFlymer(nodes: list[Node]):
 
     nodes.append(timeNode.TimeNode())
 
@@ -26,7 +28,10 @@ def makeSimMechDrive(nodes: list[Node]):
         tags.BL + tags.MOTOR_SPEED_CONTROL,
         tags.BR + tags.MOTOR_SPEED_CONTROL,
 
-        tags.GRABBER + tags.DBLSOLENOID_STATE
+        tags.GRABBER + tags.DBLSOLENOID_STATE,
+        tags.GYRO_PITCH,
+        tags.GYRO_YAW,
+        tags.GYRO_ROLL
     ]))
 
 
@@ -38,6 +43,7 @@ def makeSimMechDrive(nodes: list[Node]):
 
     nodes.append(mechController.MechProf())
     nodes.append(pneumatics.PneumaticsNode(tags.GRABBER, wpilib.PneumaticsControlModule(0).makeDoubleSolenoid(0, 1)))
+    nodes.append(gyros.GyroNode(gyros.VirtualGyro()))
 
     i = 0
     for pref in prefixes:

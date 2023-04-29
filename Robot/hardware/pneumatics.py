@@ -3,6 +3,7 @@ import utils.tags as tags
 
 
 import wpilib
+import robot
 
 
 # Note: true = set solenoid to forward, false = set solenoid reverse
@@ -24,7 +25,8 @@ class PneumaticsNode(Node):
             end = wpilib.DoubleSolenoid.Value.kForward if val else wpilib.DoubleSolenoid.Value.kReverse
             self.doubleSolenoid.set(end)
         else:
-            data.update({ self.pref + tags.DBLSOLENOID_STATE : self.doubleSolenoid.get() })
+            val = True if self.doubleSolenoid.get() else False
+            data.update({ self.pref + tags.DBLSOLENOID_STATE : val })
 
 
 
