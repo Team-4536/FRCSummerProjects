@@ -23,7 +23,6 @@ class clientWidget(widgets.widget.widget):
 
 
 
-
         with dpg.window(label="Client window"):
 
             with dpg.group(horizontal=True):

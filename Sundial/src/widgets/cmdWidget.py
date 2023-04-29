@@ -9,12 +9,13 @@ class cmdWidget(widget):
 
     def __init__(self) -> None:
 
-
+        self.expectedStamp:str = ""
 
 
         with dpg.value_registry():
             self.msgTag = dpg.add_string_value(default_value="")
             self.resTag = dpg.add_string_value(default_value="")
+
 
 
         with dpg.window(label="Cmd"):
@@ -23,7 +24,8 @@ class cmdWidget(widget):
 
             def buttonCallback(s, d):
                 msg = dpg.get_value(self.msgTag)
-                cmdTable.putString("msg", f"{time.time()}:{msg}")
+                self.expectedStamp = str(time.time())
+                cmdTable.putString("msg", f"{self.expectedStamp}:{msg}")
 
                 dpg.set_value(self.msgTag, "")
             buttonTag = dpg.add_button(label="Send!", callback=buttonCallback)
@@ -51,7 +53,11 @@ class cmdWidget(widget):
         split = ntVal.split(':', 1)
         if len(split) != 2: return
 
-        dpg.set_value(self.resTag, split[1])
+        if split[0] == self.expectedStamp:
+            dpg.set_value(self.resTag, split[1])
+            self.expectedStamp = split[0]
+        print(self.expectedStamp, end="\n")
+        print(split[0], "\n\n")
 
 
 
