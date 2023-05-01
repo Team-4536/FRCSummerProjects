@@ -36,6 +36,8 @@ DBLSOLENOID_NAME = "DBLSolenoid"
 # any straight values that only happen once
 
 DT = "dt"
+TIME_SINCE_INIT = "time"
+FRAME_TIME = "frameTime"
 INPUT = "input"
 
 

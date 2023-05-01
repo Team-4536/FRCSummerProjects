@@ -31,7 +31,10 @@ def makeFlymer(nodes: list[Node]):
         tags.GRABBER + tags.DBLSOLENOID_STATE,
         tags.GYRO_PITCH,
         tags.GYRO_YAW,
-        tags.GYRO_ROLL
+        tags.GYRO_ROLL,
+
+        tags.TIME_SINCE_INIT,
+        tags.FRAME_TIME
     ]))
 
 

@@ -1,11 +1,14 @@
 
 import dearpygui.dearpygui as dpg
+from utils import tables
+from typing import Any
 from widgets import driveWidget
 from widgets import motorTestWidget
 from widgets import ntPlot
 from widgets import client
 from widgets import cmdWidget
 from widgets import botLog
+import fileLog
 
 
 import os
@@ -69,13 +72,23 @@ if __name__ == "__main__":
     dpg.bind_theme(LIGHT_IMGUI_THEME)
     """
 
+    l = fileLog.logger(resDirectory)
 
     dpg.show_viewport()
     while dpg.is_dearpygui_running():
 
         for x in widgets:
             x.tick()
+
+        items:dict[str, Any] = { }
+
+        for k in tables.telemTable.getKeys():
+            items.update({ k : tables.telemTable.getValue(k, None) })
+
+        l.writeFrame(items)
         dpg.render_dearpygui_frame()
+
+    l.close()
 
     dpg.destroy_context()
 

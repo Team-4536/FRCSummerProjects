@@ -5,6 +5,8 @@ from typing import Any
 from node import *
 import utils.tables
 import utils.tags as tags
+import wpilib
+import robot
 
 
 
@@ -15,16 +17,18 @@ class TimeNode(Node):
         self.name = "timing"
 
         self.prevTime: float = 0.0
+        self.initTime: float = wpilib.getTime()
 
 
 
     def tick(self, data: dict[str, Any]) -> None:
 
-        data.update({ tags.DT : time.time() - self.prevTime })
-        self.prevTime = time.time()
+        data.update({ tags.DT : wpilib.getTime() - self.prevTime }) # ???: Is using one DT sample per frame accurate enough? or should each node sample?
+        data.update({ tags.TIME_SINCE_INIT : wpilib.getTime() - self.initTime })
+        self.prevTime = wpilib.getTime()
 
+        # CLEANUP: pretty sure this is redundant
         frameTime = profiling.popProf()
         profiling.pushProf()
-        utils.tables.telemTable.putNumber("Frame time ms", frameTime / 1000000)
-
+        data.update({ tags.FRAME_TIME : frameTime * 1000 })
 

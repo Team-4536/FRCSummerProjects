@@ -12,7 +12,7 @@ from node import *
 import telemetryNode
 import timeNode
 
-
+import traceback
 
 HEARTBEAT: float = 1.0
 RES = 'res'
@@ -26,11 +26,11 @@ logCount: int = 0
 # NOTE: please do not write directly to the log table value, it reuires formatting and bad messages are ignored
 def reportErr(message: str) -> None:
     global logCount # CLEANUP: this entire system is a hack, but messages aren't a thing in networktables and making a socket system is very difficult
-    cmdTable.putString(tags.LOG_TAG, f"{logCount}:ERR:" + message)
+    cmdTable.putString(tags.LOG_TAG, f"{logCount}:ERR:" + str(message))
     logCount+=1
 def reportMsg(message: str) -> None:
     global logCount
-    cmdTable.putString(tags.LOG_TAG, f"{logCount}:MSG:" + message)
+    cmdTable.putString(tags.LOG_TAG, f"{logCount}:MSG:" + str(message))
     logCount+=1
 
 
@@ -166,7 +166,7 @@ class Robot(wpilib.TimedRobot):
         try:
             x.tick(self.data)
         except Exception as exception:
-            err = f"Exception in node \"{x.name}\": {repr(exception)}"
+            err = f"Exception in node \"{x.name}\": {traceback.format_exc(chain=False)}"
             reportErr(err)
             print(err) # NOTE: this is a litte redundant, and probably tanks performance, but NT tables are too slow to actually catch every error and I don't want some slipping
 
