@@ -16,16 +16,14 @@ class logger():
     def writeFrame(self, items: dict[str, Any]):
         for k, v in items.items():
             line: str = ""
-            if type(v) is float:
-                line += "f:"
 
-                if ':' in k:
-                    assert(False)
+            if type(v) is float: line += "f:"
+            else: assert(False) # CLEANUP: These could cause big problems at competition
 
-                line += k + ":"
-                line += str(v)
-            else:
-                assert(False)
+            if ':' in k: assert(False)
+            else: line += k
+
+            line += ":" + str(v)
 
             self.file.write(line + "\n")
         self.file.write("\n")
