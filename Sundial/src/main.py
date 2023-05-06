@@ -1,4 +1,5 @@
 
+import traceback
 import dearpygui.dearpygui as dpg
 from utils import tables
 from typing import Any
@@ -85,7 +86,10 @@ if __name__ == "__main__":
         for k in tables.telemTable.getKeys():
             items.update({ k : tables.telemTable.getValue(k, None) })
 
-        l.writeFrame(items)
+        try: # CLEANUP: get rid of this trycatch
+            l.writeFrame(items)
+        except Exception as e:
+            print(traceback.format_exc(chain=False))
         dpg.render_dearpygui_frame()
 
     l.close()
