@@ -1,4 +1,5 @@
 import robotpy
+from utils.tables import telemTable
 from typing import Any
 import ntcore
 import dearpygui.dearpygui as dpg
@@ -81,14 +82,15 @@ class ntPlot(widget):
 
 
 
-    def tick(self, data: dict[str, Any]) -> None:
+    def tick(self) -> None:
 
         for i in range(len(self.tags)):
 
-            val = data.get(self.tags[i], None)
-            if val is None: val = tables.telemTable.getValue(self.tags[i], None) # CLEANUP: Hack to get around subbing to things
+            val = telemTable.getValue(self.tags[i], None)
 
-            assert(type(val) is float or type(val) is bool)
+            # NOTE: If a key doesn't exist there is no indication to the user (or if it's not a graphable type), FIX
+            if type(val) is None: continue
+            elif not (type(val) is float or type(val) is bool): continue
 
 
             # Convert types into something graphable
@@ -102,3 +104,7 @@ class ntPlot(widget):
             self.datay[i] = x
 
             dpg.set_value(self.seriesTags[i], [self.datax[i], self.datay[i]])
+
+
+
+

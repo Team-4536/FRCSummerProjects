@@ -1,4 +1,5 @@
 
+import utils.tags as tags
 import traceback
 from typing import Any
 from utils.tables import telemTable
@@ -58,17 +59,6 @@ class sundial:
             botLog.botLogWidget()
         ]
 
-        # CLEANUP: make the tags file accessable form both robot code and sundial
-        # CLEANUP: There is kind of a fundamental perforrmance problem with using a data[]
-        # instead of the plain networktables API, but like, this is just what im doing for now
-        # if it becomes a problem then we can change it
-        self.subscribedTags = [
-            "FLSpeed", "FRSpeed", "BLSpeed", "BRSpeed",
-            "FLPos", "FRPos", "BLPos", "BRPos",
-        ]
-
-        self.data: dict[str, Any] = { }
-
         dpg.show_viewport()
 
 
@@ -77,25 +67,19 @@ class sundial:
 
         logFile = open(self.resDirectory + "log.txt", "w")
 
-        # CLEANUP: Note that this doesn't cover the msg telemetry, or things sent from sun on the sundial table
-        # which im ok with for now, but it needs a better solution
-        for t in self.subscribedTags:
-            self.data.update({ t : telemTable.getValue(t, None) })
-
 
 
         while dpg.is_dearpygui_running():
 
             for x in self.widgets:
                 try:
-                    x.tick(self.data)
+                    x.tick()
                 except Exception as e:
                     print(traceback.format_exc(chain=False)) # NOTE: Add this to the logger sometime lol
 
 
-
             try: # CLEANUP: get rid of this trycatch
-                fileLogging.writeFrame(logFile, self.data)
+                fileLogging.writeFrame(logFile)
             except Exception as e:
                 print(traceback.format_exc(chain=False))
 

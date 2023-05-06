@@ -2,7 +2,6 @@
 from typing import Any
 from node import *
 import utils.tables
-from utils.tables import cmdTable
 import time
 import hardware.DCMotors
 

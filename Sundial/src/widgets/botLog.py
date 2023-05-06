@@ -1,7 +1,9 @@
 from widgets.widget import widget
+from typing import Any
 import dearpygui_ext.logger
 import dearpygui.dearpygui as dpg
-import utils.tables as tables
+from utils.tables import telemTable
+import utils.tags as tags
 
 
 
@@ -11,11 +13,12 @@ class botLogWidget(widget):
 
     def __init__(self) -> None:
         self.lastTag: str = ""
-        self.msgTopic = tables.cmdTable.getStringTopic("logs").subscribe("default")
+        self.msgTopic = telemTable.getStringTopic(tags.LOG_TAG).subscribe("default")
         self.logger = dearpygui_ext.logger.mvLogger()
 
     def tick(self) -> None:
 
+        # CLEANUP: doesn't work with data[] system
         for x in self.msgTopic.readQueue():
             split = x.value.split(":", 2)
             if (len(split) == 3):
