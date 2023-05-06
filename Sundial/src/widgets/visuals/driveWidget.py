@@ -1,7 +1,7 @@
 import dearpygui.dearpygui as dpg
+from typing import Any
 import math
 from widgets.widget import widget
-from utils.tables import *
 
 
 
@@ -103,10 +103,10 @@ class driveWidget(widget):
 
 
 
-    def tick(self) -> None:
+    def tick(self, data: dict[str, Any]) -> None:
         for i in range(0, 4):
 
-            val = telemTable.getValue(self.ntTags[i], None)
+            val = data[self.ntTags[i]]
             if type(val) is not float: continue
 
             treadPositions[i] -= val * maxWheelSpeed

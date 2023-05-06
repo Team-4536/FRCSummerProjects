@@ -1,14 +1,14 @@
 import robotpy
+from typing import Any
 import ntcore
 import dearpygui.dearpygui as dpg
 from widgets.widget import widget
 from typing import Callable
-
+import utils.tables as tables
 
 
 
 class ntPlot(widget):
-    table = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
 
     def __init__(self) -> None:
 
@@ -81,19 +81,24 @@ class ntPlot(widget):
 
 
 
-    def tick(self) -> None:
+    def tick(self, data: dict[str, Any]) -> None:
 
         for i in range(len(self.tags)):
 
-            val = self.__class__.table.getValue(self.tags[i], None)
-            if type(val) is float:
-                x = self.datay[i][1:len(self.datay[i])]
-                x.append(val)
-                self.datay[i] = x
-            # so sorry, ik this is bad, im too tired to make it good
-            if type(val) is bool:
-                x = self.datay[i][1:len(self.datay[i])]
-                x.append(1 if val else 0)
-                self.datay[i] = x
+            val = data.get(self.tags[i], None)
+            if val is None: val = tables.telemTable.getValue(self.tags[i], None) # CLEANUP: Hack to get around subbing to things
+
+            assert(type(val) is float or type(val) is bool)
+
+
+            # Convert types into something graphable
+            graphed = 0.0
+            if type(val) is bool: graphed = (1.0 if val else 0.0)
+            elif type(val) is float: graphed = val
+
+
+            x = self.datay[i][1:len(self.datay[i])]
+            x.append(graphed)
+            self.datay[i] = x
 
             dpg.set_value(self.seriesTags[i], [self.datax[i], self.datay[i]])
