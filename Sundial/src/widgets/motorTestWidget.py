@@ -5,6 +5,8 @@ from utils.tables import telemTable, sundialTable
 
 
 
+# NOTE: This whole ass class is very outdated and dumb. Please do not use until someone fixes it to be better
+# - 5/6/23
 class MotorTest(widgets.widget.widget):
 
 

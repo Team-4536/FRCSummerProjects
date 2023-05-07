@@ -1,14 +1,15 @@
 import robotpy
+from utils.tables import telemTable
+from typing import Any
 import ntcore
 import dearpygui.dearpygui as dpg
 from widgets.widget import widget
 from typing import Callable
-
+import utils.tables as tables
 
 
 
 class ntPlot(widget):
-    table = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
 
     def __init__(self) -> None:
 
@@ -85,15 +86,25 @@ class ntPlot(widget):
 
         for i in range(len(self.tags)):
 
-            val = self.__class__.table.getValue(self.tags[i], None)
-            if type(val) is float:
-                x = self.datay[i][1:len(self.datay[i])]
-                x.append(val)
-                self.datay[i] = x
-            # so sorry, ik this is bad, im too tired to make it good
-            if type(val) is bool:
-                x = self.datay[i][1:len(self.datay[i])]
-                x.append(1 if val else 0)
-                self.datay[i] = x
+            val = telemTable.getValue(self.tags[i], None)
+
+            # NOTE: If a key doesn't exist there is no indication to the user (or if it's not a graphable type), FIX
+            if type(val) is None: continue
+            elif not (type(val) is float or type(val) is bool): continue
+
+
+            # Convert types into something graphable
+            graphed = 0.0
+            if type(val) is bool: graphed = (1.0 if val else 0.0)
+            elif type(val) is float: graphed = val
+
+
+            x = self.datay[i][1:len(self.datay[i])]
+            x.append(graphed)
+            self.datay[i] = x
 
             dpg.set_value(self.seriesTags[i], [self.datax[i], self.datay[i]])
+
+
+
+

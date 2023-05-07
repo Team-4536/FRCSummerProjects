@@ -1,7 +1,9 @@
 import dearpygui.dearpygui as dpg
+from typing import Any
 import math
 from widgets.widget import widget
-from utils.tables import *
+import utils.tags as tags
+from utils.tables import telemTable
 
 
 
@@ -21,15 +23,19 @@ treadPositions: list[float] = [
 
 halfWheelSpacing: float = 70.0
 
+ntTags = [
+    tags.FL + tags.MOTOR_SPEED_CONTROL,
+    tags.FR + tags.MOTOR_SPEED_CONTROL,
+    tags.BL + tags.MOTOR_SPEED_CONTROL,
+    tags.BR + tags.MOTOR_SPEED_CONTROL
+    ]
+
 
 class driveWidget(widget):
 
 
 
     def __init__(self):
-
-
-        self.ntTags = [ "FLSpeed", "FRSpeed", "BLSpeed", "BRSpeed" ]
 
 
         with dpg.window(label="Drive", width=scWidth, height=scHeight, no_scrollbar=True) as window:
@@ -106,8 +112,8 @@ class driveWidget(widget):
     def tick(self) -> None:
         for i in range(0, 4):
 
-            val = telemTable.getValue(self.ntTags[i], None)
-            if type(val) is not float: continue
+            val = telemTable.getValue(ntTags[i], 0.0)
+            assert(type(val) is float)
 
             treadPositions[i] -= val * maxWheelSpeed
             treadPositions[i] = treadPositions[i] % treadSpacing

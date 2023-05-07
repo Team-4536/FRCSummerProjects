@@ -1,4 +1,4 @@
-
+import utils.tags as tags
 import ntcore
 from os.path import basename
 import dearpygui.dearpygui as dpg
@@ -42,7 +42,7 @@ class clientWidget(widgets.widget.widget):
 
     def tick(self) -> None:
 
-        heart = telemTable.getValue("heartbeat", None)
+        heart = telemTable.getValue(tags.HEARTBEAT, None)
         x = 0
 
         if type(heart) is float: # timeout detection

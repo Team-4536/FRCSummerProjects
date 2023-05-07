@@ -1,94 +1,107 @@
 
-import dearpygui.dearpygui as dpg
-from utils import tables
+import utils.tags as tags
+import traceback
 from typing import Any
-from widgets import driveWidget
-from widgets import motorTestWidget
+from utils.tables import telemTable
+import dearpygui.dearpygui as dpg
+from widgets.visuals import driveWidget
 from widgets import ntPlot
 from widgets import client
 from widgets import cmdWidget
 from widgets import botLog
-import fileLog
+import fileLogging
 
 
 import os
 from widgets.widget import widget
 
 
+class sundial:
+    def __init__(self) -> None:
+        # CLEANUP: is this the best way to do it?
+        self.resDirectory = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', "res"))
+        self.resDirectory += "/"
+        dpg.create_context()
+
+        # Load a font that looks ok
+        with dpg.font_registry():
+            default_font = dpg.add_font(self.resDirectory + "consolab.ttf", 13)
+        dpg.bind_font(default_font)
+
+        # Enable docking
+        dpg.create_viewport(title='Sundial', width=600, height=600)
+        dpg.configure_app(docking=True, docking_space=True)
+
+        # Load the docking layout
+        dpg.configure_app(init_file=self.resDirectory+"dpg.ini")
+
+        dpg.setup_dearpygui()
+
+
+        # menu bar initalization
+        def save_init():
+            dpg.save_init_file(self.resDirectory+"dpg.ini")
+
+        with dpg.viewport_menu_bar():
+            with dpg.menu(label="Add widgets"):
+                dpg.add_menu_item(label="NT Plot", callback=lambda s,d: self.widgets.append(ntPlot.ntPlot()))
+            dpg.add_button(label="save layout", callback=save_init)
+
+
+
+
+        self.widgets: list[widget] = [
+
+            driveWidget.driveWidget(),
+            client.clientWidget(),
+            ntPlot.ntPlot(),
+            cmdWidget.cmdWidget(),
+            botLog.botLogWidget()
+        ]
+
+        dpg.show_viewport()
+
+
+
+    def run(self):
+
+        logFile = open(self.resDirectory + "log.txt", "w")
+
+
+
+        while dpg.is_dearpygui_running():
+
+            for x in self.widgets:
+                try:
+                    x.tick()
+                except Exception as e:
+                    print(traceback.format_exc(chain=False)) # NOTE: Add this to the logger sometime lol
+
+
+            try: # CLEANUP: get rid of this trycatch
+                fileLogging.writeFrame(logFile)
+            except Exception as e:
+                print(traceback.format_exc(chain=False))
+
+            dpg.render_dearpygui_frame()
+
+        logFile.close()
+        dpg.destroy_context()
+
+
+
 
 if __name__ == "__main__":
 
-    # CLEANUP: is this the best way to do it?
-    resDirectory = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', "res"))
-    resDirectory += "/"
-    dpg.create_context()
 
+    s = sundial()
+    s.run()
 
-
-    with dpg.font_registry():
-        default_font = dpg.add_font(resDirectory + "consolab.ttf", 13)
-    dpg.bind_font(default_font)
-
-
-
-
-
-
-
-    dpg.create_viewport(title='Sundial', width=600, height=600)
-    dpg.configure_app(docking=True, docking_space=True)
-    dpg.configure_app(init_file=resDirectory+"dpg.ini")
-    dpg.setup_dearpygui()
-
-
-
-    widgets: list[widget] = [ ]
-
-    widgets.append(driveWidget.driveWidget())
-    widgets.append(client.clientWidget())
-    widgets.append(ntPlot.ntPlot())
-    widgets.append(motorTestWidget.MotorTest())
-    widgets.append(motorTestWidget.MotorTest())
-    widgets.append(cmdWidget.cmdWidget())
-    widgets.append(botLog.botLogWidget())
-
-
-
-
-    def save_init():
-        dpg.save_init_file(resDirectory+"dpg.ini")
-
-    with dpg.viewport_menu_bar():
-        with dpg.menu(label="Add widgets"):
-            dpg.add_menu_item(label="NT Plot", callback=lambda s,d: widgets.append(ntPlot.ntPlot()))
-        dpg.add_button(label="save layout", callback=save_init)
-
-
-
-    """
-
+    """ #NOTE: I tried to get this to work but docking kinda really broke it
     import dearpygui_ext.themes as themes
     LIGHT_IMGUI_THEME = themes.create_theme_imgui_light()
     dpg.bind_theme(LIGHT_IMGUI_THEME)
     """
 
-    l = fileLog.logger(resDirectory)
 
-    dpg.show_viewport()
-    while dpg.is_dearpygui_running():
-
-        for x in widgets:
-            x.tick()
-
-        items:dict[str, Any] = { }
-
-        for k in tables.telemTable.getKeys():
-            items.update({ k : tables.telemTable.getValue(k, None) })
-
-        l.writeFrame(items)
-        dpg.render_dearpygui_frame()
-
-    l.close()
-
-    dpg.destroy_context()
 

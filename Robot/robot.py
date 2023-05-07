@@ -15,7 +15,6 @@ import timeNode
 import traceback
 
 HEARTBEAT: float = 1.0
-RES = 'res'
 UNKNOWN_RES = 'unknown cmd'
 
 
@@ -26,11 +25,11 @@ logCount: int = 0
 # NOTE: please do not write directly to the log table value, it reuires formatting and bad messages are ignored
 def reportErr(message: str) -> None:
     global logCount # CLEANUP: this entire system is a hack, but messages aren't a thing in networktables and making a socket system is very difficult
-    cmdTable.putString(tags.LOG_TAG, f"{logCount}:ERR:" + str(message))
+    telemTable.putString(tags.LOG_TAG, f"{logCount}:ERR:" + str(message))
     logCount+=1
 def reportMsg(message: str) -> None:
     global logCount
-    cmdTable.putString(tags.LOG_TAG, f"{logCount}:MSG:" + str(message))
+    telemTable.putString(tags.LOG_TAG, f"{logCount}:MSG:" + str(message))
     logCount+=1
 
 
@@ -84,7 +83,7 @@ class Robot(wpilib.TimedRobot):
             }
 
         self.prevTime: float = 0.0
-        self.msgTopic = cmdTable.getStringTopic("msg").subscribe("default")
+        self.msgTopic = telemTable.getStringTopic(tags.MSG).subscribe("default")
 
 
 
@@ -121,15 +120,14 @@ class Robot(wpilib.TimedRobot):
 
         t = time.time()
         if (t - self.prevTime) > HEARTBEAT:
-            telemTable.putNumber("heartbeat", t)
+            telemTable.putNumber(tags.HEARTBEAT, t)
             self.prevTime = t
 
 
 
         for x in self.msgTopic.readQueue():
             res = self.parseAndRespondMsg(x.value)
-            if res is not None: cmdTable.putString(RES, res)
-
+            if res is not None: telemTable.putString(tags.RES, res)
 
 
         # run procs +=====================================================================

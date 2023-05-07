@@ -37,15 +37,22 @@ DBLSOLENOID_NAME = "DBLSolenoid"
 
 DT = "dt"
 TIME_SINCE_INIT = "time"
+HEARTBEAT = "heartbeat"
+
+GYRO_PITCH = "pitch"
+GYRO_YAW = "yaw"
+GYRO_ROLL = "roll"
+
 FRAME_TIME = "frameTime"
 INPUT = "input"
 
 
 LOG_TAG = "logs"
+MSG = "msg"
+RES = 'res'
 
-GYRO_PITCH = "pitch"
-GYRO_YAW = "yaw"
-GYRO_ROLL = "roll"
+
+
 
 
 
