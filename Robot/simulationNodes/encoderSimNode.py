@@ -8,7 +8,7 @@ import utils.tags as tags
 class EncoderSimNode(Node):
 
 
-    def __init__(self, pref: tags.Tag, motor: DCMotorNode, encoder: VirtualEncoderNode) -> None:
+    def __init__(self, pref: str, motor: DCMotorNode, encoder: VirtualEncoderNode) -> None:
 
         self.pref = pref
 

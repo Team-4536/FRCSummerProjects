@@ -9,7 +9,7 @@ import robot
 # Note: true = set solenoid to forward, false = set solenoid reverse
 class PneumaticsNode(Node):
 
-    def __init__(self, pref: tags.Tag, solenoid: wpilib.DoubleSolenoid) -> None:
+    def __init__(self, pref: str, solenoid: wpilib.DoubleSolenoid) -> None:
         self.pref = pref
 
         self.doubleSolenoid = solenoid

@@ -90,10 +90,10 @@ class Robot(wpilib.TimedRobot):
 
 
         self.data: dict[str, Any] = { } # continuous data
-        self.procs: list[Node] = [ ] # processes / including hardware
+        self.procs: list[Node] = [ ] # NODES / including hardware
 
 
-        inits.makeFlymer(self.procs)
+        inits.makeSwerveDrive(self.procs)
 
         found = False
         for x in self.procs:

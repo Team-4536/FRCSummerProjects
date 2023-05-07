@@ -27,13 +27,27 @@ treadCount = 5
 treadPositions: list[float] = [ 0, 0, 0, 0 ]
 
 
-ntTags = [
-    tags.FL + tags.MOTOR_SPEED_CONTROL,
-    tags.FR + tags.MOTOR_SPEED_CONTROL,
-    tags.BL + tags.MOTOR_SPEED_CONTROL,
-    tags.BR + tags.MOTOR_SPEED_CONTROL
+steeringTags = [
+    tags.FLSteering + tags.ENCODER_READING,
+    tags.FLSteering + tags.ENCODER_READING,
+    tags.FLSteering + tags.ENCODER_READING,
+    tags.FLSteering + tags.ENCODER_READING
     ]
 
+driveTags = [
+    tags.FLDrive + tags.MOTOR_SPEED_CONTROL,
+    tags.FRDrive + tags.MOTOR_SPEED_CONTROL,
+    tags.BLDrive + tags.MOTOR_SPEED_CONTROL,
+    tags.BRDrive + tags.MOTOR_SPEED_CONTROL
+    ]
+
+
+translations = [
+    [-halfWheelSpacing, -halfWheelSpacing],
+    [ halfWheelSpacing, -halfWheelSpacing],
+    [-halfWheelSpacing,  halfWheelSpacing],
+    [ halfWheelSpacing,  halfWheelSpacing]
+]
 
 class swerveWidget(widget):
 
@@ -69,39 +83,35 @@ class swerveWidget(widget):
                         self.wheelNodes = [ ]
                         self.treadNodes = [ ]
                         self.maskNodes = [ ]
+                        self.rotationNodes = [ ]
                         for x in range(0, 4):
                             with dpg.draw_node() as wheelNode:
                                 self.wheelNodes.append(wheelNode)
-                                dpg.draw_rectangle([-wheelWidth/2, wheelHeight/2], [wheelWidth/2, -wheelHeight/2], color=wheelColor, thickness=lineThickness)
-                                dpg.draw_circle((0, 0), wheelRadius, color=wheelColor, thickness=lineThickness)
-                                with dpg.draw_node() as treadNode:
-                                    self.treadNodes.append(treadNode)
-                                    for y in range(0, treadCount):
 
-                                        dpg.draw_line([-wheelWidth/2, y*treadSpacing-wheelHeight/2], [wheelWidth/2, y*treadSpacing-wheelHeight/2], color=wheelColor, thickness=lineThickness)
+                                with dpg.draw_node() as rotNode:
+                                    self.rotationNodes.append(rotNode)
+
+                                    dpg.draw_rectangle([-wheelWidth/2, wheelHeight/2], [wheelWidth/2, -wheelHeight/2], color=wheelColor, thickness=lineThickness)
+                                    dpg.draw_circle((0, 0), wheelRadius, color=wheelColor, thickness=lineThickness)
+                                    with dpg.draw_node() as treadNode:
+                                        self.treadNodes.append(treadNode)
+                                        for y in range(0, treadCount):
+
+                                            dpg.draw_line([-wheelWidth/2, y*treadSpacing-wheelHeight/2], [wheelWidth/2, y*treadSpacing-wheelHeight/2], color=wheelColor, thickness=lineThickness)
 
 
-                                with dpg.draw_node() as maskNode:
-                                    self.maskNodes.append(maskNode)
-                                    # upper mask
-                                    dpg.draw_rectangle([-wheelWidth/2-3, (-wheelHeight/2)-2], [wheelWidth/2+3, (-wheelHeight/2)-wheelWidth-5], fill=backColor, color=backColor)
-                                    # lower
-                                    dpg.draw_rectangle([-wheelWidth/2-3, (wheelHeight/2)+1], [wheelWidth/2+3, (wheelHeight/2)+wheelWidth+5], fill=backColor, color=backColor)
+                                    with dpg.draw_node() as maskNode:
+                                        self.maskNodes.append(maskNode)
+                                        # upper mask
+                                        dpg.draw_rectangle([-wheelWidth/2-3, (-wheelHeight/2)-2], [wheelWidth/2+3, (-wheelHeight/2)-wheelWidth-5], fill=backColor, color=backColor)
+                                        # lower
+                                        dpg.draw_rectangle([-wheelWidth/2-3, (wheelHeight/2)+1], [wheelWidth/2+3, (wheelHeight/2)+wheelWidth+5], fill=backColor, color=backColor)
 
 
 
         dpg.apply_transform(self.rootNode, dpg.create_translation_matrix([scWidth / 2, scHeight / 2])) # type: ignore
-
-        translations = [
-            [-halfWheelSpacing, -halfWheelSpacing],
-            [ halfWheelSpacing, -halfWheelSpacing],
-            [-halfWheelSpacing,  halfWheelSpacing],
-            [ halfWheelSpacing,  halfWheelSpacing]
-        ]
-
         for i in range(0, 4):
             dpg.apply_transform(self.wheelNodes[i], dpg.create_translation_matrix(translations[i]))
-
 
 
 
@@ -110,12 +120,20 @@ class swerveWidget(widget):
     def tick(self) -> None:
         for i in range(0, 4):
 
-            val = telemTable.getValue(ntTags[i], 0.0)
+            # TREAD MOVEMENT ============================
+            val = telemTable.getValue(driveTags[i], 0.0)
             assert(type(val) is float)
 
             treadPositions[i] -= val * maxWheelSpeed
             treadPositions[i] = treadPositions[i] % treadSpacing
             dpg.apply_transform(self.treadNodes[i], dpg.create_translation_matrix([0, treadPositions[i]]))
+
+
+            # TURNING MOVEMENT ==========================
+            val = telemTable.getValue(steeringTags[i], 0.0)
+            assert(type(val) is float)
+
+            dpg.apply_transform(self.rotationNodes[i], dpg.create_rotation_matrix(val, [0, 0, -1]))
 
 
         width = dpg.get_item_width(self.windowTag)
