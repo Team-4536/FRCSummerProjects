@@ -10,7 +10,7 @@ from utils.tables import telemTable
 halfWheelSpacing: float = 70.0
 wheelRadius = 35
 
-backColor = [100, 100, 30]
+backColor = [0, 0, 0]
 wheelColor = [255, 255, 255]
 
 wheelWidth = 30
