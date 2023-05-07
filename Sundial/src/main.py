@@ -5,6 +5,7 @@ from typing import Any
 from utils.tables import telemTable
 import dearpygui.dearpygui as dpg
 from widgets.visuals import driveWidget
+from widgets.visuals import swerveWidget
 from widgets import ntPlot
 from widgets import client
 from widgets import cmdWidget
@@ -52,11 +53,12 @@ class sundial:
 
         self.widgets: list[widget] = [
 
-            driveWidget.driveWidget(),
+            #driveWidget.driveWidget(),
+            swerveWidget.swerveWidget(),
             client.clientWidget(),
             ntPlot.ntPlot(),
             cmdWidget.cmdWidget(),
-            botLog.botLogWidget()
+            botLog.botLogWidget(),
         ]
 
         dpg.show_viewport()
