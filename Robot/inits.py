@@ -9,7 +9,7 @@ import simulationNodes.encoderSimNode as encoderSimNode
 from hardware.DCMotors import *
 from hardware.Encoders import *
 import hardware.Input
-import mechController
+import swerveController
 import hardware.pneumatics as pneumatics
 import hardware.gyros as gyros
 
@@ -50,6 +50,7 @@ def makeSwerveDrive(nodes: list[Node]):
     nodes.append(gyros.GyroNode(gyros.VirtualGyro()))
     nodes.append(hardware.Input.FlymerInputNode())
     # SWERVE CTRLR
+    nodes.append(swerveController.SwerveProf())
 
 
 
@@ -69,12 +70,17 @@ def makeSwerveDrive(nodes: list[Node]):
         driveEncoders.append(VirtualEncoderNode(drivePrefs[i]))
         nodes.append(driveEncoders[-1])
 
+        nodes.append(encoderSimNode.EncoderSimNode(drivePrefs[i], driveMotors[i], driveEncoders[i]))
+
+
 
         steerMotors.append(DCMotorNode(steerPrefs[i], NEOSpec, VirtualController()))
         nodes.append(steerMotors[-1])
 
         steerEncoders.append(VirtualEncoderNode(steerPrefs[i]))
         nodes.append(steerEncoders[-1])
+
+        nodes.append(encoderSimNode.EncoderSimNode(steerPrefs[i], steerMotors[i], steerEncoders[i]))
 
 
 

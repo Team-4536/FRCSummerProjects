@@ -53,9 +53,6 @@ class cmdWidget(widget):
             dpg.set_value(self.resTag, split[1])
             self.expectedStamp = split[0]
 
-        print(self.expectedStamp, end="\n")
-        print(split[0], "\n\n")
-
 
 
 

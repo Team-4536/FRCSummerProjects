@@ -10,7 +10,7 @@ from utils.tables import telemTable
 halfWheelSpacing: float = 70.0
 wheelRadius = 35
 
-backColor = [0, 0, 0]
+backColor = [100, 100, 30]
 wheelColor = [255, 255, 255]
 
 wheelWidth = 30
@@ -29,9 +29,9 @@ treadPositions: list[float] = [ 0, 0, 0, 0 ]
 
 steeringTags = [
     tags.FLSteering + tags.ENCODER_READING,
-    tags.FLSteering + tags.ENCODER_READING,
-    tags.FLSteering + tags.ENCODER_READING,
-    tags.FLSteering + tags.ENCODER_READING
+    tags.FRSteering + tags.ENCODER_READING,
+    tags.BLSteering + tags.ENCODER_READING,
+    tags.BRSteering + tags.ENCODER_READING
     ]
 
 driveTags = [
@@ -48,6 +48,17 @@ translations = [
     [-halfWheelSpacing,  halfWheelSpacing],
     [ halfWheelSpacing,  halfWheelSpacing]
 ]
+
+def drawPolyRect(start, end, color, fill, thickness):
+    points = [
+        [start[0], start[1]],
+        [start[0], end[1]],
+        [end[0], end[1]],
+        [end[0], start[1]]
+    ]
+    dpg.draw_polygon(points, thickness=thickness, fill=fill, color=color)
+
+
 
 class swerveWidget(widget):
 
@@ -82,7 +93,6 @@ class swerveWidget(widget):
 
                         self.wheelNodes = [ ]
                         self.treadNodes = [ ]
-                        self.maskNodes = [ ]
                         self.rotationNodes = [ ]
                         for x in range(0, 4):
                             with dpg.draw_node() as wheelNode:
@@ -91,21 +101,18 @@ class swerveWidget(widget):
                                 with dpg.draw_node() as rotNode:
                                     self.rotationNodes.append(rotNode)
 
-                                    dpg.draw_rectangle([-wheelWidth/2, wheelHeight/2], [wheelWidth/2, -wheelHeight/2], color=wheelColor, thickness=lineThickness)
+                                    drawPolyRect([-wheelWidth/2, wheelHeight/2], [wheelWidth/2, -wheelHeight/2], wheelColor, [0, 0, 0, 0], lineThickness)
                                     dpg.draw_circle((0, 0), wheelRadius, color=wheelColor, thickness=lineThickness)
                                     with dpg.draw_node() as treadNode:
                                         self.treadNodes.append(treadNode)
                                         for y in range(0, treadCount):
-
                                             dpg.draw_line([-wheelWidth/2, y*treadSpacing-wheelHeight/2], [wheelWidth/2, y*treadSpacing-wheelHeight/2], color=wheelColor, thickness=lineThickness)
 
 
-                                    with dpg.draw_node() as maskNode:
-                                        self.maskNodes.append(maskNode)
-                                        # upper mask
-                                        dpg.draw_rectangle([-wheelWidth/2-3, (-wheelHeight/2)-2], [wheelWidth/2+3, (-wheelHeight/2)-wheelWidth-5], fill=backColor, color=backColor)
-                                        # lower
-                                        dpg.draw_rectangle([-wheelWidth/2-3, (wheelHeight/2)+1], [wheelWidth/2+3, (wheelHeight/2)+wheelWidth+5], fill=backColor, color=backColor)
+                                    # upper mask
+                                    drawPolyRect([-wheelWidth/2-3, (-wheelHeight/2)-2], [wheelWidth/2+3, (-wheelHeight/2)-wheelWidth-5], backColor, backColor, lineThickness)
+                                    # lower
+                                    drawPolyRect([-wheelWidth/2-3, (wheelHeight/2)+1], [wheelWidth/2+3, (wheelHeight/2)+wheelWidth+5], backColor, backColor, lineThickness)
 
 
 
@@ -133,7 +140,8 @@ class swerveWidget(widget):
             val = telemTable.getValue(steeringTags[i], 0.0)
             assert(type(val) is float)
 
-            dpg.apply_transform(self.rotationNodes[i], dpg.create_rotation_matrix(val, [0, 0, -1]))
+            val *= 2 * math.pi
+            dpg.apply_transform(self.rotationNodes[i], dpg.create_rotation_matrix(val, [0, 0, 1]))
 
 
         width = dpg.get_item_width(self.windowTag)

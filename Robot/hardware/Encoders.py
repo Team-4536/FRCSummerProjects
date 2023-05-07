@@ -40,7 +40,7 @@ class RelativeEncoderNode(EncoderNode):
 # output will move with motor output, so reversal doesnt need to happen if the motors are all reversed correctly
 class VirtualEncoderNode(EncoderNode):
 
-    NOISE = 0.005
+    NOISE = 0.001
 
     def __init__(self, pref: str) -> None:
 

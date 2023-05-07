@@ -19,14 +19,12 @@ loggedTags = [
     tags.FRSteering + tags.ENCODER_READING,
     tags.BLSteering + tags.ENCODER_READING,
     tags.BRSteering + tags.ENCODER_READING,
-    tags.MSG,
-    tags.LOG_TAG,
-    tags.RES,
     tags.TIME_SINCE_INIT,
     tags.GYRO_PITCH,
     tags.GYRO_YAW,
     tags.GYRO_ROLL
 ]
+# NOTE: not logging msg, err, or response rn bc they are strs and would be bad to log
 
 
 
