@@ -5,6 +5,7 @@ import utils.tags as tags
 from hardware.Input import FlymerInputProfile
 from utils.V2 import V2
 from typing import Any
+from utils.PIDController import PIDController
 
 
 class SwerveProf(Node):
@@ -37,58 +38,119 @@ class SwerveProf(Node):
         BRTurningVector = V2(-math.cos(45) * inputZ, math.cos(45) * inputZ)
 
         #field oriented offset (change later from gyro to encoder readings)
-        #leftStick = leftStick.rotateDegrees(-inputGyro)
+        leftStick = leftStick.rotateDegrees(-inputGyro)
 
         FLVector = leftStick.avg(FLTurningVector)
         FRVector = leftStick.avg(FRTurningVector)
         BLVector = leftStick.avg(BLTurningVector)
         BRVector = leftStick.avg(BRTurningVector)
 
+        """-----------------------------------------"""
+
+        #Encoder positions conversion to angle and first wrap (0 to 359)
+        FLPos = abs(data[tags.FLSteering + tags.ENCODER_READING] * 360)
+        if FLPos >= 360:
+            FLPos = 360 - FLPos
+
+        FRPos = abs(data[tags.FRSteering + tags.ENCODER_READING] * 360)
+        if FRPos >= 360:
+            FRPos = 360 - FRPos
+
+        BLPos = abs(data[tags.BLSteering + tags.ENCODER_READING] * 360)
+        if BLPos >= 360:
+            BLPos = 360 - BLPos
+
+        BRPos = abs(data[tags.BRSteering + tags.ENCODER_READING] * 360)
+        if BRPos >= 360:
+            BRPos = 360 - BRPos
+
+        """----------------------------------------------------"""
+
+        #set values                  
+        FLTarget = FLVector.getAngle()
+        FRTarget = FRVector.getAngle()
+        BLTarget = BLVector.getAngle()
+        BRTarget = BRVector.getAngle()
+
+        FLPower = FLVector.getLength()
+        FRPower = FRVector.getLength()
+        BLPower = BLVector.getLength()
+        BRPower = BRVector.getLength()
+
+        """------------------------------------"""
+
+        #find quickest path and change values to it
+        if (FLTarget - FLPos) > 180:
+            FLTarget = FLTarget + 180
+            FLPower = FLPower * -1
+
+        if (FRTarget - FRPos) > 180:
+            FRTarget = FRTarget + 180
+            FRPower = FRPower * -1
+
+        if (BLTarget - BLPos) > 180:
+            BLTarget = BLTarget + 180
+            BLPower = BLPower * -1
+
+        if (BRTarget - BRPos) > 180:
+            BRTarget = BRTarget + 180
+            BRPower = BRPower * -1
+
+        """-------------------------------"""
+
+        #angle wrap for targets (0 to 359)
+        #FL
+        if FLTarget >= 360:
+            FLTarget = FLTarget - 360
+        
+        #FR
+        if FRTarget >= 360:
+            FRTarget = FRTarget - 360
+        
+        #BL
+        if BLTarget >= 360:
+            BLTarget = BLTarget - 360
+        
+        #BR
+        if BRTarget >= 360:
+            BRTarget = BRTarget - 360
+
+        """---------------------------------------"""
+
         #scalar
         #find highest value
-        if FLVector.getLength() > FRVector.getLength():
-            maxPowerInput = FLVector.getLength()
-        elif FRVector.getLength() > BLVector.getLength():
-            maxPowerInput = FRVector.getLength()
-        elif BLVector.getLength() > BRVector.getLength():
-            maxPowerInput = BRVector.getLength()
-        else:
-            maxPowerInput = BRVector.getLength()
+        maxPowerInput = 0
+
+        #FL vs FR
+        if abs(FLPower) > abs(FRPower):
+            maxPowerInput = abs(FLPower)
+        else: 
+            maxPowerInput = abs(FRPower)
+        #BL
+        if abs(BLPower) > maxPowerInput:
+            maxPowerInput = abs(BLPower)
+        #BR
+        if abs(BRPower) > maxPowerInput:
+            maxPowerInput = abs(BRPower)
         
-        #set scalar value
+        #set scalar value, if loop can be removed later for fastest speeds but it broke last time I tried and will probably kill someone if it runs
         if maxPowerInput > 1:
             scalar = 1 / maxPowerInput
         else:
             scalar = 1
+
+        """---------------------------------------------"""
+
+        #drive values (power)
+        data[tags.FLDrive + tags.MOTOR_SPEED_CONTROL] = FLPower * scalar
+        data[tags.FRDrive + tags.MOTOR_SPEED_CONTROL] = FRPower * scalar
+        data[tags.BLDrive + tags.MOTOR_SPEED_CONTROL] = BLPower * scalar
+        data[tags.BRDrive + tags.MOTOR_SPEED_CONTROL] = BRPower * scalar
+
+        #target steering values (in rotaions)
+        data[tags.FLSteering + tags.MOTOR_SPEED_CONTROL] = inputZ #FLTarget / 360 # "/ 360" converts back to rotations
+        data[tags.FRSteering + tags.MOTOR_SPEED_CONTROL] = inputZ #FRTarget / 360
+        data[tags.BLSteering + tags.MOTOR_SPEED_CONTROL] = inputZ #BLTarget / 360
+        data[tags.BRSteering + tags.MOTOR_SPEED_CONTROL] = inputZ #BRTarget / 360
         
-
-        #completed wheel value assignement
-        FLScaled = FLVector.multiplyBy(scalar)
-        FRScaled = FRVector.multiplyBy(scalar)
-        BLScaled = BLVector.multiplyBy(scalar)
-        BRScaled = BRVector.multiplyBy(scalar)
-
-        
-        data[tags.FLDrive + tags.MOTOR_SPEED_CONTROL] = inputY #wheel output is still always positive for some reason
-        data[tags.FRDrive + tags.MOTOR_SPEED_CONTROL] = inputY
-        data[tags.BLDrive + tags.MOTOR_SPEED_CONTROL] = inputY
-        data[tags.BRDrive + tags.MOTOR_SPEED_CONTROL] = inputY
-
-
-        data[tags.FLSteering] = 0 #will be an angle once pid is created, for now just nothing
-        data[tags.FRSteering] = 0
-        data[tags.BLSteering] = 0
-        data[tags.BRSteering] = 0
-
-
-
-
-
-
-
-
-
-
-
-
 
