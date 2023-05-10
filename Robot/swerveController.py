@@ -24,8 +24,8 @@ class SwerveProf(Node):
         assert type(input) == FlymerInputProfile
 
         #raw inputs
-        inputX = input.drive[0]
-        inputY = input.drive[1]
+        inputY = input.drive[0]
+        inputX = input.drive[1]
         inputZ = input.turning
 
         inputGyro = 0 #constant for testing
@@ -33,12 +33,12 @@ class SwerveProf(Node):
         #assign inputs to vectors
         leftStick = V2(inputX, inputY)
         FLTurningVector = V2(math.cos(45) * inputZ, math.cos(45) * inputZ)
-        FRTurningVector = V2(math.cos(45) * inputZ, -math.cos(45) * inputZ)
-        BLTurningVector = V2(-math.cos(45) * inputZ, -math.cos(45) * inputZ)
-        BRTurningVector = V2(-math.cos(45) * inputZ, math.cos(45) * inputZ)
+        FRTurningVector = V2(-math.cos(45) * inputZ, math.cos(45) * inputZ)
+        BLTurningVector = V2(math.cos(45) * inputZ, -math.cos(45) * inputZ)
+        BRTurningVector = V2(-math.cos(45) * inputZ, -math.cos(45) * inputZ)
 
         #field oriented offset (change later from gyro to encoder readings)
-        leftStick = leftStick.rotateDegrees(-inputGyro)
+        #leftStick = leftStick.rotateDegrees(-inputGyro)
 
         FLVector = leftStick.avg(FLTurningVector)
         FRVector = leftStick.avg(FRTurningVector)
@@ -47,23 +47,32 @@ class SwerveProf(Node):
 
         """-----------------------------------------"""
 
-        #Encoder positions conversion to angle and first wrap (0 to 359)
-        FLPos = abs(data[tags.FLSteering + tags.ENCODER_READING] * 360)
-        if FLPos >= 360:
-            FLPos = 360 - FLPos
+        #raw encoder positions
+        FLPos = data[tags.FLSteering + tags.ENCODER_READING]
+        FRPos = data[tags.FRSteering + tags.ENCODER_READING]
+        BLPos = data[tags.BLSteering + tags.ENCODER_READING]
+        BRPos = data[tags.BRSteering + tags.ENCODER_READING]
 
-        FRPos = abs(data[tags.FRSteering + tags.ENCODER_READING] * 360)
-        if FRPos >= 360:
-            FRPos = 360 - FRPos
 
-        BLPos = abs(data[tags.BLSteering + tags.ENCODER_READING] * 360)
-        if BLPos >= 360:
-            BLPos = 360 - BLPos
+        #Encoder positions as angles and first wrap (0 to 359)
+        FLPosAngle = (data[tags.FLSteering + tags.ENCODER_READING] % 1) * 360
+        FRPosAngle = (data[tags.FRSteering + tags.ENCODER_READING] % 1) * 360
+        BLPosAngle = (data[tags.BLSteering + tags.ENCODER_READING] % 1) * 360
+        BRPosAngle = (data[tags.BRSteering + tags.ENCODER_READING] % 1) * 360
 
-        BRPos = abs(data[tags.BRSteering + tags.ENCODER_READING] * 360)
-        if BRPos >= 360:
-            BRPos = 360 - BRPos
+        if FLPosAngle < 0:
+            FLPosAngle = FLPosAngle + 360
 
+        """
+        if FLPosAngle > 180:
+            FLPosAngle = FLPosAngle - 360
+        if FRPosAngle > 180:
+            FRPosAngle = FRPosAngle - 360
+        if BLPosAngle > 180:
+            BLPosAngle = BLPosAngle - 360
+        if BRPosAngle > 180:
+            BRPosAngle = BRPosAngle - 360
+        """
         """----------------------------------------------------"""
 
         #set values                  
@@ -72,49 +81,39 @@ class SwerveProf(Node):
         BLTarget = BLVector.getAngle()
         BRTarget = BRVector.getAngle()
 
+        if FLTarget >= 360:
+            FLTarget = FLTarget - 360
+        if FRTarget > 180:
+            FRTarget = FRTarget - 360
+        if BLTarget > 180:
+            BLTarget = BLTarget - 360
+        if BRTarget > 180:
+            BRTarget = BRTarget - 360
+
         FLPower = FLVector.getLength()
         FRPower = FRVector.getLength()
         BLPower = BLVector.getLength()
         BRPower = BRVector.getLength()
 
         """------------------------------------"""
-
+        """
         #find quickest path and change values to it
-        if (FLTarget - FLPos) > 180:
+        if (FLTarget - FLPosAngle) >= 180:
             FLTarget = FLTarget + 180
-            FLPower = FLPower * -1
+            FLPower = -FLPower
 
-        if (FRTarget - FRPos) > 180:
+        if (FRTarget - FRPosAngle) >= 180:
             FRTarget = FRTarget + 180
-            FRPower = FRPower * -1
+            FRPower = -FRPower
 
-        if (BLTarget - BLPos) > 180:
+        if (BLTarget - BLPosAngle) >= 180:
             BLTarget = BLTarget + 180
-            BLPower = BLPower * -1
+            BLPower = -BLPower
 
-        if (BRTarget - BRPos) > 180:
+        if (BRTarget - BRPosAngle) >= 180:
             BRTarget = BRTarget + 180
-            BRPower = BRPower * -1
-
-        """-------------------------------"""
-
-        #angle wrap for targets (0 to 359)
-        #FL
-        if FLTarget >= 360:
-            FLTarget = FLTarget - 360
-        
-        #FR
-        if FRTarget >= 360:
-            FRTarget = FRTarget - 360
-        
-        #BL
-        if BLTarget >= 360:
-            BLTarget = BLTarget - 360
-        
-        #BR
-        if BRTarget >= 360:
-            BRTarget = BRTarget - 360
-
+            BRPower = -BRPower
+        """
         """---------------------------------------"""
 
         #scalar
@@ -135,22 +134,81 @@ class SwerveProf(Node):
         
         #set scalar value, if loop can be removed later for fastest speeds but it broke last time I tried and will probably kill someone if it runs
         if maxPowerInput > 1:
-            scalar = 1 / maxPowerInput
+            scalarPower = 1 / maxPowerInput
         else:
-            scalar = 1
+            scalarPower = 1
 
         """---------------------------------------------"""
 
+        #PID Controller for  steering
+        FLPID = PIDController(5.0, 0.0, 0.0)
+        FRPID = PIDController(5.0, 0.0, 0.0)
+        BLPID = PIDController(5.0, 0.0, 0.0)
+        BRPID = PIDController(5.0, 0.0, 0.0)
+
+        #calculate error
+
+        #i spent an hour trying to figure out why the error is never set to a negative number EVER
+        #its like 11:30pm now and i still don't know whats wrong
+        #normally i would ask rob but he went to bed after doing school work so im on my own
+        #everything was almost working, and now nothing works - i love it when that happens
+        #i have been working on this since 6pm and it still doesnt work
+        #i hope rob finishes his work soon so that i can get this working
+        #i am making a diary here to distract my mind from the unsolvale problem
+        #it took me like 7 tries to figure out how to spell problem - i should probably go to bed
+        #i just want our stupid serve to work but ive ran through the sim in my head and did all the math this file does
+        #and it got a different result
+        #wtf
+        #goodnight
+        FLSteeringError = (360 - FLPosAngle) - FLTarget
+        FRSteeringError = FRTarget - FRPosAngle
+        BLSteeringError = BLTarget - BLPosAngle
+        BRSteeringError = BRTarget - BRPosAngle
+        
+        if FLSteeringError > 180:
+            FLSteeringError = 360 - FLSteeringError
+
+        if FRSteeringError > 180:
+            FRSteeringError = FRSteeringError - 360
+
+        if BLSteeringError > 180:
+            BLSteeringError = BLSteeringError - 360
+
+        if BRSteeringError > 180:
+            BRSteeringError = BRSteeringError - 360
+        """
+        #ignore wrap
+        if (FLSteeringError) >= 180:
+            FLTarget = FLTarget + 180
+            FLPower = -FLPower
+
+        if (FRSteeringError) >= 180:
+            FRTarget = FRTarget + 180
+            FRPower = -FRPower
+
+        if (BLSteeringError) >= 180:
+            BLTarget = BLTarget + 180
+            BLPower = -BLPower
+
+        if (BRSteeringError) >= 180:
+            BRTarget = BRTarget + 180
+            BRPower = -BRPower
+        """
+        """============================================="""
+
         #drive values (power)
-        data[tags.FLDrive + tags.MOTOR_SPEED_CONTROL] = FLPower * scalar
-        data[tags.FRDrive + tags.MOTOR_SPEED_CONTROL] = FRPower * scalar
-        data[tags.BLDrive + tags.MOTOR_SPEED_CONTROL] = BLPower * scalar
-        data[tags.BRDrive + tags.MOTOR_SPEED_CONTROL] = BRPower * scalar
+        data[tags.FLDrive + tags.MOTOR_SPEED_CONTROL] = FLPower * scalarPower
+        data[tags.FRDrive + tags.MOTOR_SPEED_CONTROL] = FRPower * scalarPower
+        data[tags.BLDrive + tags.MOTOR_SPEED_CONTROL] = BLPower * scalarPower
+        data[tags.BRDrive + tags.MOTOR_SPEED_CONTROL] = BRPower * scalarPower
 
         #target steering values (in rotaions)
-        data[tags.FLSteering + tags.MOTOR_SPEED_CONTROL] = inputZ #FLTarget / 360 # "/ 360" converts back to rotations
-        data[tags.FRSteering + tags.MOTOR_SPEED_CONTROL] = inputZ #FRTarget / 360
-        data[tags.BLSteering + tags.MOTOR_SPEED_CONTROL] = inputZ #BLTarget / 360
-        data[tags.BRSteering + tags.MOTOR_SPEED_CONTROL] = inputZ #BRTarget / 360
-        
+        data[tags.FLSteering + tags.MOTOR_SPEED_CONTROL] = FLPID.tickErr(FLSteeringError / 360, data[tags.DT])
 
+        data[tags.FRSteering + tags.MOTOR_SPEED_CONTROL] = FRPID.tick(FRSteeringError / 360, FRPosAngle / 360, data[tags.DT])
+        data[tags.BLSteering + tags.MOTOR_SPEED_CONTROL] = BLPID.tick(BLSteeringError / 360, BLPosAngle / 360, data[tags.DT])
+        data[tags.BRSteering + tags.MOTOR_SPEED_CONTROL] = BRPID.tick(BRSteeringError / 360, BRPosAngle / 360, data[tags.DT])
+
+        data[tags.BLSteering + tags.MOTOR_SPEED_CONTROL] = FLTarget #test values
+        data[tags.BRSteering + tags.MOTOR_SPEED_CONTROL] = FLPosAngle
+        data[tags.FRSteering + tags.MOTOR_SPEED_CONTROL] = FLSteeringError
