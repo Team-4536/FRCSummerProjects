@@ -6,7 +6,7 @@ from hardware.Input import FlymerInputProfile
 from utils.V2 import V2
 from typing import Any
 from utils.PIDController import PIDController
-
+#i meant commiting in the last commit, not comming
 
 class SwerveProf(Node):
 
@@ -37,8 +37,8 @@ class SwerveProf(Node):
         BLTurningVector = V2(math.cos(45) * inputZ, -math.cos(45) * inputZ)
         BRTurningVector = V2(-math.cos(45) * inputZ, -math.cos(45) * inputZ)
 
-        #field oriented offset (change later from gyro to encoder readings)
-        #leftStick = leftStick.rotateDegrees(-inputGyro)
+        #field oriented offset (change later to gyro readings)
+        leftStick = leftStick.rotateDegrees(-inputGyro)
 
         FLVector = leftStick.avg(FLTurningVector)
         FRVector = leftStick.avg(FRTurningVector)
@@ -47,12 +47,13 @@ class SwerveProf(Node):
 
         """-----------------------------------------"""
 
-        #Encoder positions as angles and first wrap (0 to 359)
+        #read encoder positions and set them angles
         FLPosAngle = (data[tags.FLSteering + tags.ENCODER_READING] % 1) * 360
         FRPosAngle = (data[tags.FRSteering + tags.ENCODER_READING] % 1) * 360
         BLPosAngle = (data[tags.BLSteering + tags.ENCODER_READING] % 1) * 360
         BRPosAngle = (data[tags.BRSteering + tags.ENCODER_READING] % 1) * 360
 
+        #wrap angles (0, 90, 180, -90)
         if FLPosAngle > 180:
             FLPosAngle = FLPosAngle - 360
         if FRPosAngle > 180:
@@ -60,11 +61,11 @@ class SwerveProf(Node):
         if BLPosAngle > 180:
             BLPosAngle = BLPosAngle - 360
         if BRPosAngle > 180:
-            BRPosAngle =BRPosAngle - 360
+            BRPosAngle = BRPosAngle - 360
 
         """----------------------------------------------------"""
 
-        #set values                  
+        #separate vector values                 
         FLTarget = FLVector.getAngle()
         FRTarget = FRVector.getAngle()
         BLTarget = BLVector.getAngle()
@@ -77,80 +78,145 @@ class SwerveProf(Node):
 
         """---------------------------------------"""
 
-        #scalar
-        #find highest value
-        maxPowerInput = 0
+        #PID Controller for  steering
+        FLPID = PIDController(10.0, 0.0, 0.0)
+        FRPID = PIDController(10.0, 0.0, 0.0)
+        BLPID = PIDController(10.0, 0.0, 0.0)
+        BRPID = PIDController(10.0, 0.0, 0.0)
 
+        """---------------------------------------"""
+
+        #calculate error
+
+        #FL
+        FLFakeError = FLTarget - FLPosAngle
+        FLTarget = 0
+        FLPos = -(FLFakeError)
+        while FLPos > 90:
+            FLPos = FLPos - 180
+            FLPower = -(FLPower)
+        FLSteeringError = FLTarget - FLPos
+        while FLSteeringError > 90:
+            FLSteeringError = FLSteeringError - 180
+            FLPower = -(FLPower)
+        if FLSteeringError > 180:
+            FLSteeringError = FLSteeringError - 360
+
+        #FR
+        FRFakeError = FRTarget - FRPosAngle
+        FRTarget = 0
+        FRPos = -(FRFakeError)
+        while FRPos > 90:
+            FRPos = FRPos - 180
+            FRPower = -(FRPower)
+        FRSteeringError = FRTarget - FRPos
+        while FRSteeringError > 90:
+            FRSteeringError = FRSteeringError - 180
+            FRPower = -(FRPower)
+        if FRSteeringError > 180:
+            FRSteeringError = FRSteeringError - 360
+
+        #BL
+        BLFakeError = BLTarget -BLPosAngle
+        BLTarget = 0
+        BLPos = -(BLFakeError)
+        while BLPos > 90:
+            BLPos = BLPos - 180
+            BLPower = -(BLPower)
+        BLSteeringError = BLTarget - BLPos
+        while BLSteeringError > 90:
+            BLSteeringError = BLSteeringError - 180
+            BLPower = -(BLPower)
+        if BLSteeringError > 180:
+            BLSteeringError = BLSteeringError - 360
+
+        #BR
+        BRFakeError = BRTarget - BRPosAngle
+        BRTarget = 0
+        BRPos = -(BRFakeError)
+        while BRPos > 90:
+            BRPos = BRPos - 180
+            BRPower = -(BRPower)
+        BRSteeringError = BRTarget - BRPos
+        while BRSteeringError > 90:
+            BRSteeringError = BRSteeringError - 180
+            BRPower = -(BRPower)
+        if BRSteeringError > 180:
+            BRSteeringError = BRSteeringError - 360
+
+        #assign motor powers
+        FLSteeringPower = FLPID.tickErr(FLSteeringError / 360, data[tags.DT])
+        FRSteeringPower = FRPID.tickErr(FRSteeringError / 360, data[tags.DT])
+        BLSteeringPower = BLPID.tickErr(BLSteeringError / 360, data[tags.DT])
+        BRSteeringPower = BRPID.tickErr(BRSteeringError / 360, data[tags.DT])
+
+        """--------------------------------------------------"""
+        
+        #scalar
+        maxPowerInput = 0
+        maxSteeringInput = 0
+
+        #power scalar
         #FL vs FR
         if abs(FLPower) > abs(FRPower):
             maxPowerInput = abs(FLPower)
         else: 
-            maxPowerInput = abs(FRPower)
-        #BL
+            maxPowerInput = abs(FLPower)
+        #BL   
         if abs(BLPower) > maxPowerInput:
             maxPowerInput = abs(BLPower)
         #BR
         if abs(BRPower) > maxPowerInput:
             maxPowerInput = abs(BRPower)
         
-        #set scalar value, if loop can be removed later for fastest speeds but it broke last time I tried and will probably kill someone if it runs
-        if maxPowerInput > 1:
-            scalarPower = 1 / maxPowerInput
+        #set scalar value
+        if maxPowerInput == 0:
+            powerScalar = 1
         else:
-            scalarPower = 1
+            powerScalar = 1 / maxPowerInput
 
-        """---------------------------------------------"""
 
-        #PID Controller for  steering
-        FLPID = PIDController(5.0, 0.0, 0.0)
-        FRPID = PIDController(5.0, 0.0, 0.0)
-        BLPID = PIDController(5.0, 0.0, 0.0)
-        BRPID = PIDController(5.0, 0.0, 0.0)
-
-        #calculate error
-        FLFakeError = FLTarget - FLPosAngle
-        FLTarget = 0
-        FLPos = -(FLFakeError)
-        FLSteeringError = FLTarget - FLPos
-        if FLSteeringError > 180:
-            FLSteeringError = FLSteeringError - 360
-            
-        FRFakeError = FRTarget - FRPosAngle
-        FRTarget = 0
-        FRPos = -(FRFakeError)
-        FRSteeringError = FRTarget - FRPos
-        if FRSteeringError > 180:
-            FRSteeringError = FRSteeringError - 360
-
-        BLFakeError = BLTarget -BLPosAngle
-        BLTarget = 0
-        BLPos = -(BLFakeError)
-        BLSteeringError = BLTarget - BLPos
-        if BLSteeringError > 180:
-            BLSteeringError = BLSteeringError - 360
-
-        BRFakeError = BRTarget - BRPosAngle
-        BRTarget = 0
-        BRPos = -(BRFakeError)
-        BRSteeringError = BRTarget - BRPos
-        if BRSteeringError > 180:
-            BRSteeringError = BRSteeringError - 360
+        #steering scalar
+        #FL vs FR
+        if abs(FLSteeringPower) > abs(FRSteeringPower):
+            maxSteeringInput = abs(FLSteeringPower)
+        else: 
+            maxSteeringInput = abs(FRSteeringPower)
+        #BL
+        if abs(BLSteeringPower) > maxSteeringInput:
+            maxSteeringInput = abs(BLSteeringPower)
+        #BR
+        if abs(BRSteeringPower) > maxSteeringInput:
+            maxSteeringInput = abs(BRSteeringPower)
         
+        #set scalar value
+        if maxSteeringInput > 1:
+            steeringScalar = 1 / maxSteeringInput
+        else:
+            steeringScalar = 1
+        """============================================="""
+
+        #final scaled motor speeds
+        FLPower = FLPower * powerScalar
+        FRPower = FRPower * powerScalar
+        BLPower = BLPower * powerScalar
+        BRPower = BRPower * powerScalar
+
+        FLSteeringPower = FLSteeringPower * steeringScalar
+        FRSteeringPower = FRSteeringPower * steeringScalar
+        BLSteeringPower = BLSteeringPower * steeringScalar
+        BRSteeringPower = BRSteeringPower * steeringScalar
+
         """============================================="""
 
         #drive values (power)
-        data[tags.FLDrive + tags.MOTOR_SPEED_CONTROL] = FLPower * scalarPower
-        data[tags.FRDrive + tags.MOTOR_SPEED_CONTROL] = FRPower * scalarPower
-        data[tags.BLDrive + tags.MOTOR_SPEED_CONTROL] = BLPower * scalarPower
-        data[tags.BRDrive + tags.MOTOR_SPEED_CONTROL] = BRPower * scalarPower
+        data[tags.FLDrive + tags.MOTOR_SPEED_CONTROL] = FLPower
+        data[tags.FRDrive + tags.MOTOR_SPEED_CONTROL] = FRPower
+        data[tags.BLDrive + tags.MOTOR_SPEED_CONTROL] = BLPower
+        data[tags.BRDrive + tags.MOTOR_SPEED_CONTROL] = BRPower
 
         #target steering values (in rotaions)
-        data[tags.FLSteering + tags.MOTOR_SPEED_CONTROL] = FLPID.tickErr(FLSteeringError / 360, data[tags.DT])
-
-        data[tags.FRSteering + tags.MOTOR_SPEED_CONTROL] = FRPID.tickErr(FRSteeringError / 360, data[tags.DT])
-        data[tags.BLSteering + tags.MOTOR_SPEED_CONTROL] = BLPID.tickErr(BLSteeringError / 360, data[tags.DT])
-        data[tags.BRSteering + tags.MOTOR_SPEED_CONTROL] = BRPID.tickErr(BRSteeringError / 360, data[tags.DT])
-
-        #data[tags.BLSteering + tags.MOTOR_SPEED_CONTROL] = FLTarget #test values
-        #data[tags.BRSteering + tags.MOTOR_SPEED_CONTROL] = FLPosAngle
-        #data[tags.FRSteering + tags.MOTOR_SPEED_CONTROL] = FLSteeringError
+        data[tags.FLSteering + tags.MOTOR_SPEED_CONTROL] = FLSteeringPower
+        data[tags.FRSteering + tags.MOTOR_SPEED_CONTROL] = FRSteeringPower
+        data[tags.BLSteering + tags.MOTOR_SPEED_CONTROL] = BLSteeringPower
+        data[tags.BRSteering + tags.MOTOR_SPEED_CONTROL] = BRSteeringPower
