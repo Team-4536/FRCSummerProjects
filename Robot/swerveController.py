@@ -6,13 +6,14 @@ from hardware.Input import FlymerInputProfile
 from utils.V2 import V2
 from typing import Any
 from utils.PIDController import PIDController
-#i meant commiting in the last commit, not comming
 
 class SwerveProf(Node):
 
     def __init__(self) -> None:
         self.name = "SwerveProfile"
         self.priority = NODE_PROF
+        
+        self.brakes = 1
 
     def tick(self, data: dict[str, Any]) -> None:
 
@@ -24,10 +25,22 @@ class SwerveProf(Node):
         assert type(input) == FlymerInputProfile
 
         #raw inputs
+
+        # Y = Up/Down
+        # X = Left/Right
+        # Z = Turning
+        # Brakes are nothing right now
+
         inputY = input.drive[0]
         inputX = input.drive[1]
         inputZ = input.turning
 
+        #brake input toggle
+        brake = input.brakeToggle
+        if brake == True:
+            self.brakes = self.brakes * -1
+
+        #gyro input
         inputGyro = 0 #constant for testing
 
         #assign inputs to vectors
@@ -39,6 +52,11 @@ class SwerveProf(Node):
 
         #field oriented offset (change later to gyro readings)
         leftStick = leftStick.rotateDegrees(-inputGyro)
+
+        #joystick scalar (adjusts speed depending on how far you move the joysticks)
+        inputScalar = leftStick.getLength() + abs(inputZ)
+        if inputScalar > 1:
+            inputScalar = 1
 
         FLVector = leftStick.avg(FLTurningVector)
         FRVector = leftStick.avg(FRTurningVector)
@@ -65,16 +83,28 @@ class SwerveProf(Node):
 
         """----------------------------------------------------"""
 
-        #separate vector values                 
+        #separate vector values
+
         FLTarget = FLVector.getAngle()
         FRTarget = FRVector.getAngle()
         BLTarget = BLVector.getAngle()
-        BRTarget = BRVector.getAngle()
+        BRTarget = BRVector.getAngle()      
 
         FLPower = FLVector.getLength()
         FRPower = FRVector.getLength()
         BLPower = BLVector.getLength()
         BRPower = BRVector.getLength()
+
+        #set brakes
+        if self.brakes == -1:
+            FLTarget = 135
+            FRTarget = 225
+            BLTarget = 45
+            BRTarget = 315
+            FLPower = 0
+            FRPower = 0
+            BLPower = 0
+            BRPower = 0
 
         """---------------------------------------"""
 
@@ -152,7 +182,7 @@ class SwerveProf(Node):
 
         """--------------------------------------------------"""
         
-        #scalar
+        #scalars
         maxPowerInput = 0
         maxSteeringInput = 0
 
@@ -190,17 +220,19 @@ class SwerveProf(Node):
             maxSteeringInput = abs(BRSteeringPower)
         
         #set scalar value
-        if maxSteeringInput > 1:
+        if maxSteeringInput == 0:
+            steeringScalar = 1
+        elif maxSteeringInput > 1:
             steeringScalar = 1 / maxSteeringInput
         else:
             steeringScalar = 1
         """============================================="""
 
         #final scaled motor speeds
-        FLPower = FLPower * powerScalar
-        FRPower = FRPower * powerScalar
-        BLPower = BLPower * powerScalar
-        BRPower = BRPower * powerScalar
+        FLPower = (FLPower * powerScalar) * inputScalar
+        FRPower = (FRPower * powerScalar) * inputScalar
+        BLPower = (BLPower * powerScalar) * inputScalar
+        BRPower = (BRPower * powerScalar) * inputScalar
 
         FLSteeringPower = FLSteeringPower * steeringScalar
         FRSteeringPower = FRSteeringPower * steeringScalar
