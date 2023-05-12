@@ -57,6 +57,16 @@ class V2:
         averageY  = (self.y + newV2.y) / 2
 
         return V2(averageX, averageY)
+    
+    #there's probably an easier way to do this
+    def noValue(self):
+        
+        if self.x == 0 and self.y == 0:
+            noValue = True
+        else:
+            noValue = False
+
+        return noValue
   
 #Flymer = V2(1.0, 0.6)
 #Flymer = Flymer.rotateDegrees(90)

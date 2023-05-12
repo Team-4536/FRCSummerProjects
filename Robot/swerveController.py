@@ -84,7 +84,6 @@ class SwerveProf(Node):
         """----------------------------------------------------"""
 
         #separate vector values
-
         FLTarget = FLVector.getAngle()
         FRTarget = FRVector.getAngle()
         BLTarget = BLVector.getAngle()
@@ -173,6 +172,16 @@ class SwerveProf(Node):
             BRPower = -(BRPower)
         if BRSteeringError > 180:
             BRSteeringError = BRSteeringError - 360
+
+        #hold position if  no input is given
+        if FLVector.noValue() == True and self.brakes != -1:
+            FLSteeringError = 0
+        if FRVector.noValue() == True and self.brakes != -1:
+            FRSteeringError = 0
+        if BLVector.noValue() == True and self.brakes != -1:
+            BLSteeringError  = 0
+        if BRVector.noValue() == True and self.brakes != -1:
+            BRSteeringError = 0
 
         #assign motor powers
         FLSteeringPower = FLPID.tickErr(FLSteeringError / 360, data[tags.DT])
