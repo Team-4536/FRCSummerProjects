@@ -7,6 +7,8 @@ from utils.V2 import V2
 from typing import Any
 from utils.PIDController import PIDController
 
+#next thing to do: change brake mode from toggle to happen until input received
+
 class SwerveProf(Node):
 
     def __init__(self) -> None:
@@ -14,6 +16,9 @@ class SwerveProf(Node):
         self.priority = NODE_PROF
         
         self.brakes = 1
+
+        #choose between brake or hold position when no input is given (if false brake will be a toggle on button "A")
+        self.brakeDefault = False
 
     def tick(self, data: dict[str, Any]) -> None:
 
@@ -41,7 +46,7 @@ class SwerveProf(Node):
             self.brakes = self.brakes * -1
 
         #gyro input
-        inputGyro = 0 #constant for testing
+        inputGyro = 0 #constant for testing, can be changed to simulate gyro input
 
         #assign inputs to vectors
         leftStick = V2(inputX, inputY)
@@ -95,19 +100,26 @@ class SwerveProf(Node):
         BRPower = BRVector.getLength()
 
         #set brakes
-        if self.brakes == -1:
-            FLTarget = 135
-            FRTarget = 225
-            BLTarget = 45
-            BRTarget = 315
-            FLPower = 0
-            FRPower = 0
-            BLPower = 0
-            BRPower = 0
+        if self.brakeDefault == False:
+            if self.brakes == -1:
+                FLTarget = 135
+                FRTarget = 225
+                BLTarget = 45
+                BRTarget = 315
+                FLPower = 0
+                FRPower = 0
+                BLPower = 0
+                BRPower = 0
+        else:
+            if inputX == 0 and inputY == 0 and inputZ == 0:
+                FLTarget = 135
+                FRTarget = 225
+                BLTarget = 45
+                BRTarget = 315
 
         """---------------------------------------"""
 
-        #PID Controller for  steering
+        #PID Controller for steering
         FLPID = PIDController(10.0, 0.0, 0.0)
         FRPID = PIDController(10.0, 0.0, 0.0)
         BLPID = PIDController(10.0, 0.0, 0.0)
@@ -173,16 +185,17 @@ class SwerveProf(Node):
         if BRSteeringError > 180:
             BRSteeringError = BRSteeringError - 360
 
-        #hold position if  no input is given
-        if FLVector.noValue() == True and self.brakes != -1:
-            FLSteeringError = 0
-        if FRVector.noValue() == True and self.brakes != -1:
-            FRSteeringError = 0
-        if BLVector.noValue() == True and self.brakes != -1:
-            BLSteeringError  = 0
-        if BRVector.noValue() == True and self.brakes != -1:
-            BRSteeringError = 0
-
+        #hold position if no input is given
+        if self.brakeDefault == False:   
+            if FLVector.noValue() == True and self.brakes != -1:
+                FLSteeringError = 0
+            if FRVector.noValue() == True and self.brakes != -1:
+                FRSteeringError = 0
+            if BLVector.noValue() == True and self.brakes != -1:
+                BLSteeringError  = 0
+            if BRVector.noValue() == True and self.brakes != -1:
+                BRSteeringError = 0
+        
         #assign motor powers
         FLSteeringPower = FLPID.tickErr(FLSteeringError / 360, data[tags.DT])
         FRSteeringPower = FRPID.tickErr(FRSteeringError / 360, data[tags.DT])
