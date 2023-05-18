@@ -14,7 +14,7 @@ class SwerveProf(Node):
     def __init__(self) -> None:
         self.name = "SwerveProfile"
         self.priority = NODE_PROF
-        
+
         self.brakes = 1
 
         #choose between brake or hold position when no input is given (if false brake will be a toggle on button "A")
@@ -92,7 +92,7 @@ class SwerveProf(Node):
         FLTarget = FLVector.getAngle()
         FRTarget = FRVector.getAngle()
         BLTarget = BLVector.getAngle()
-        BRTarget = BRVector.getAngle()      
+        BRTarget = BRVector.getAngle()
 
         FLPower = FLVector.getLength()
         FRPower = FRVector.getLength()
@@ -186,7 +186,7 @@ class SwerveProf(Node):
             BRSteeringError = BRSteeringError - 360
 
         #hold position if no input is given
-        if self.brakeDefault == False:   
+        if self.brakeDefault == False:
             if FLVector.noValue() == True and self.brakes != -1:
                 FLSteeringError = 0
             if FRVector.noValue() == True and self.brakes != -1:
@@ -195,7 +195,7 @@ class SwerveProf(Node):
                 BLSteeringError  = 0
             if BRVector.noValue() == True and self.brakes != -1:
                 BRSteeringError = 0
-        
+
         #assign motor powers
         FLSteeringPower = FLPID.tickErr(FLSteeringError / 360, data[tags.DT])
         FRSteeringPower = FRPID.tickErr(FRSteeringError / 360, data[tags.DT])
@@ -203,7 +203,7 @@ class SwerveProf(Node):
         BRSteeringPower = BRPID.tickErr(BRSteeringError / 360, data[tags.DT])
 
         """--------------------------------------------------"""
-        
+
         #scalars
         maxPowerInput = 0
         maxSteeringInput = 0
@@ -212,15 +212,15 @@ class SwerveProf(Node):
         #FL vs FR
         if abs(FLPower) > abs(FRPower):
             maxPowerInput = abs(FLPower)
-        else: 
+        else:
             maxPowerInput = abs(FLPower)
-        #BL   
+        #BL
         if abs(BLPower) > maxPowerInput:
             maxPowerInput = abs(BLPower)
         #BR
         if abs(BRPower) > maxPowerInput:
             maxPowerInput = abs(BRPower)
-        
+
         #set scalar value
         if maxPowerInput == 0:
             powerScalar = 1
@@ -232,7 +232,7 @@ class SwerveProf(Node):
         #FL vs FR
         if abs(FLSteeringPower) > abs(FRSteeringPower):
             maxSteeringInput = abs(FLSteeringPower)
-        else: 
+        else:
             maxSteeringInput = abs(FRSteeringPower)
         #BL
         if abs(BLSteeringPower) > maxSteeringInput:
@@ -240,7 +240,7 @@ class SwerveProf(Node):
         #BR
         if abs(BRSteeringPower) > maxSteeringInput:
             maxSteeringInput = abs(BRSteeringPower)
-        
+
         #set scalar value
         if maxSteeringInput == 0:
             steeringScalar = 1
