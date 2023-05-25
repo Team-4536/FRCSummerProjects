@@ -78,8 +78,9 @@ class sundial:
                     print(traceback.format_exc(chain=False)) # NOTE: Add this to the logger sometime lol
 
 
-            try: # CLEANUP: get rid of this trycatch
-                fileLogging.writeFrame(logFile)
+            try: # CLEANUP: get rid of this tr~ycatch
+                # fileLogging.writeFrame(logFile)
+                pass
             except Exception as e:
                 print(traceback.format_exc(chain=False))
 

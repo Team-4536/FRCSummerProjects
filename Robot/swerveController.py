@@ -20,6 +20,11 @@ class SwerveProf(Node):
         #choose between brake or hold position when no input is given (if false brake will be a toggle on button "A")
         self.brakeDefault = False
 
+        self.FLPID = PIDController(10.0, 0.0, 0.0)
+        self.FRPID = PIDController(10.0, 0.0, 0.0)
+        self.BLPID = PIDController(10.0, 0.0, 0.0)
+        self.BRPID = PIDController(10.0, 0.0, 0.0)
+
     def tick(self, data: dict[str, Any]) -> None:
 
         input = data.get(tags.INPUT)
@@ -56,7 +61,7 @@ class SwerveProf(Node):
         BRTurningVector = V2(-math.cos(45) * inputZ, -math.cos(45) * inputZ)
 
         #field oriented offset (change later to gyro readings)
-        leftStick = leftStick.rotateDegrees(-inputGyro)
+        leftStick = leftStick.rotateDegrees(-data[tags.GYRO_YAW])
 
         #joystick scalar (adjusts speed depending on how far you move the joysticks)
         inputScalar = leftStick.getLength() + abs(inputZ)
@@ -120,10 +125,7 @@ class SwerveProf(Node):
         """---------------------------------------"""
 
         #PID Controller for steering
-        FLPID = PIDController(10.0, 0.0, 0.0)
-        FRPID = PIDController(10.0, 0.0, 0.0)
-        BLPID = PIDController(10.0, 0.0, 0.0)
-        BRPID = PIDController(10.0, 0.0, 0.0)
+        
 
         """---------------------------------------"""
 
@@ -197,10 +199,10 @@ class SwerveProf(Node):
                 BRSteeringError = 0
 
         #assign motor powers
-        FLSteeringPower = FLPID.tickErr(FLSteeringError / 360, data[tags.DT])
-        FRSteeringPower = FRPID.tickErr(FRSteeringError / 360, data[tags.DT])
-        BLSteeringPower = BLPID.tickErr(BLSteeringError / 360, data[tags.DT])
-        BRSteeringPower = BRPID.tickErr(BRSteeringError / 360, data[tags.DT])
+        FLSteeringPower = self.FLPID.tickErr(FLSteeringError / 360, data[tags.DT])
+        FRSteeringPower = self.FRPID.tickErr(FRSteeringError / 360, data[tags.DT])
+        BLSteeringPower = self.BLPID.tickErr(BLSteeringError / 360, data[tags.DT])
+        BRSteeringPower = self.BRPID.tickErr(BRSteeringError / 360, data[tags.DT])
 
         """--------------------------------------------------"""
 
