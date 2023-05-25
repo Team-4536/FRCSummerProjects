@@ -4,7 +4,7 @@ import traceback
 from typing import Any
 from utils.tables import telemTable
 import dearpygui.dearpygui as dpg
-from widgets.visuals import driveWidget
+from widgets.visuals import swerveWidget
 from widgets import ntPlot
 from widgets import client
 from widgets import cmdWidget
@@ -52,7 +52,7 @@ class sundial:
 
         self.widgets: list[widget] = [
 
-            driveWidget.driveWidget(),
+            swerveWidget.swerveWidget(),
             client.clientWidget(),
             ntPlot.ntPlot(),
             cmdWidget.cmdWidget(),
@@ -78,8 +78,9 @@ class sundial:
                     print(traceback.format_exc(chain=False)) # NOTE: Add this to the logger sometime lol
 
 
-            try: # CLEANUP: get rid of this trycatch
-                fileLogging.writeFrame(logFile)
+            try: # CLEANUP: get rid of this tr~ycatch
+                # fileLogging.writeFrame(logFile)
+                pass
             except Exception as e:
                 print(traceback.format_exc(chain=False))
 

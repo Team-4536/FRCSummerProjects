@@ -2,10 +2,15 @@
 
 
 
-FL = "FL"
-FR = "FR"
-BL = "BL"
-BR = "BR"
+FLDrive = "FLDrive"
+FRDrive = "FRDrive"
+BLDrive = "BLDrive"
+BRDrive = "BRDrive"
+
+FLSteering = "FLSteering"
+FRSteering = "FRSteering"
+BLSteering = "BLSteering"
+BRSteering = "BRSteering"
 
 MOTOR_SPEED_CONTROL = "Speed"
 ENCODER_READING = "Pos"

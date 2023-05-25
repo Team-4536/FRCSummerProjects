@@ -7,9 +7,8 @@ import utils.tags as tags
 
 class EncoderNode(Node):
 
-    # it's like this because I'm lazy. :).
-    def __init__(self, pref: tags.Tag) -> None:
-        self.pref: tags.Tag = pref
+    def __init__(self, pref: str) -> None:
+        self.pref: str = pref
 
         self.name: str = pref + tags.ENCODER_NAME
         self.priority = NODE_HARDWARE
@@ -26,7 +25,7 @@ class EncoderNode(Node):
 
 class RelativeEncoderNode(EncoderNode):
 
-    def __init__(self, pref: tags.Tag, encObj: rev.RelativeEncoder) -> None:
+    def __init__(self, pref: str, encObj: rev.RelativeEncoder) -> None:
 
         self.__encoder: rev.RelativeEncoder = encObj
         self.pref = pref
@@ -41,9 +40,9 @@ class RelativeEncoderNode(EncoderNode):
 # output will move with motor output, so reversal doesnt need to happen if the motors are all reversed correctly
 class VirtualEncoderNode(EncoderNode):
 
-    NOISE = 0.005
+    NOISE = 0.001
 
-    def __init__(self, pref: tags.Tag) -> None:
+    def __init__(self, pref: str) -> None:
 
         self.realPosition: float = 0.0
         self.pref = pref

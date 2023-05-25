@@ -24,10 +24,10 @@ treadPositions: list[float] = [
 halfWheelSpacing: float = 70.0
 
 ntTags = [
-    tags.FL + tags.MOTOR_SPEED_CONTROL,
-    tags.FR + tags.MOTOR_SPEED_CONTROL,
-    tags.BL + tags.MOTOR_SPEED_CONTROL,
-    tags.BR + tags.MOTOR_SPEED_CONTROL
+    tags.FLDrive + tags.MOTOR_SPEED_CONTROL,
+    tags.FRDrive + tags.MOTOR_SPEED_CONTROL,
+    tags.BLDrive + tags.MOTOR_SPEED_CONTROL,
+    tags.BRDrive + tags.MOTOR_SPEED_CONTROL
     ]
 
 

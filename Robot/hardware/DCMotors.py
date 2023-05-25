@@ -65,7 +65,7 @@ class FalconSpec(DCMotorSpec):
 # composes spec and controller, provides nicer interfacing
 class DCMotorNode(Node):
 
-    def __init__(self, pref: tags.Tag, spec: type[DCMotorSpec], ctrlr: DCMotorController) -> None:
+    def __init__(self, pref: str, spec: type[DCMotorSpec], ctrlr: DCMotorController) -> None:
         self.spec: type[DCMotorSpec] = spec
         self.controller: DCMotorController = ctrlr
 

@@ -4,15 +4,18 @@ from typing import TypeAlias
 from enum import Enum
 
 
-Tag: TypeAlias = str
-
 # tag prefixes denote a certain piece of hardware
 # to avoid conflicts between nodes being used more than once
 
-FL = "FL"
-FR = "FR"
-BL = "BL"
-BR = "BR"
+FLDrive = "FLDrive"
+FRDrive = "FRDrive"
+BLDrive = "BLDrive"
+BRDrive = "BRDrive"
+
+FLSteering = "FLSteering"
+FRSteering = "FRSteering"
+BLSteering = "BLSteering"
+BRSteering = "BRSteering"
 
 GRABBER = "Grab"
 
