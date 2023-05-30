@@ -18,7 +18,7 @@ BLSteering = "BLSteering"
 BRSteering = "BRSteering"
 
 GRABBER = "Grab"
-
+LIMIT_SWITCH = "Switch"
 
 # Suffixes are for what each node is doing
 
