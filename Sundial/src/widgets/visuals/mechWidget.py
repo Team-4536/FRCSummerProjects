@@ -31,7 +31,7 @@ ntTags = [
     ]
 
 
-class driveWidget(widget):
+class mechWidget(widget):
 
 
 

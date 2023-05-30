@@ -47,7 +47,7 @@ class MechProf(Node):
             for i in range(0, 4):
                 speeds[i] /= max
 
-        prefs = [ tags.FL, tags.FR, tags.BL, tags.BR ]
+        prefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
         for i in range(0, 4):
             data[prefs[i] + tags.MOTOR_SPEED_CONTROL]  = speeds[i]
 

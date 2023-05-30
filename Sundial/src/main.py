@@ -5,6 +5,7 @@ from typing import Any
 from utils.tables import telemTable
 import dearpygui.dearpygui as dpg
 from widgets.visuals import swerveWidget
+from widgets.visuals import mechWidget
 from widgets import ntPlot
 from widgets import client
 from widgets import cmdWidget
@@ -52,7 +53,7 @@ class sundial:
 
         self.widgets: list[widget] = [
 
-            swerveWidget.swerveWidget(),
+            mechWidget.mechWidget(),
             client.clientWidget(),
             ntPlot.ntPlot(),
             cmdWidget.cmdWidget(),

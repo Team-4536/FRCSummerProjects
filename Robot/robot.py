@@ -93,7 +93,7 @@ class Robot(wpilib.TimedRobot):
         self.procs: list[Node] = [ ] # NODES / including hardware
 
 
-        inits.makeSwerveDrive(self.procs)
+        inits.makeMechDrive(self.procs)
 
         found = False
         for x in self.procs:
