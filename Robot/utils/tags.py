@@ -17,6 +17,10 @@ FRSteering = "FRSteering"
 BLSteering = "BLSteering"
 BRSteering = "BRSteering"
 
+LIFT_MOTOR = "Lift"
+EXTEND_MOTOR = "Extend"
+TURRET_MOTOR = "Turret"
+
 GRABBER = "Grab"
 LIMIT_SWITCH = "Switch"
 
