@@ -39,9 +39,13 @@ def makeMechDrive(nodes: list[Node]):
 
     nodes.append(gyros.GyroNode(gyros.VirtualGyro()))
     nodes.append(hardware.Input.FlymerInputNode())
-    # SWERVE CTRLR
+    # MECH CTRLR
     nodes.append(mechController.MechProf())
 
+    liftMotor = DCMotorNode(tags.LIFT_MOTOR, NEOSpec, VirtualController())
+    nodes.append(liftMotor)
+    liftEncoder = VirtualEncoderNode(tags.LIFT_MOTOR)
+    nodes.append(liftEncoder)
 
 
     drivePrefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
