@@ -18,7 +18,7 @@ BLSteering = "BLSteering"
 BRSteering = "BRSteering"
 
 LIFT_MOTOR = "Lift"
-EXTEND_MOTOR = "Extend"
+RETRACT_MOTOR = "Retract"
 TURRET_MOTOR = "Turret"
 
 GRABBER = "Grab"
