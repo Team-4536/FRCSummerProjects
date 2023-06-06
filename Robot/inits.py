@@ -48,11 +48,10 @@ def makeMechDrive(nodes: list[Node]):
     nodes.append(liftEncoder)
 
 
-    drivePrefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
     driveMotors = []
     driveEncoders = []
 
-  
+    drivePrefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
     for i in range(0, 4):
 
         driveMotors.append(DCMotorNode(drivePrefs[i], NEOSpec, VirtualController()))
@@ -65,5 +64,4 @@ def makeMechDrive(nodes: list[Node]):
 
 
 
-    
 
