@@ -8,35 +8,14 @@ from robot import reportErr, reportMsg
 
 
 
-# stores state needed to operate, along with get and set interface
-class DCMotorController:
-
-    def get(self) -> float:
-        raise NotImplementedError()
-
-    def set(self, pwr: float) -> None:
-        raise NotImplementedError()
-
 
 # power set vals are assumed to be clamped
-class VirtualController(DCMotorController):
+class VirtualController():
     def __init__(self) -> None:
         self.speed: float = 0.0
 
     def get(self) -> float: return self.speed
     def set(self, pwr: float) -> None: self.speed = pwr
-
-
-class SparkMaxController(DCMotorController):
-    def __init__(self, ctrlr: rev.CANSparkMax) -> None:
-        self.controller = ctrlr
-
-    def get(self) -> float: return self.controller.get()
-    def set(self, pwr: float) -> None: self.controller.set(pwr)
-
-
-
-
 
 
 
@@ -65,9 +44,9 @@ class FalconSpec(DCMotorSpec):
 # composes spec and controller, provides nicer interfacing
 class DCMotorNode(Node):
 
-    def __init__(self, pref: str, spec: type[DCMotorSpec], ctrlr: DCMotorController) -> None:
+    def __init__(self, pref: str, spec: type[DCMotorSpec], ctrlr: VirtualController|rev.CANSparkMax) -> None:
         self.spec: type[DCMotorSpec] = spec
-        self.controller: DCMotorController = ctrlr
+        self.controller = ctrlr
 
         self.pref = pref
         self.name = self.pref + tags.MOTOR_NAME
@@ -79,7 +58,7 @@ class DCMotorNode(Node):
         val = data.get(self.pref + tags.MOTOR_SPEED_CONTROL)
 
         if type(val) == float or type(val) == int:
-            val = min(1, max(-1, val))
+            val = min(1, max(-1, val)) # type: ignore
             self.controller.set(val)
         else:
             data.update({ self.pref + tags.MOTOR_SPEED_CONTROL : self.controller.get() })

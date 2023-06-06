@@ -9,11 +9,20 @@ import simulationNodes.encoderSimNode as encoderSimNode
 from hardware.DCMotors import *
 from hardware.Encoders import *
 import hardware.Input
-import swerveController
+import mechController
 import hardware.pneumatics as pneumatics
 import hardware.gyros as gyros
 
-def makeSwerveDrive(nodes: list[Node]):
+
+
+def addNode(nodes: list[Node], node):
+    nodes.append(node)
+    return node
+
+
+
+
+def makeBasics(nodes: list[Node]):
 
     nodes.append(timeNode.TimeNode())
 
@@ -28,16 +37,6 @@ def makeSwerveDrive(nodes: list[Node]):
         tags.BLDrive + tags.MOTOR_SPEED_CONTROL,
         tags.BRDrive + tags.MOTOR_SPEED_CONTROL,
 
-        tags.FLSteering + tags.ENCODER_READING,
-        tags.FRSteering + tags.ENCODER_READING,
-        tags.BLSteering + tags.ENCODER_READING,
-        tags.BRSteering + tags.ENCODER_READING,
-
-        tags.FLSteering + tags.MOTOR_SPEED_CONTROL,
-        tags.FRSteering + tags.MOTOR_SPEED_CONTROL,
-        tags.BLSteering + tags.MOTOR_SPEED_CONTROL,
-        tags.BRSteering + tags.MOTOR_SPEED_CONTROL,
-
         tags.GYRO_PITCH,
         tags.GYRO_YAW,
         tags.GYRO_ROLL,
@@ -47,41 +46,56 @@ def makeSwerveDrive(nodes: list[Node]):
     ]))
 
 
-    nodes.append(gyros.GyroNode(gyros.VirtualGyro()))
-    nodes.append(hardware.Input.FlymerInputNode())
-    # SWERVE CTRLR
-    nodes.append(swerveController.SwerveProf())
 
+
+
+
+
+def makeVirtualFlymer(nodes: list[Node]):
+    makeBasics(nodes)
+
+    nodes.append(hardware.Input.FlymerInputNode())
+    nodes.append(mechController.MechProf())
+
+
+    nodes.append(gyros.GyroNode(gyros.VirtualGyro()))
+
+    liftMotor = addNode(nodes, DCMotorNode(tags.LIFT_MOTOR, NEOSpec, VirtualController()))
+    liftEncoder = addNode(nodes, EncoderNode(tags.LIFT_MOTOR, VirtualEncoder()))
 
 
     drivePrefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
-    driveMotors = []
-    driveEncoders = []
-
-    steerPrefs = [ tags.FLSteering, tags.FRSteering, tags.BLSteering, tags.BRSteering ]
-    steerMotors = []
-    steerEncoders = []
-
     for i in range(0, 4):
 
-        driveMotors.append(DCMotorNode(drivePrefs[i], NEOSpec, VirtualController()))
-        nodes.append(driveMotors[-1])
-
-        driveEncoders.append(VirtualEncoderNode(drivePrefs[i]))
-        nodes.append(driveEncoders[-1])
-
-        nodes.append(encoderSimNode.EncoderSimNode(drivePrefs[i], driveMotors[i], driveEncoders[i]))
+        motor = addNode(nodes, DCMotorNode(drivePrefs[i], NEOSpec, VirtualController()))
+        encoder = addNode(nodes, EncoderNode(drivePrefs[i], VirtualEncoder()))
+        nodes.append(encoderSimNode.EncoderSimNode(drivePrefs[i], motor, encoder))
 
 
 
-        steerMotors.append(DCMotorNode(steerPrefs[i], NEOSpec, VirtualController()))
-        nodes.append(steerMotors[-1])
-
-        steerEncoders.append(VirtualEncoderNode(steerPrefs[i]))
-        nodes.append(steerEncoders[-1])
-
-        nodes.append(encoderSimNode.EncoderSimNode(steerPrefs[i], steerMotors[i], steerEncoders[i]))
 
 
 
+
+
+def makeRealFlymer(nodes: list[Node]):
+    makeBasics(nodes)
+
+    nodes.append(hardware.Input.FlymerInputNode())
+    nodes.append(mechController.MechProf())
+
+
+    nodes.append(gyros.GyroNode(navx.AHRS(wpilib.SPI.Port.kMXP)))
+
+
+    drivePrefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
+    drivePorts = [ 4, 1, 3, 2 ]
+    driveFlips = [ False, True, False, True]
+    for i in range(0, 4):
+
+        spark = rev.CANSparkMax(drivePorts[i], rev.CANSparkMax.MotorType.kBrushless)
+        spark.setInverted(driveFlips[i])
+
+        motor = addNode(nodes, DCMotorNode(drivePrefs[i], NEOSpec, spark))
+        encoder = addNode(nodes, EncoderNode(drivePrefs[i], motor.controller.getEncoder()))
 
