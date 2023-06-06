@@ -3,7 +3,6 @@
 from typing import TypeAlias
 from enum import Enum
 
-
 # tag prefixes denote a certain piece of hardware
 # to avoid conflicts between nodes being used more than once
 
@@ -22,7 +21,9 @@ RETRACT_MOTOR = "Retract"
 TURRET_MOTOR = "Turret"
 
 GRABBER = "Grab"
-LIMIT_SWITCH = "Switch"
+
+LIFT_MOTOR = "LiftPower"
+
 
 # Suffixes are for what each node is doing
 
@@ -38,7 +39,10 @@ ENCODER_SIM_NAME = "Encodersim"
 TESTER_NAME = "Tester"
 DBLSOLENOID_NAME = "DBLSolenoid"
 
-
+UP_LIMIT_SWITCH = "UpSwitch"
+DOWN_LIMIT_SWITCH = "DownSwitch"
+CLOCK_LIMIT_SWITCH = "ClockSwitch"
+COUTNER_LIMIT_SWITCH = "CounterSwitch"
 
 # any straight values that only happen once
 

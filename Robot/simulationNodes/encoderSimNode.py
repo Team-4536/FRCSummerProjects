@@ -8,7 +8,7 @@ import utils.tags as tags
 class EncoderSimNode(Node):
 
 
-    def __init__(self, pref: str, motor: DCMotorNode, encoder: VirtualEncoderNode) -> None:
+    def __init__(self, pref: str, motor: DCMotorNode, encoder: EncoderNode) -> None:
 
         self.pref = pref
 
@@ -16,6 +16,7 @@ class EncoderSimNode(Node):
         self.priority = NODE_SIM
 
         self.motor = motor
+        assert(type(encoder.encoderObj) is VirtualEncoder)
         self.encoder = encoder
 
         self.position: float = 0.0 # in rotations
@@ -33,7 +34,9 @@ class EncoderSimNode(Node):
 
         self.velocity += speedDelta
         self.position += self.velocity * dt
-        self.encoder.realPosition = self.position
+
+        #                       VVVVV works because ctrlr type is asserted above
+        self.encoder.encoderObj.realPosition = self.position # type: ignore
 
         data.update({ self.pref + tags.ENCODER_SIM_VELOCITY : self.velocity })
 
