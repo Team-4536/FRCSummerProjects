@@ -16,7 +16,6 @@ class EncoderSimNode(Node):
         self.priority = NODE_SIM
 
         self.motor = motor
-        assert(type(encoder.encoderObj) is VirtualEncoder)
         self.encoder = encoder
 
         self.position: float = 0.0 # in rotations
@@ -35,7 +34,7 @@ class EncoderSimNode(Node):
         self.velocity += speedDelta
         self.position += self.velocity * dt
 
-        #                       VVVVV works because ctrlr type is asserted above
+        assert(type(self.encoder.encoderObj) is VirtualEncoder) # not put in ctor only for fears of crashes at comp
         self.encoder.encoderObj.realPosition = self.position # type: ignore
 
         data.update({ self.pref + tags.ENCODER_SIM_VELOCITY : self.velocity })

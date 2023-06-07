@@ -20,6 +20,9 @@ def switch(cond: bool, a, b):
 
 
 
+"""
+Creates and adds a motor node and encoder node. Adds virtual versions if isReal is false
+"""
 def sparkMaxAndEncoderPair(nodes: list[Node], isReal: bool, prefix: str, motorSpec: type[DCMotorSpec], motorBrushed: bool, motorPort: int, motorFlipped: bool):
 
     if isReal:
@@ -70,11 +73,14 @@ def makeFlymer(nodes: list[Node], isReal: bool):
         tags.FRAME_TIME
     ]))
 
-
+    # -------------------------- DEFAULT PROFILE --------------------------------------------------
 
     hardware.Input.FlymerInputNode().addToo(nodes)
     mechController.MechProf().addToo(nodes)
 
+
+
+    # --------------------------- HARDWARE ---------------------------------------------------------
 
     gyros.GyroNode(
             navx.AHRS(wpilib.SPI.Port.kMXP) if isReal else
@@ -82,12 +88,9 @@ def makeFlymer(nodes: list[Node], isReal: bool):
         ).addToo(nodes)
 
 
-
     liftMotor, liftEncoder = sparkMaxAndEncoderPair(nodes, isReal, tags.LIFT_MOTOR, NEOSpec, False, 0, False)
     if not isReal:
         encoderSimNode.EncoderSimNode(tags.LIFT_MOTOR, liftMotor, liftEncoder).addToo(nodes)
-
-
 
 
     drivePrefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
