@@ -33,7 +33,7 @@ def sparkMaxAndEncoderPair(nodes: list[Node], isReal: bool, prefix: str, motorSp
 
 
     encoder = EncoderNode(prefix,
-            motor.controller.getEncoder() if isReal else
+            motor.controller.getEncoder() if isReal else # type: ignore
             VirtualEncoder()
         ).addToo(nodes)
 
