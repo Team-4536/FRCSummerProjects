@@ -4,7 +4,6 @@ from node import Node
 import navx
 import telemetryNode
 import timeNode
-import motorTestNode
 import simulationNodes.encoderSimNode as encoderSimNode
 from hardware.DCMotors import *
 from hardware.Encoders import *
@@ -15,17 +14,46 @@ import hardware.gyros as gyros
 
 
 
-def addNode(nodes: list[Node], node):
-    nodes.append(node)
-    return node
+
+def switch(cond: bool, a, b):
+    return a if cond else b
+
+
+
+"""
+Creates and adds a motor node and encoder node. Adds virtual versions if isReal is false
+"""
+def sparkMaxAndEncoderPair(nodes: list[Node], isReal: bool, prefix: str, motorSpec: type[DCMotorSpec], motorBrushed: bool, motorPort: int, motorFlipped: bool):
+
+    if isReal:
+        t = rev.CANSparkMax.MotorType.kBrushed if motorBrushed else rev.CANSparkMax.MotorType.kBrushless
+        ctrlr = rev.CANSparkMax(motorPort, t)
+        ctrlr.setInverted(motorFlipped)
+    else:
+        ctrlr = VirtualController()
+
+    motor = DCMotorNode(prefix, motorSpec, ctrlr).addToo(nodes)
+
+
+    encoder = EncoderNode(prefix,
+            motor.controller.getEncoder() if isReal else # type: ignore
+            VirtualEncoder()
+        ).addToo(nodes)
+
+    return motor, encoder
 
 
 
 
-def makeBasics(nodes: list[Node]):
+
+
+
+
+
+
+def makeFlymer(nodes: list[Node], isReal: bool):
 
     nodes.append(timeNode.TimeNode())
-
     nodes.append(telemetryNode.TelemNode([
         tags.FLDrive + tags.ENCODER_READING,
         tags.FRDrive + tags.ENCODER_READING,
@@ -45,57 +73,39 @@ def makeBasics(nodes: list[Node]):
         tags.FRAME_TIME
     ]))
 
+    # -------------------------- DEFAULT PROFILE --------------------------------------------------
+
+    hardware.Input.FlymerInputNode().addToo(nodes)
+    mechController.MechProf().addToo(nodes)
 
 
 
+    # --------------------------- HARDWARE ---------------------------------------------------------
+
+    gyros.GyroNode(
+            navx.AHRS(wpilib.SPI.Port.kMXP) if isReal else
+            gyros.VirtualGyro()
+        ).addToo(nodes)
 
 
-
-def makeVirtualFlymer(nodes: list[Node]):
-    makeBasics(nodes)
-
-    nodes.append(hardware.Input.FlymerInputNode())
-    nodes.append(mechController.MechProf())
-
-
-    nodes.append(gyros.GyroNode(gyros.VirtualGyro()))
-
-    liftMotor = addNode(nodes, DCMotorNode(tags.LIFT_MOTOR, NEOSpec, VirtualController()))
-    liftEncoder = addNode(nodes, EncoderNode(tags.LIFT_MOTOR, VirtualEncoder()))
-
-
-    drivePrefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
-    for i in range(0, 4):
-
-        motor = addNode(nodes, DCMotorNode(drivePrefs[i], NEOSpec, VirtualController()))
-        encoder = addNode(nodes, EncoderNode(drivePrefs[i], VirtualEncoder()))
-        nodes.append(encoderSimNode.EncoderSimNode(drivePrefs[i], motor, encoder))
-
-
-
-
-
-
-
-
-def makeRealFlymer(nodes: list[Node]):
-    makeBasics(nodes)
-
-    nodes.append(hardware.Input.FlymerInputNode())
-    nodes.append(mechController.MechProf())
-
-
-    nodes.append(gyros.GyroNode(navx.AHRS(wpilib.SPI.Port.kMXP)))
+    liftMotor, liftEncoder = sparkMaxAndEncoderPair(nodes, isReal, tags.LIFT_MOTOR, NEOSpec, False, 0, False)
+    if not isReal:
+        encoderSimNode.EncoderSimNode(tags.LIFT_MOTOR, liftMotor, liftEncoder).addToo(nodes)
 
 
     drivePrefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
-    drivePorts = [ 4, 1, 3, 2 ]
     driveFlips = [ False, True, False, True]
+    drivePorts = [ 4, 1, 3, 2 ]
     for i in range(0, 4):
 
-        spark = rev.CANSparkMax(drivePorts[i], rev.CANSparkMax.MotorType.kBrushless)
-        spark.setInverted(driveFlips[i])
+        motor, encoder = sparkMaxAndEncoderPair(nodes, isReal,
+            prefix=drivePrefs[i],
+            motorSpec=NEOSpec,
+            motorBrushed=False,
+            motorPort=drivePorts[i],
+            motorFlipped=driveFlips[i])
 
-        motor = addNode(nodes, DCMotorNode(drivePrefs[i], NEOSpec, spark))
-        encoder = addNode(nodes, EncoderNode(drivePrefs[i], motor.controller.getEncoder()))
+        if not isReal:
+            encoderSimNode.EncoderSimNode(drivePrefs[i], motor, encoder).addToo(nodes)
+
 

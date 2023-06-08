@@ -22,7 +22,7 @@ TURRET_MOTOR = "Turret"
 
 GRABBER = "Grab"
 
-LIFT_MOTOR = "LiftPower"
+LIFT_MOTOR = "Lift"
 
 
 # Suffixes are for what each node is doing

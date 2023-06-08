@@ -3,7 +3,6 @@ import wpilib
 import rev
 from node import *
 import utils.tags as tags
-from robot import reportErr, reportMsg
 
 
 

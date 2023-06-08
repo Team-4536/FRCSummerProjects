@@ -93,7 +93,8 @@ class Robot(wpilib.TimedRobot):
         self.procs: list[Node] = [ ] # NODES / including hardware
 
 
-        inits.makeRealFlymer(self.procs)
+        inits.makeFlymer(self.procs, not self.isSimulation)
+        # inits.makeFlymer(self.procs, True)
 
         found = False
         for x in self.procs:

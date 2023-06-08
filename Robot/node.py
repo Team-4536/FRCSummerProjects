@@ -20,7 +20,15 @@ NODE_LAST: int =        6 # anything that needs to happen after, telemetry, file
 
 NodeFunction = Callable[[dict[str, Any]], None]
 
+
+
+
+
 class Node:
+
+    def addToo(self, set):
+        set.append(self)
+        return self
 
     # please leave spaces out of names in nodes and hardware and data
     # so that they can be adressed by commands
