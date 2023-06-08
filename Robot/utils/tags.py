@@ -55,6 +55,13 @@ GYRO_ROLL = "roll"
 
 FRAME_TIME = "frameTime"
 INPUT = "input"
+OPMODE = "opmode"
+
+# NOTE: this is bad
+class Opmodes(Enum):
+    DISABLED = 0
+    AUTO = 1
+    TELEOP = 2
 
 
 LOG_TAG = "logs"

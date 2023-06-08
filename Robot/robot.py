@@ -66,6 +66,13 @@ class Robot(wpilib.TimedRobot):
 
         return "args missing: [nodes|data|hardware]"
 
+    def value(self, args: list[str]) ->str:
+        if len(args) != 1: return f"Invalid arg count {len(args)}."
+
+        if args[0] in self.data:
+            return str(self.data[args[0]])
+        else: return f"{args[0]} is not in data."
+
 
     def kill(self, args: list[str]) -> str:
         raise SystemExit()
@@ -79,7 +86,8 @@ class Robot(wpilib.TimedRobot):
         self.ctrls: dict[str, Callable[[list[str]], str]] = {
             "ping" : self.returnPing,
             "list" : self.lis,
-            "kill" : self.kill
+            "kill" : self.kill,
+            "value" : self.value
             }
 
         self.prevTime: float = 0.0
@@ -117,12 +125,19 @@ class Robot(wpilib.TimedRobot):
     def robotPeriodic(self) -> None:
 
 
-        # respond to commands +==========================================================
-
         t = time.time()
         if (t - self.prevTime) > HEARTBEAT:
             telemTable.putNumber(tags.HEARTBEAT, t)
             self.prevTime = t
+
+
+
+        if self.isAutonomousEnabled(): state = tags.Opmodes.AUTO
+        elif self.isTeleopEnabled():   state = tags.Opmodes.TELEOP
+        else:                          state = tags.Opmodes.DISABLED
+        self.data.update({ tags.OPMODE : state })
+
+        # respond to commands +==========================================================
 
 
 

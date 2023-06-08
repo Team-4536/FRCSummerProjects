@@ -4,7 +4,7 @@ import rev
 from node import *
 import utils.tags as tags
 
-
+from robot import reportMsg
 
 
 
@@ -58,7 +58,11 @@ class DCMotorNode(Node):
 
         if type(val) == float or type(val) == int:
             val = min(1, max(-1, val)) # type: ignore
+
+            if data[tags.OPMODE] == tags.Opmodes.DISABLED:
+                val = 0
+
             self.controller.set(val)
-        else:
-            data.update({ self.pref + tags.MOTOR_SPEED_CONTROL : self.controller.get() })
+
+        data.update({ self.pref + tags.MOTOR_SPEED_CONTROL : self.controller.get() })
 
