@@ -22,7 +22,11 @@ TURRET_MOTOR = "Turret"
 
 GRABBER = "Grab"
 
-LIFT_MOTOR = "Lift"
+UP_LIMIT_SWITCH = "UpSwitch"
+DOWN_LIMIT_SWITCH = "DownSwitch"
+CLOCK_LIMIT_SWITCH = "ClockSwitch"
+COUTNER_LIMIT_SWITCH = "CounterSwitch"
+
 
 
 # Suffixes are for what each node is doing
@@ -38,11 +42,6 @@ MOTOR_NAME = "Motor"
 ENCODER_SIM_NAME = "Encodersim"
 TESTER_NAME = "Tester"
 DBLSOLENOID_NAME = "DBLSolenoid"
-
-UP_LIMIT_SWITCH = "UpSwitch"
-DOWN_LIMIT_SWITCH = "DownSwitch"
-CLOCK_LIMIT_SWITCH = "ClockSwitch"
-COUTNER_LIMIT_SWITCH = "CounterSwitch"
 
 # any straight values that only happen once
 
