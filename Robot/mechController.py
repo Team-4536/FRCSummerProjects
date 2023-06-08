@@ -4,12 +4,6 @@ from hardware.Input import FlymerInputProfile
 
 
 
-
-
-
-
-
-
 class MechProf(Node):
 
     def __init__(self) -> None:
@@ -21,7 +15,7 @@ class MechProf(Node):
 
 
         input = data.get(tags.INPUT)
-        if type(input) is not FlymerInputProfile: return
+        assert(type(input) is FlymerInputProfile)
 
 
         if input.grabToggle:
@@ -49,7 +43,7 @@ class MechProf(Node):
 
         prefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
         for i in range(0, 4):
-            data[prefs[i] + tags.MOTOR_SPEED_CONTROL]  = speeds[i]
+            data[prefs[i] + tags.MOTOR_SPEED_CONTROL]  = speeds[i] * 0.2
 
 
 

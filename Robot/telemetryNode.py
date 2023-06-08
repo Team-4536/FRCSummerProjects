@@ -21,6 +21,9 @@ class TelemNode(Node):
     def tick(self, data: dict[str, Any]) -> None:
 
         for x in self.published:
+            if not (x in data):
+                continue
+
             d = data[x]
 
             if type(d) == float or type(d) == int:

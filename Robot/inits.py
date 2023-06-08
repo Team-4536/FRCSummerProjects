@@ -11,6 +11,7 @@ import hardware.Input
 import mechController
 import hardware.pneumatics as pneumatics
 import hardware.gyros as gyros
+import motorTestNode
 
 
 
@@ -29,8 +30,10 @@ def sparkMaxAndEncoderPair(nodes: list[Node], isReal: bool, prefix: str, motorSp
         t = rev.CANSparkMax.MotorType.kBrushed if motorBrushed else rev.CANSparkMax.MotorType.kBrushless
         ctrlr = rev.CANSparkMax(motorPort, t)
         ctrlr.setInverted(motorFlipped)
+        reportMsg(f"motor created")
     else:
         ctrlr = VirtualController()
+        reportMsg(f"fake motor created")
 
     motor = DCMotorNode(prefix, motorSpec, ctrlr).addToo(nodes)
 
@@ -76,8 +79,8 @@ def makeFlymer(nodes: list[Node], isReal: bool):
     # -------------------------- DEFAULT PROFILE --------------------------------------------------
 
     hardware.Input.FlymerInputNode().addToo(nodes)
-    mechController.MechProf().addToo(nodes)
-
+    #mechController.MechProf().addToo(nodes)
+    motorTestNode.MotorTestNode(tags.FLDrive).addToo(nodes)
 
 
     # --------------------------- HARDWARE ---------------------------------------------------------
@@ -88,10 +91,10 @@ def makeFlymer(nodes: list[Node], isReal: bool):
         ).addToo(nodes)
 
 
-    liftMotor, liftEncoder = sparkMaxAndEncoderPair(nodes, isReal, tags.LIFT_MOTOR, NEOSpec, False, 0, False)
-    if not isReal: encoderSimNode.EncoderSimNode(tags.LIFT_MOTOR, liftMotor, liftEncoder).addToo(nodes)
+    # liftMotor, liftEncoder = sparkMaxAndEncoderPair(nodes, isReal, tags.LIFT_MOTOR, NEOSpec, False, 0, False)
+    # if not isReal: encoderSimNode.EncoderSimNode(tags.LIFT_MOTOR, liftMotor, liftEncoder).addToo(nodes)
 
-
+    """
     drivePrefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
     driveFlips = [ False, True, False, True]
     drivePorts = [ 4, 1, 3, 2 ]
@@ -105,5 +108,7 @@ def makeFlymer(nodes: list[Node], isReal: bool):
             motorFlipped=driveFlips[i])
 
         if not isReal: encoderSimNode.EncoderSimNode(drivePrefs[i], motor, encoder).addToo(nodes)
-
+        """
+    reportMsg(str(isReal))
+    testMotor, testEncoder = sparkMaxAndEncoderPair(nodes, True, tags.FLDrive, NEOSpec, False, 0, False)
 

@@ -9,8 +9,8 @@ inst = ntcore.NetworkTableInstance.getDefault()
 inst.startClient4(basename(__file__))
 
 # CLEANUP: figure something out to set this from within sundial, and keep it in a load file
-# inst.setServer("10.45.36.2")
-inst.setServer("localhost")
+inst.setServer("10.45.36.2")
+# inst.setServer("localhost")
 from utils.tables import telemTable
 
 
