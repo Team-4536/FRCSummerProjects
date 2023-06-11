@@ -143,9 +143,9 @@ class Robot(wpilib.TimedRobot):
 
 
 
-        if self.isAutonomousEnabled(): state = tags.Opmodes.AUTO
-        elif self.isTeleopEnabled():   state = tags.Opmodes.TELEOP
-        else:                          state = tags.Opmodes.DISABLED
+        if self.isAutonomousEnabled(): state = tags.OP_AUTO
+        elif self.isTeleopEnabled():   state = tags.OP_TELEOP
+        else:                          state = tags.OP_DISABLED
         self.data.update({ tags.OPMODE : state })
 
 

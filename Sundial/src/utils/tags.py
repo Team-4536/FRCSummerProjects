@@ -21,6 +21,13 @@ LOG_TAG = "logs"
 
 
 TIME_SINCE_INIT = "time"
+OPMODE = "opmode"
+# NOTE: numbers for opmode because enums and NT dont play well
+"""
+DISABLED = 0
+AUTO = 1
+TELEOP = 2
+"""
 
 GYRO_PITCH = "pitch"
 GYRO_YAW = "yaw"

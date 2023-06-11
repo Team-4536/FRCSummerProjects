@@ -26,6 +26,7 @@ class TelemNode(Node):
 
             d = data[x]
 
+            # TODO: figure out a solution to sending ints
             if type(d) == float or type(d) == int:
                 utils.tables.telemTable.putNumber(x, float(data[x]))
             elif type(d) == bool:

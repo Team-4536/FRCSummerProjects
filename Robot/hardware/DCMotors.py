@@ -59,7 +59,7 @@ class DCMotorNode(Node):
         if type(val) == float or type(val) == int:
             val = min(1, max(-1, val)) # type: ignore
 
-            if data[tags.OPMODE] == tags.Opmodes.DISABLED:
+            if data[tags.OPMODE] == tags.OP_DISABLED:
                 val = 0
 
             self.controller.set(val)

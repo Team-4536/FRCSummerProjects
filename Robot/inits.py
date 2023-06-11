@@ -66,7 +66,8 @@ def makeFlymer(nodes: list[Node], isReal: bool):
         tags.GYRO_ROLL,
 
         tags.TIME_SINCE_INIT,
-        tags.FRAME_TIME
+        tags.FRAME_TIME,
+        tags.OPMODE
     ]))
 
     # -------------------------- DEFAULT PROFILE --------------------------------------------------
@@ -104,5 +105,5 @@ def makeFlymer(nodes: list[Node], isReal: bool):
         """
     reportMsg(str(isReal))
     testMotor, testEncoder = sparkMaxAndEncoderPair(nodes, True, tags.FLDrive, NEOSpec, False, 0, False)
-    if not isReal: encoderSimNode.EncoderSimNode(tags.FLDrive, testMotor, testEncoder).addToo(nodes)
+    # if not isReal: encoderSimNode.EncoderSimNode(tags.FLDrive, testMotor, testEncoder).addToo(nodes)
 

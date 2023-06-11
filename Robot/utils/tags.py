@@ -49,19 +49,18 @@ DT = "dt"
 TIME_SINCE_INIT = "time"
 FRAME_TIME = "frameTime"
 INPUT = "input"
-OPMODE = "opmode"
 ISREAL = "isreal"
+OPMODE = "opmode"
+
+OP_DISABLED = 0
+OP_AUTO = 1
+OP_TELEOP = 2
+
 
 GYRO_PITCH = "pitch"
 GYRO_YAW = "yaw"
 GYRO_ROLL = "roll"
 
-
-# NOTE: this is bad
-class Opmodes(Enum):
-    DISABLED = 0
-    AUTO = 1
-    TELEOP = 2
 
 
 LOG_TAG = "logs"

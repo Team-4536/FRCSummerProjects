@@ -24,7 +24,7 @@ class PneumaticsNode(Node):
         if type(val) == bool:
             end = wpilib.DoubleSolenoid.Value.kForward if val else wpilib.DoubleSolenoid.Value.kReverse
 
-            if data[tags.OPMODE] != tags.Opmodes.DISABLED:
+            if data[tags.OPMODE] != tags.OP_DISABLED:
                 self.doubleSolenoid.set(end)
 
         rec = True if self.doubleSolenoid.get() else False

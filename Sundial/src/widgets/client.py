@@ -21,6 +21,8 @@ class clientWidget(widgets.widget.widget):
 
         self.prevHeart: float = 0.0
 
+        with dpg.value_registry():
+            self.valueTag = dpg.add_string_value(default_value="")
 
 
         with dpg.window(label="Client window"):
@@ -36,13 +38,29 @@ class clientWidget(widgets.widget.widget):
                         self.heartbeatNode: int|str = node # type: ignore
                         dpg.draw_rectangle([-100, -100], [100, 100], fill=[0, 255, 0])
 
+            with dpg.group(horizontal=True):
+                dpg.add_text("Opmode: ")
+                dpg.add_text(source=self.valueTag)
+
 
 
 
 
     def tick(self) -> None:
 
+
         # scale green box by x
         # 0 if no conneciton, 1 if yes conneciton
         x = 1 if inst.isConnected() else 0
         dpg.apply_transform(self.heartbeatNode, dpg.create_scale_matrix([x, x]))
+
+
+
+
+        val = telemTable.getValue(tags.OPMODE, None)
+        print(type(val))
+        if type(val) is not float: val = "Disconnected"
+        else:
+            dict = { 0.0 : "Disabled" , 1.0 : "Auto", 2.0 : "Teleop" }
+            val = dict[val]
+        dpg.set_value(self.valueTag, str(val))
