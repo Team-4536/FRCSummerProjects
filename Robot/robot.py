@@ -33,6 +33,15 @@ def reportMsg(message: str) -> None:
     logCount+=1
 
 
+class ThrowDict(dict):
+    def __missing__(self, key):
+        raise KeyError
+
+    def __setitem__(self, __key: Any, __value: Any) -> None:
+        if not (__key in self): raise KeyError
+        return super().__setitem__(__key, __value)
+
+
 class Robot(wpilib.TimedRobot):
 
 
@@ -97,7 +106,8 @@ class Robot(wpilib.TimedRobot):
 
 
 
-        self.data: dict[str, Any] = { } # continuous data
+        # self.data: dict[str, Any] = { } # continuous data
+        self.data: dict[str, Any] = ThrowDict()
         self.procs: list[Node] = [ ] # NODES / including hardware
 
 

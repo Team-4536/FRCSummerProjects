@@ -49,3 +49,11 @@ class Node:
         raise NotImplementedError()
 
 
+
+# grabs thing at [key] from [data] and asserts type
+# asserts if key does not exist
+def getOrAssert(key: str, expectedType: type, data: dict[str, Any]):
+    val = data.get(key)
+    assert(val is not None)
+    assert(type(val) is expectedType)
+    return val

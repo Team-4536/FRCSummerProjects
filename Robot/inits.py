@@ -16,9 +16,6 @@ import motorTestNode
 
 
 
-def switch(cond: bool, a, b):
-    return a if cond else b
-
 
 
 """
@@ -30,10 +27,8 @@ def sparkMaxAndEncoderPair(nodes: list[Node], isReal: bool, prefix: str, motorSp
         t = rev.CANSparkMax.MotorType.kBrushed if motorBrushed else rev.CANSparkMax.MotorType.kBrushless
         ctrlr = rev.CANSparkMax(motorPort, t)
         ctrlr.setInverted(motorFlipped)
-        reportMsg(f"motor created")
     else:
         ctrlr = VirtualController()
-        reportMsg(f"fake motor created")
 
     motor = DCMotorNode(prefix, motorSpec, ctrlr).addToo(nodes)
 
@@ -79,7 +74,7 @@ def makeFlymer(nodes: list[Node], isReal: bool):
     # -------------------------- DEFAULT PROFILE --------------------------------------------------
 
     hardware.Input.FlymerInputNode().addToo(nodes)
-    #mechController.MechProf().addToo(nodes)
+    # mechController.MechProf().addToo(nodes)
     motorTestNode.MotorTestNode(tags.FLDrive).addToo(nodes)
 
 

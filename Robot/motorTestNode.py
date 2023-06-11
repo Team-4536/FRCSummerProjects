@@ -4,6 +4,7 @@ from hardware.DCMotors import DCMotorNode
 import utils.tables
 import utils.tags as tags
 from hardware.Input import FlymerInputProfile
+from robot import reportMsg
 
 
 class MotorTestNode(Node):
@@ -16,7 +17,6 @@ class MotorTestNode(Node):
 
     def tick(self, data: dict[str, Any]) -> None:
 
-        input = data[tags.INPUT]
-        assert(type(input) == FlymerInputProfile)
+        input = getOrAssert(tags.INPUT, FlymerInputProfile, data)
 
         data[tags.FLDrive + tags.MOTOR_SPEED_CONTROL] = input.drive[1] * 0.2

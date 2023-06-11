@@ -16,8 +16,7 @@ class LiftProf(Node):
 
     def tick(self, data: dict[str, Any]) -> None:
 
-        input = data.get(tags.INPUT)
-        if type(input) is not FlymerInputProfile: return
+        input = getOrAssert(tags.INPUT, FlymerInputProfile, data)
 
         liftPower = input.lift
         liftPos = data[tags.LIFT_MOTOR + tags.ENCODER_READING]
@@ -35,8 +34,7 @@ class TurretProf(Node):
 
     def tick(self, data: dict[str, Any]) -> None:
 
-        input = data.get(tags.INPUT)
-        if type(input) is not FlymerInputProfile: return
+        input = getOrAssert(tags.INPUT, FlymerInputProfile, data)
 
         turretPower = input.turret
         turretPos = data[tags.TURRET_MOTOR + tags.ENCODER_READING]
@@ -44,22 +42,21 @@ class TurretProf(Node):
         data[tags.TURRET_MOTOR + tags.MOTOR_SPEED_CONTROL] = turretPower
 
 
-    """---------------Retract Motor Control---------------------------"""
+"""---------------Retract Motor Control---------------------------"""
 
-    class RetractProf(Node):
+class RetractProf(Node):
 
-        def __init__(self) -> None:
-            self.name = "RetractProfile"
-            self.priority = NODE_PROF
+    def __init__(self) -> None:
+        self.name = "RetractProfile"
+        self.priority = NODE_PROF
 
-        def tick(self, data: dict[str, Any]) -> None:
+    def tick(self, data: dict[str, Any]) -> None:
 
-            input = data.get(tags.INPUT)
-            if type(input) is not FlymerInputProfile: return
+        input = getOrAssert(tags.INPUT, FlymerInputProfile, data)
 
-            retractPower = input.retract
-            retractPos = data[tags.RETRACT_MOTOR + tags.ENCODER_READING]
+        retractPower = input.retract
+        retractPos = data[tags.RETRACT_MOTOR + tags.ENCODER_READING]
 
-            data[tags.RETRACT_MOTOR + tags.MOTOR_SPEED_CONTROL] = retractPower
+        data[tags.RETRACT_MOTOR + tags.MOTOR_SPEED_CONTROL] = retractPower
 
-    """-----------------------------------------------------------------------"""
+"""-----------------------------------------------------------------------"""

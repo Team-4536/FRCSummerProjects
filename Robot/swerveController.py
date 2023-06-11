@@ -27,12 +27,9 @@ class SwerveProf(Node):
 
     def tick(self, data: dict[str, Any]) -> None:
 
-        input = data.get(tags.INPUT)
-        if type(input) is not FlymerInputProfile: return
 
         #grab controller inputs
-        input = data[tags.INPUT]
-        assert type(input) == FlymerInputProfile
+        input = getOrAssert(tags.INPUT, FlymerInputProfile, data)
 
         #raw inputs
 

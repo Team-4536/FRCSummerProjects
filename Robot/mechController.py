@@ -13,13 +13,8 @@ class MechProf(Node):
 
     def tick(self, data: dict[str, Any]) -> None:
 
+        input = getOrAssert(tags.INPUT, FlymerInputProfile, data)
 
-        input = data.get(tags.INPUT)
-        assert(type(input) is FlymerInputProfile)
-
-
-        if input.grabToggle:
-            data.update({tags.GRABBER + tags.DBLSOLENOID_STATE : not data[tags.GRABBER + tags.DBLSOLENOID_STATE] })
 
         x = input.drive[0]
         y = input.drive[1]
