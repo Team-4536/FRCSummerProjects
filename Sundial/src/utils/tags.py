@@ -18,7 +18,6 @@ ENCODER_READING = "Pos"
 MSG = "msg"
 RES = "res"
 LOG_TAG = "logs"
-HEARTBEAT = "heartbeat"
 
 
 TIME_SINCE_INIT = "time"

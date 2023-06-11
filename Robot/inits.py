@@ -3,7 +3,6 @@ from node import Node
 
 import navx
 import telemetryNode
-import timeNode
 import simulationNodes.encoderSimNode as encoderSimNode
 from hardware.DCMotors import *
 from hardware.Encoders import *
@@ -51,7 +50,6 @@ def sparkMaxAndEncoderPair(nodes: list[Node], isReal: bool, prefix: str, motorSp
 
 def makeFlymer(nodes: list[Node], isReal: bool):
 
-    nodes.append(timeNode.TimeNode())
     nodes.append(telemetryNode.TelemNode([
         tags.FLDrive + tags.ENCODER_READING,
         tags.FRDrive + tags.ENCODER_READING,
@@ -106,4 +104,5 @@ def makeFlymer(nodes: list[Node], isReal: bool):
         """
     reportMsg(str(isReal))
     testMotor, testEncoder = sparkMaxAndEncoderPair(nodes, True, tags.FLDrive, NEOSpec, False, 0, False)
+    if not isReal: encoderSimNode.EncoderSimNode(tags.FLDrive, testMotor, testEncoder).addToo(nodes)
 

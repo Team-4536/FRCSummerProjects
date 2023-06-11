@@ -42,13 +42,7 @@ class clientWidget(widgets.widget.widget):
 
     def tick(self) -> None:
 
-        heart = telemTable.getValue(tags.HEARTBEAT, None)
-        x = 0
-
-        if type(heart) is float: # timeout detection
-            if heart - self.prevHeart < 1.1: x = 1
-            self.prevHeart = heart
-
         # scale green box by x
         # 0 if no conneciton, 1 if yes conneciton
+        x = 1 if inst.isConnected() else 0
         dpg.apply_transform(self.heartbeatNode, dpg.create_scale_matrix([x, x]))
