@@ -73,8 +73,8 @@ def makeFlymer(nodes: list[Node], isReal: bool):
     # -------------------------- DEFAULT PROFILE --------------------------------------------------
 
     hardware.Input.FlymerInputNode().addToo(nodes)
-    # mechController.MechProf().addToo(nodes)
-    motorTestNode.MotorTestNode(tags.FLDrive).addToo(nodes)
+    mechController.MechProf().addToo(nodes)
+    # motorTestNode.MotorTestNode(tags.FLDrive).addToo(nodes)
 
 
     # --------------------------- HARDWARE ---------------------------------------------------------
@@ -88,10 +88,10 @@ def makeFlymer(nodes: list[Node], isReal: bool):
     # liftMotor, liftEncoder = sparkMaxAndEncoderPair(nodes, isReal, tags.LIFT_MOTOR, NEOSpec, False, 0, False)
     # if not isReal: encoderSimNode.EncoderSimNode(tags.LIFT_MOTOR, liftMotor, liftEncoder).addToo(nodes)
 
-    """
+    
     drivePrefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
-    driveFlips = [ False, True, False, True]
-    drivePorts = [ 4, 1, 3, 2 ]
+    driveFlips = [ False, False, False, False]
+    drivePorts = [ 2, 18, 1, 0 ]
     for i in range(0, 4):
 
         motor, encoder = sparkMaxAndEncoderPair(nodes, isReal,
@@ -102,8 +102,12 @@ def makeFlymer(nodes: list[Node], isReal: bool):
             motorFlipped=driveFlips[i])
 
         if not isReal: encoderSimNode.EncoderSimNode(drivePrefs[i], motor, encoder).addToo(nodes)
-        """
-    reportMsg(str(isReal))
-    testMotor, testEncoder = sparkMaxAndEncoderPair(nodes, True, tags.FLDrive, NEOSpec, False, 0, False)
-    # if not isReal: encoderSimNode.EncoderSimNode(tags.FLDrive, testMotor, testEncoder).addToo(nodes)
+        
 
+
+    #testMotor = DCMotorNode(tags.FLDrive, NEOSpec, rev.CANSparkMax(3, rev.CANSparkMax.MotorType.kBrushless)).addToo(nodes)
+    #self.motor = rev.CANSparkMax(3, rev.CANSparkMax.MotorType.kBrushless)
+
+    testMotor, testEncoder = sparkMaxAndEncoderPair(nodes, isReal, tags.FLDrive, NEOSpec, False, 3, False)
+    # if not isReal: encoderSimNode.EncoderSimNode(tags.FLDrive, testMotor, testEncoder).addToo(nodes)
+    # reportMsg(str(isReal))

@@ -62,7 +62,7 @@ class DCMotorNode(Node):
             if data[tags.OPMODE] == tags.OP_DISABLED:
                 val = 0
 
-            self.controller.set(val)
+            self.controller.set(float(val))
 
         data.update({ self.pref + tags.MOTOR_SPEED_CONTROL : self.controller.get() })
 

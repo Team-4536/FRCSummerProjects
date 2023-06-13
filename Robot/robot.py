@@ -102,15 +102,12 @@ class Robot(wpilib.TimedRobot):
         self.msgTopic = telemTable.getStringTopic(tags.MSG).subscribe("default")
 
 
-
-
-
         # self.data: dict[str, Any] = { } # continuous data
         self.data: dict[str, Any] = ThrowDict()
         self.procs: list[Node] = [ ] # NODES / including hardware
 
 
-        inits.makeFlymer(self.procs, not self.isSimulation)
+        inits.makeFlymer(self.procs, not self.isSimulation())
         # inits.makeFlymer(self.procs, True)
 
         # CLEANUP: move telem into the robot class
@@ -131,7 +128,6 @@ class Robot(wpilib.TimedRobot):
         self.data.update({ tags.DT : wpilib.getTime() - self.prevTime }) # ???: Is using one DT sample per frame accurate enough? or should each node sample?
         self.data.update({ tags.TIME_SINCE_INIT : wpilib.getTime() - self.initTime })
         self.prevTime = wpilib.getTime()
-
 
 
         # CLEANUP: pretty sure this is redundant
