@@ -10,8 +10,6 @@ from utils.tables import *
 from node import *
 
 import telemetryNode
-import timeNode
-
 import traceback
 
 HEARTBEAT: float = 1.0
@@ -22,7 +20,7 @@ UNKNOWN_RES = 'unknown cmd'
 
 logCount: int = 0
 
-# NOTE: please do not write directly to the log table value, it reuires formatting and bad messages are ignored
+# NOTE: please do not write directly to the log table value, it reqires formatting and bad messages are ignored
 def reportErr(message: str) -> None:
     global logCount # CLEANUP: this entire system is a hack, but messages aren't a thing in networktables and making a socket system is very difficult
     telemTable.putString(tags.LOG_TAG, f"{logCount}:ERR:" + str(message))
@@ -31,6 +29,16 @@ def reportMsg(message: str) -> None:
     global logCount
     telemTable.putString(tags.LOG_TAG, f"{logCount}:MSG:" + str(message))
     logCount+=1
+
+
+# Ok i know this is kind of awful, but nodes that would set members that didn't exist wouldn't throw and it was really annoying so i made it throw
+class ThrowDict(dict):
+    def __missing__(self, key):
+        raise KeyError
+
+    def __setitem__(self, __key: Any, __value: Any) -> None:
+        if not (__key in self): raise KeyError
+        return super().__setitem__(__key, __value)
 
 
 class Robot(wpilib.TimedRobot):
@@ -66,6 +74,13 @@ class Robot(wpilib.TimedRobot):
 
         return "args missing: [nodes|data|hardware]"
 
+    def value(self, args: list[str]) ->str:
+        if len(args) != 1: return f"Invalid arg count {len(args)}."
+
+        if args[0] in self.data:
+            return str(self.data[args[0]])
+        else: return f"{args[0]} is not in data."
+
 
     def kill(self, args: list[str]) -> str:
         raise SystemExit()
@@ -74,39 +89,33 @@ class Robot(wpilib.TimedRobot):
 
 
     def robotInit(self) -> None:
-        self._logCount = 0 # to uniquely identify log messages sent from the robot, cause apperently that has to be required
 
         self.ctrls: dict[str, Callable[[list[str]], str]] = {
             "ping" : self.returnPing,
             "list" : self.lis,
-            "kill" : self.kill
+            "kill" : self.kill,
+            "value" : self.value
             }
 
+        self.initTime = wpilib.getTime()
         self.prevTime: float = 0.0
         self.msgTopic = telemTable.getStringTopic(tags.MSG).subscribe("default")
 
 
-
-
-
-        self.data: dict[str, Any] = { } # continuous data
+        # self.data: dict[str, Any] = { } # continuous data
+        self.data: dict[str, Any] = ThrowDict()
         self.procs: list[Node] = [ ] # NODES / including hardware
 
 
-        inits.makeRealFlymer(self.procs)
+        inits.makeFlymer(self.procs, not self.isSimulation())
+        # inits.makeFlymer(self.procs, True)
 
+        # CLEANUP: move telem into the robot class
         found = False
         for x in self.procs:
             found = x.__class__ == telemetryNode.TelemNode
             if found: break
         assert(found)
-
-        found = False
-        for x in self.procs:
-            found = x.__class__ == timeNode.TimeNode
-            if found: break
-        assert(found)
-
 
 
 
@@ -116,12 +125,30 @@ class Robot(wpilib.TimedRobot):
     def robotPeriodic(self) -> None:
 
 
-        # respond to commands +==========================================================
+        self.data.update({ tags.DT : wpilib.getTime() - self.prevTime }) # ???: Is using one DT sample per frame accurate enough? or should each node sample?
+        self.data.update({ tags.TIME_SINCE_INIT : wpilib.getTime() - self.initTime })
+        self.prevTime = wpilib.getTime()
 
-        t = time.time()
-        if (t - self.prevTime) > HEARTBEAT:
-            telemTable.putNumber(tags.HEARTBEAT, t)
-            self.prevTime = t
+
+        # CLEANUP: pretty sure this is redundant
+        """
+        frameTime = profiling.popProf()
+        profiling.pushProf()
+        self.data.update({ tags.FRAME_TIME : frameTime * 1000 })
+        """
+
+
+
+        if self.isAutonomousEnabled(): state = tags.OP_AUTO
+        elif self.isTeleopEnabled():   state = tags.OP_TELEOP
+        else:                          state = tags.OP_DISABLED
+        self.data.update({ tags.OPMODE : state })
+
+
+
+        self.data.update({ tags.ISREAL : not self.isSimulation() })
+
+        # respond to commands +==========================================================
 
 
 

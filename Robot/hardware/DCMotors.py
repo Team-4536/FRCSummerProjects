@@ -3,9 +3,8 @@ import wpilib
 import rev
 from node import *
 import utils.tags as tags
-from robot import reportErr, reportMsg
 
-
+from robot import reportMsg
 
 
 
@@ -59,7 +58,11 @@ class DCMotorNode(Node):
 
         if type(val) == float or type(val) == int:
             val = min(1, max(-1, val)) # type: ignore
-            self.controller.set(val)
-        else:
-            data.update({ self.pref + tags.MOTOR_SPEED_CONTROL : self.controller.get() })
+
+            if data[tags.OPMODE] == tags.OP_DISABLED:
+                val = 0
+
+            self.controller.set(float(val))
+
+        data.update({ self.pref + tags.MOTOR_SPEED_CONTROL : self.controller.get() })
 

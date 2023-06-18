@@ -4,12 +4,6 @@ from hardware.Input import FlymerInputProfile
 
 
 
-
-
-
-
-
-
 class MechProf(Node):
 
     def __init__(self) -> None:
@@ -19,13 +13,8 @@ class MechProf(Node):
 
     def tick(self, data: dict[str, Any]) -> None:
 
+        input = getOrAssert(tags.INPUT, FlymerInputProfile, data)
 
-        input = data.get(tags.INPUT)
-        if type(input) is not FlymerInputProfile: return
-
-
-        if input.grabToggle:
-            data.update({tags.GRABBER + tags.DBLSOLENOID_STATE : not data[tags.GRABBER + tags.DBLSOLENOID_STATE] })
 
         x = input.drive[0]
         y = input.drive[1]
@@ -49,7 +38,7 @@ class MechProf(Node):
 
         prefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
         for i in range(0, 4):
-            data[prefs[i] + tags.MOTOR_SPEED_CONTROL]  = speeds[i]
+            data[prefs[i] + tags.MOTOR_SPEED_CONTROL]  = speeds[i] * 0.2
 
 
 

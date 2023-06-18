@@ -21,8 +21,12 @@ class TelemNode(Node):
     def tick(self, data: dict[str, Any]) -> None:
 
         for x in self.published:
+            if not (x in data):
+                continue
+
             d = data[x]
 
+            # TODO: figure out a solution to sending ints
             if type(d) == float or type(d) == int:
                 utils.tables.telemTable.putNumber(x, float(data[x]))
             elif type(d) == bool:

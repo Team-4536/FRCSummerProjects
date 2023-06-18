@@ -16,9 +16,17 @@ FRSteering = "FRSteering"
 BLSteering = "BLSteering"
 BRSteering = "BRSteering"
 
+LIFT_MOTOR = "Lift"
+RETRACT_MOTOR = "Retract"
+TURRET_MOTOR = "Turret"
+
 GRABBER = "Grab"
 
-LIFT_MOTOR = "LiftPower"
+UP_LIMIT_SWITCH = "UpSwitch"
+DOWN_LIMIT_SWITCH = "DownSwitch"
+CLOCK_LIMIT_SWITCH = "ClockSwitch"
+COUTNER_LIMIT_SWITCH = "CounterSwitch"
+
 
 
 # Suffixes are for what each node is doing
@@ -35,23 +43,24 @@ ENCODER_SIM_NAME = "Encodersim"
 TESTER_NAME = "Tester"
 DBLSOLENOID_NAME = "DBLSolenoid"
 
-UP_LIMIT_SWITCH = "UpSwitch"
-DOWN_LIMIT_SWITCH = "DownSwitch"
-CLOCK_LIMIT_SWITCH = "ClockSwitch"
-COUTNER_LIMIT_SWITCH = "CounterSwitch"
-
 # any straight values that only happen once
 
 DT = "dt"
 TIME_SINCE_INIT = "time"
-HEARTBEAT = "heartbeat"
+FRAME_TIME = "frameTime"
+INPUT = "input"
+ISREAL = "isreal"
+OPMODE = "opmode"
+
+OP_DISABLED = 0
+OP_AUTO = 1
+OP_TELEOP = 2
+
 
 GYRO_PITCH = "pitch"
 GYRO_YAW = "yaw"
 GYRO_ROLL = "roll"
 
-FRAME_TIME = "frameTime"
-INPUT = "input"
 
 
 LOG_TAG = "logs"

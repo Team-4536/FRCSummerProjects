@@ -3,41 +3,28 @@ from typing import Any
 from hardware.DCMotors import DCMotorNode
 import utils.tables
 import utils.tags as tags
+from hardware.Input import FlymerInputProfile
+from robot import reportMsg
+import rev
 
 
 class MotorTestNode(Node):
 
-    def __init__(self, srcTag: str, motorPrefix: str) -> None:
-        self.priority = NODE_HARDWARE
+    def __init__(self, motorPrefix: str) -> None:
+        self.priority = NODE_PROF
         self.name = "motorTestNode"
-        self.srcTag = srcTag
         self.motorPrefix = motorPrefix
+
+        #self.motor = rev.CANSparkMax(3, rev.CANSparkMax.MotorType.kBrushless)
 
 
     def tick(self, data: dict[str, Any]) -> None:
 
-        self.name = self.motorPrefix + tags.TESTER_NAME
-
-        val = utils.tables.sundialTable.getValue(self.srcTag, None)
-        if type(val) is not float: return
-
-        data.update({ self.motorPrefix + tags.MOTOR_SPEED_CONTROL : val })
-
-    def command(self, args: list[str], data: dict[str, Any]) -> str:
-
-        if len(args) <= 0:
-            return "missing args [info]"
-
-        if args[0] == "info":
-            return f"Tag being set: {self.motorPrefix + tags.MOTOR_SPEED_CONTROL}, Source tag: {self.srcTag}"
-
-        return "missing args [info]"
-
-
-
-
-
-
-
-
-
+        input = getOrAssert(tags.INPUT, FlymerInputProfile, data)
+        """
+        if  getOrAssert(tags.OPMODE, int, data) == tags.OP_TELEOP:
+            self.motor.set(.1)
+        else:
+            self.motor.set(0)
+        """
+        data[tags.FLDrive + tags.MOTOR_SPEED_CONTROL] = input.drive[1] * 0.2
