@@ -8,10 +8,19 @@ import widgets.widget
 inst = ntcore.NetworkTableInstance.getDefault()
 inst.startClient4(basename(__file__))
 
-# CLEANUP: figure something out to set this from within sundial, and keep it in a load file
+# default is to connect to real robot
 inst.setServer("10.45.36.2")
-# inst.setServer("localhost")
+
 from utils.tables import telemTable
+
+
+
+def connecitonSwitchCallback(sender, data):
+    if(data == "Real"):
+        inst.setServer("10.45.36.2")
+        print('set to real')
+    elif(data == "Sim"):
+        inst.setServer("localhost")
 
 
 
@@ -41,6 +50,9 @@ class clientWidget(widgets.widget.widget):
             with dpg.group(horizontal=True):
                 dpg.add_text("Opmode: ")
                 dpg.add_text(source=self.valueTag)
+
+            with dpg.group(horizontal=True):
+                dpg.add_radio_button([ "Real", "Sim" ], label="Connected to:", callback=connecitonSwitchCallback)
 
 
 
