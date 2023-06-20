@@ -152,9 +152,10 @@ def makeDemo(nodes: list[Node], isReal: bool):
     
     drivePrefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
     driveFlips = [ False, False, False, False]
-    drivePorts = [ 2, 18, 1, 0 ]
+    drivePorts = [ 2, 3, 1, 4 ]
     for i in range(0, 4):
 
+        motor = DCMotorNode(drive)
         motor, encoder = sparkMaxAndEncoderPair(nodes, isReal,
             prefix=drivePrefs[i],
             motorSpec=NEOSpec,
