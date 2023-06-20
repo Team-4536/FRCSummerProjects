@@ -11,7 +11,7 @@ import mechController
 import hardware.pneumatics as pneumatics
 import hardware.gyros as gyros
 import motorTestNode
-
+import tankController
 
 
 
@@ -111,3 +111,56 @@ def makeFlymer(nodes: list[Node], isReal: bool):
     testMotor, testEncoder = sparkMaxAndEncoderPair(nodes, isReal, tags.FLDrive, NEOSpec, False, 3, False)
     # if not isReal: encoderSimNode.EncoderSimNode(tags.FLDrive, testMotor, testEncoder).addToo(nodes)
     # reportMsg(str(isReal))
+
+def makeDemo(nodes: list[Node], isReal: bool):
+
+    nodes.append(telemetryNode.TelemNode([
+        tags.FLDrive + tags.ENCODER_READING,
+        tags.FRDrive + tags.ENCODER_READING,
+        tags.BLDrive + tags.ENCODER_READING,
+        tags.BRDrive + tags.ENCODER_READING,
+
+        tags.FLDrive + tags.MOTOR_SPEED_CONTROL,
+        tags.FRDrive + tags.MOTOR_SPEED_CONTROL,
+        tags.BLDrive + tags.MOTOR_SPEED_CONTROL,
+        tags.BRDrive + tags.MOTOR_SPEED_CONTROL,
+
+        tags.GYRO_PITCH,
+        tags.GYRO_YAW,
+        tags.GYRO_ROLL,
+
+        tags.TIME_SINCE_INIT,
+        tags.FRAME_TIME,
+        tags.OPMODE
+    ]))
+
+    # -------------------------- DEFAULT PROFILE --------------------------------------------------
+
+    hardware.Input.DemoInputNode().addToo(nodes)
+    tankController.TankProf().addToo(nodes)
+    # motorTestNode.MotorTestNode(tags.FLDrive).addToo(nodes)
+
+
+    # --------------------------- HARDWARE ---------------------------------------------------------
+
+    gyros.GyroNode(
+            navx.AHRS(wpilib.SPI.Port.kMXP) if isReal else
+            gyros.VirtualGyro()
+        ).addToo(nodes)
+
+
+    
+    drivePrefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
+    driveFlips = [ False, False, False, False]
+    drivePorts = [ 2, 18, 1, 0 ]
+    for i in range(0, 4):
+
+        motor, encoder = sparkMaxAndEncoderPair(nodes, isReal,
+            prefix=drivePrefs[i],
+            motorSpec=NEOSpec,
+            motorBrushed=False,
+            motorPort=drivePorts[i],
+            motorFlipped=driveFlips[i])
+
+        if not isReal: encoderSimNode.EncoderSimNode(drivePrefs[i], motor, encoder).addToo(nodes)
+        

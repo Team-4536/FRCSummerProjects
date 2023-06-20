@@ -107,7 +107,7 @@ class Robot(wpilib.TimedRobot):
         self.procs: list[Node] = [ ] # NODES / including hardware
 
 
-        inits.makeFlymer(self.procs, not self.isSimulation())
+        inits.makeDemo(self.procs, not self.isSimulation())
         # inits.makeFlymer(self.procs, True)
 
         # CLEANUP: move telem into the robot class

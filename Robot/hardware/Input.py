@@ -68,3 +68,36 @@ class FlymerInputNode(Node):
 
 
         data.update({ tags.INPUT : input })
+
+class DemoInputProfile:
+
+    def __init__(self) -> None:
+        self.driveLeft: float = 0.0
+        self.driveRight: float = 0.0
+
+
+    def publish(self, name: str, table: ntcore.NetworkTable) -> None:
+
+        # CLEANUP: these should probs be in the tags file
+        table.putNumber(name + "/driveL", self.driveLeft)
+        table.putNumber(name + "/driveR", self.driveRight)
+        
+class DemoInputNode(Node):
+
+    def __init__(self) -> None:
+        self.driveController = wpilib.XboxController(0)
+
+        self.priority = NODE_FIRST
+        self.name = tags.INPUT
+
+
+    def tick(self, data: dict[str, Any]) -> None:
+
+        input = DemoInputProfile()
+
+        input.driveLeft = deadZone((-self.driveController.getLeftY()))
+        input.driveRight = deadZone((-self.driveController.getRightY()))
+
+
+
+        data.update({ tags.INPUT : input })
