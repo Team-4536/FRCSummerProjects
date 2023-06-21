@@ -86,9 +86,13 @@ def makeFlymer(nodes: list[Node], data: dict[str, Any], isReal: bool):
         ).addToo(nodes)
 
 
+    # liftMotor, liftEncoder = sparkMaxAndEncoderPair(nodes, isReal, tags.LIFT_MOTOR, NEOSpec, False, 0, False)
+    # if not isReal: encoderSimNode.EncoderSimNode(tags.LIFT_MOTOR, liftMotor, liftEncoder).addToo(nodes)
+
+    
     drivePrefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
-    driveFlips = [ False, False, False, False]
-    drivePorts = [ 2, 18, 1, 0 ]
+    driveFlips = [ False, True, False, True]
+    drivePorts = [ 4, 1, 3, 2 ]
     for i in range(0, 4):
 
         motor, encoder = sparkMaxAndEncoderPair(nodes, isReal,
@@ -99,8 +103,6 @@ def makeFlymer(nodes: list[Node], data: dict[str, Any], isReal: bool):
             motorFlipped=driveFlips[i])
 
         if not isReal: encoderSimNode.EncoderSimNode(drivePrefs[i], motor, encoder).addToo(nodes)
-
-
 
 
 
@@ -140,5 +142,6 @@ def makeDemo(nodes: list[Node], data: dict[str, Any], isReal: bool):
 
 
 
-
+    #testMotor = DCMotorNode(tags.FLDrive, NEOSpec, rev.CANSparkMax(3, rev.CANSparkMax.MotorType.kBrushless)).addToo(nodes)
+    #self.motor = rev.CANSparkMax(3, rev.CANSparkMax.MotorType.kBrushless)
 

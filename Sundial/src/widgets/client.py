@@ -70,7 +70,7 @@ class clientWidget(widgets.widget.widget):
 
 
         val = telemTable.getValue(tags.OPMODE, None)
-        if type(val) is not float: val = "Disconnected"
+        if type(val) is not float: val = "Invalid reading"
         else:
             dict = { 0.0 : "Disabled" , 1.0 : "Auto", 2.0 : "Teleop" }
             val = dict[val]
