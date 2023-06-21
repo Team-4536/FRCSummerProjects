@@ -42,7 +42,26 @@ def sparkMaxAndEncoderPair(nodes: list[Node], isReal: bool, prefix: str, motorSp
 
 
 
+standardPublishedTags = [
+    tags.FLDrive + tags.ENCODER_READING,
+    tags.FRDrive + tags.ENCODER_READING,
+    tags.BLDrive + tags.ENCODER_READING,
+    tags.BRDrive + tags.ENCODER_READING,
 
+    tags.FLDrive + tags.MOTOR_SPEED_CONTROL,
+    tags.FRDrive + tags.MOTOR_SPEED_CONTROL,
+    tags.BLDrive + tags.MOTOR_SPEED_CONTROL,
+    tags.BRDrive + tags.MOTOR_SPEED_CONTROL,
+
+    tags.GYRO_PITCH,
+    tags.GYRO_YAW,
+    tags.GYRO_ROLL,
+
+    tags.TIME_SINCE_INIT,
+    tags.FRAME_TIME,
+    tags.OPMODE,
+    tags.INPUT
+]
 
 
 
@@ -50,25 +69,7 @@ def sparkMaxAndEncoderPair(nodes: list[Node], isReal: bool, prefix: str, motorSp
 
 def makeFlymer(nodes: list[Node], data: dict[str, Any], isReal: bool):
 
-    nodes.append(telemetryNode.TelemNode([
-        tags.FLDrive + tags.ENCODER_READING,
-        tags.FRDrive + tags.ENCODER_READING,
-        tags.BLDrive + tags.ENCODER_READING,
-        tags.BRDrive + tags.ENCODER_READING,
-
-        tags.FLDrive + tags.MOTOR_SPEED_CONTROL,
-        tags.FRDrive + tags.MOTOR_SPEED_CONTROL,
-        tags.BLDrive + tags.MOTOR_SPEED_CONTROL,
-        tags.BRDrive + tags.MOTOR_SPEED_CONTROL,
-
-        tags.GYRO_PITCH,
-        tags.GYRO_YAW,
-        tags.GYRO_ROLL,
-
-        tags.TIME_SINCE_INIT,
-        tags.FRAME_TIME,
-        tags.OPMODE
-    ]))
+    telemetryNode.TelemNode(standardPublishedTags).addToo(nodes)
 
     # -------------------------- DEFAULT PROFILE --------------------------------------------------
 
@@ -114,27 +115,14 @@ def makeFlymer(nodes: list[Node], data: dict[str, Any], isReal: bool):
 
 
 
+
+
+
+
+
 def makeDemo(nodes: list[Node], data: dict[str, Any], isReal: bool):
 
-    nodes.append(telemetryNode.TelemNode([
-        tags.FLDrive + tags.ENCODER_READING,
-        tags.FRDrive + tags.ENCODER_READING,
-        tags.BLDrive + tags.ENCODER_READING,
-        tags.BRDrive + tags.ENCODER_READING,
-
-        tags.FLDrive + tags.MOTOR_SPEED_CONTROL,
-        tags.FRDrive + tags.MOTOR_SPEED_CONTROL,
-        tags.BLDrive + tags.MOTOR_SPEED_CONTROL,
-        tags.BRDrive + tags.MOTOR_SPEED_CONTROL,
-
-        tags.GYRO_PITCH,
-        tags.GYRO_YAW,
-        tags.GYRO_ROLL,
-
-        tags.TIME_SINCE_INIT,
-        tags.FRAME_TIME,
-        tags.OPMODE
-    ]))
+    telemetryNode.TelemNode(standardPublishedTags).addToo(nodes)
 
     # -------------------------- DEFAULT CONTROLS --------------------------------------------------
 
