@@ -8,13 +8,13 @@ from hardware.DCMotors import *
 from hardware.Encoders import *
 from utils.tables import *
 from node import *
+import hardware.Input as Input
 
 import telemetryNode
 import traceback
 
 HEARTBEAT: float = 1.0
 UNKNOWN_RES = 'unknown cmd'
-
 
 
 
@@ -41,52 +41,9 @@ class ThrowDict(dict):
         return super().__setitem__(__key, __value)
 
 
+
+
 class Robot(wpilib.TimedRobot):
-
-
-
-    def returnPing(self, args: list[str]) -> str:
-        return "ping response!"
-
-    def lis(self, args: list[str]) -> str:
-
-        if len(args) == 0:
-            return "args missing: [nodes|data]"
-
-        if args[0] == "nodes":
-
-            res: str = self.procs[0].name
-            if len(self.procs) == 0: return "[There are no processes]"
-
-            for i in range(1, len(self.procs)):
-                res += ",\n" + self.procs[i].name
-
-            return res
-
-        elif args[0] == "data":
-            if len(self.data) == 0: return "[There is no data]"
-
-            res = ""
-            for k in self.data:
-                res += k + ",\n"
-            return res
-
-
-        return "args missing: [nodes|data|hardware]"
-
-    def value(self, args: list[str]) ->str:
-        if len(args) != 1: return f"Invalid arg count {len(args)}."
-
-        if args[0] in self.data:
-            return str(self.data[args[0]])
-        else: return f"{args[0]} is not in data."
-
-
-    def kill(self, args: list[str]) -> str:
-        raise SystemExit()
-
-
-
 
     def robotInit(self) -> None:
 
@@ -101,14 +58,18 @@ class Robot(wpilib.TimedRobot):
         self.prevTime: float = 0.0
         self.msgTopic = telemTable.getStringTopic(tags.MSG).subscribe("default")
 
-
-        # self.data: dict[str, Any] = { } # continuous data
         self.data: dict[str, Any] = ThrowDict()
         self.procs: list[Node] = [ ] # NODES / including hardware
 
+        self.driveController = wpilib.XboxController(0)
+        self.armController = wpilib.XboxController(1)
+        self.buttonPanel = wpilib.Joystick(2)
 
-        inits.makeFlymer(self.procs, not self.isSimulation())
-        # inits.makeFlymer(self.procs, True)
+
+        # TODO: imperative refactor
+        inits.makeDemo(self.procs, self.data, not self.isSimulation())
+        # inits.makeFlymer(self.procs, self.data, not self.isSimulation())
+
 
         # CLEANUP: move telem into the robot class
         found = False
@@ -117,6 +78,14 @@ class Robot(wpilib.TimedRobot):
             if found: break
         assert(found)
 
+        # TODO: imperative refactor
+        found = False
+        for kv in self.data.items():
+            if isinstance(kv[1], Input.InputProfile):
+                found = True
+                kv[1].update(self.driveController, self.armController, self.buttonPanel)
+                break
+        assert(found)
 
 
 
@@ -130,48 +99,40 @@ class Robot(wpilib.TimedRobot):
         self.prevTime = wpilib.getTime()
 
 
-        # CLEANUP: pretty sure this is redundant
-        """
-        frameTime = profiling.popProf()
-        profiling.pushProf()
-        self.data.update({ tags.FRAME_TIME : frameTime * 1000 })
-        """
-
-
-
         if self.isAutonomousEnabled(): state = tags.OP_AUTO
         elif self.isTeleopEnabled():   state = tags.OP_TELEOP
         else:                          state = tags.OP_DISABLED
         self.data.update({ tags.OPMODE : state })
 
 
-
         self.data.update({ tags.ISREAL : not self.isSimulation() })
 
+
+        # TODO: exception saftey
+        # TODO: imperitive refactor
+        self.data[tags.INPUT].update(self.driveController, self.armController, self.buttonPanel)
+
+
+
         # respond to commands +==========================================================
-
-
 
         for x in self.msgTopic.readQueue():
             res = self.parseAndRespondMsg(x.value)
             if res is not None: telemTable.putString(tags.RES, res)
 
-
         # run procs +=====================================================================
+
         ordered: dict[int, list[Node]] = {}
         maxPri = 0
         for val in self.procs:
 
             maxPri = max(val.priority, maxPri)
 
-            # execute all first pri procs
-            if val.priority == NODE_FIRST: self.runProcessNodeSafe(val)
-            # store the rest, ordered
+            # order nodes based on priority
+            if val.priority in ordered:
+                ordered[val.priority].append(val)
             else:
-                if val.priority in ordered:
-                    ordered[val.priority].append(val)
-                else:
-                    ordered.update({ val.priority : [val] })
+                ordered.update({ val.priority : [val] })
 
 
         # execute other procs, in order
@@ -181,6 +142,7 @@ class Robot(wpilib.TimedRobot):
                 l = ordered[i]
                 for x in l:
                     self.runProcessNodeSafe(x)
+
         # run procs +=====================================================================
 
 
@@ -193,20 +155,20 @@ class Robot(wpilib.TimedRobot):
         except Exception as exception:
             err = f"Exception in node \"{x.name}\": {traceback.format_exc(chain=False)}"
             reportErr(err)
-            print(err) # NOTE: this is a litte redundant, and probably tanks performance, but NT tables are too slow to actually catch every error and I don't want some slipping
+
+            if not self.isReal: print(err) # NOTE: this is a litte redundant, and probably tanks performance
+
+
 
 
 
     """
     Message format:
-
     <stamp>:<cmd> <space separated args>
 
     messages stamp is determined by the str before the first colon, and args are space seperated
-
     badly formatted messages are ignored and not responded to
     """
-
 
     # none return type indicates bad message format (no parsable stamp)
     def parseAndRespondMsg(self, msg: str) -> str | None:
@@ -263,31 +225,49 @@ class Robot(wpilib.TimedRobot):
 
 
 
+    # COMMANDS ==================================================================================
+
+    def returnPing(self, args: list[str]) -> str:
+        return "ping response!"
+
+    def lis(self, args: list[str]) -> str:
+
+        if len(args) == 0:
+            return "args missing: [nodes|data]"
+
+        if args[0] == "nodes":
+
+            res: str = self.procs[0].name
+            if len(self.procs) == 0: return "[There are no processes]"
+
+            for i in range(1, len(self.procs)):
+                res += ",\n" + self.procs[i].name
+
+            return res
+
+        elif args[0] == "data":
+            if len(self.data) == 0: return "[There is no data]"
+
+            res = ""
+            for k in self.data:
+                res += k + ",\n"
+            return res
 
 
+        return "args missing: [nodes|data|hardware]"
 
-    def teleopInit(self) -> None:
-        pass
+    def value(self, args: list[str]) ->str:
+        if len(args) != 1: return f"Invalid arg count {len(args)}."
 
-    def teleopPeriodic(self) -> None:
-        pass
-
-
-
-    def autonomousInit(self) -> None:
-        pass
-
-    def autonomousPeriodic(self) -> None:
-        pass
+        if args[0] in self.data:
+            return str(self.data[args[0]])
+        else: return f"{args[0]} is not in data."
 
 
+    def kill(self, args: list[str]) -> str:
+        raise SystemExit()
 
-
-    def disabledInit(self) -> None:
-        pass
-
-    def disabledPeriodic(self) -> None:
-        pass
+# end robot class
 
 
 
@@ -295,26 +275,19 @@ class Robot(wpilib.TimedRobot):
 
 if __name__ == "__main__":
     wpilib.run(Robot)
+
+    """
+    driveController = wpilib.XboxController(0)
+    armController = wpilib.XboxController(1)
+    buttonPanel = wpilib.Joystick(2)
+
+    inp = Input.FlymerInputProfile()
+    inp.update(driveController, armController, buttonPanel)
+
+    t = telemetryNode.TelemNode([tags.INPUT])
+    t.tick({ tags.INPUT : inp })
+    """
 
     # uncomment these for debugging the init func
     # x = Robot()
     # x.robotInit()
-
-
-"""
-if __name__ == "__main__":
-
-    src = ""
-    with open(__file__, 'r') as file:
-        src = file.read()
-
-    x = compile(src, __file__, mode="exec")
-    exec(x, {"Node" : Node, "wpilib" : wpilib}, {})
-    print("prg ran!")
-
-
-if __name__ == "builtins":
-    print("running!")
-    wpilib.run(Robot)
-
-"""

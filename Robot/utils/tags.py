@@ -67,12 +67,6 @@ LOG_TAG = "logs"
 MSG = "msg"
 RES = 'res'
 
-
-
-
-
-
-
 """
 Use tag prefixes and suffixes to keep your tags organized.
 

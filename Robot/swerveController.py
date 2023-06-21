@@ -38,8 +38,8 @@ class SwerveProf(Node):
         # Z = Turning
         # Brakes are nothing right now
 
-        inputY = input.drive[0]
-        inputX = input.drive[1]
+        inputY = input.driveY
+        inputX = input.driveX
         inputZ = input.turning
 
         #brake input toggle

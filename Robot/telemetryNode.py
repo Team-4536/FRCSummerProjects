@@ -7,7 +7,7 @@ import hardware.DCMotors
 
 
 # Note: if you have a class that needs to be sent over telemetry, implement the "publish" method.
-# example can be found in Input.py
+# example can be found at the way top of Input.py
 
 class TelemNode(Node):
 

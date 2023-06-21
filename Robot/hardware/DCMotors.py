@@ -43,7 +43,7 @@ class FalconSpec(DCMotorSpec):
 # composes spec and controller, provides nicer interfacing
 class DCMotorNode(Node):
 
-    def __init__(self, pref: str, spec: type[DCMotorSpec], ctrlr: VirtualController|rev.CANSparkMax) -> None:
+    def __init__(self, pref: str, spec: type[DCMotorSpec], ctrlr: VirtualController|rev.CANSparkMax|wpilib.Spark) -> None:
         self.spec: type[DCMotorSpec] = spec
         self.controller = ctrlr
 

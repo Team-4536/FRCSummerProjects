@@ -13,58 +13,80 @@ def deadZone(input: float) -> float:
         else:
             return float(input)
 
-class FlymerInputProfile:
 
-    def __init__(self) -> None:
-        self.drive: tuple[float, float] = (0.0, 0.0)
-        self.turning: float = 0.0
 
-        self.lift: float = 0.0
-        self.turret: float = 0.0
-        self.retract: float = 0.0
 
-        self.brakeToggle: bool = False
-        self.grabToggle: bool = False
+
+
+
+
+
+"""
+IMPORTANT NOTE:
+because inputs need to be logged, and defining publishing functions for every one is a little much,
+type schenanigans are being used.
+
+Every single prop in an input prof are looped over and sent over
+Props that arent floats or ints or bools with raise an assertion error
+"""
+class InputProfile:
+
+    def update(self, driveController: wpilib.XboxController, armController: wpilib.XboxController, buttonPanel: wpilib.Joystick):
+        raise NotImplementedError()
 
     def publish(self, name: str, table: ntcore.NetworkTable) -> None:
+        for propKV in self.__dict__.items():
 
-        # CLEANUP: these should probs be in the tags file
-        table.putNumber(name + "/driveX", self.drive[0])
-        table.putNumber(name + "/driveY", self.drive[1])
-        table.putNumber(name + "/turning", self.turning)
-        table.putNumber(name + "/lift", self.lift)
-        table.putNumber(name + "/turret", self.turret)
-        table.putNumber(name + "/retract", self.retract)
-        table.putNumber(name + "/brakeToggle", int(self.brakeToggle))
-        table.putNumber(name + "/grabToggle", int(self.grabToggle))
+            if type(propKV[1]) == float:
+                table.putNumber(name + "/" + propKV[0], propKV[1])
+            elif type(propKV[1]) == int:
+                table.putNumber(name + "/" + propKV[0], propKV[1])
+            elif type(propKV[1]) == bool:
+                table.putBoolean(name + "/" + propKV[0], propKV[1])
 
 
 
 
 
-class FlymerInputNode(Node):
-
-    def __init__(self) -> None:
-        self.driveController = wpilib.XboxController(0)
-        self.armController = wpilib.XboxController(1)
-        self.buttonPanel = wpilib.Joystick(2)
-
-        self.priority = NODE_FIRST
-        self.name = tags.INPUT
 
 
-    def tick(self, data: dict[str, Any]) -> None:
-
-        input = FlymerInputProfile()
-
-        input.drive = (deadZone(self.driveController.getLeftX()), deadZone((-self.driveController.getLeftY())))
-        input.turning = deadZone(self.driveController.getRightX())
-        input.brakeToggle = self.driveController.getAButtonPressed()
-
-        input.lift = deadZone(self.armController.getLeftY())
-        input.turret = deadZone(self.armController.getLeftX())
-        input.retract = deadZone(self.armController.getRightY())
-        input.grabToggle = self.armController.getAButtonPressed()
 
 
-        data.update({ tags.INPUT : input })
+class FlymerInputProfile(InputProfile):
+
+    def update(self, driveController: wpilib.XboxController, armController: wpilib.XboxController, buttonPanel: wpilib.Joystick):
+
+        self.driveX = deadZone(driveController.getLeftX())
+        self.driveY = deadZone((-driveController.getLeftY()))
+        self.turning = deadZone(driveController.getRightX())
+        self.brakeToggle = driveController.getAButtonPressed()
+
+        self.lift = deadZone(armController.getLeftY())
+        self.turret = deadZone(armController.getLeftX())
+        self.retract = deadZone(armController.getRightY())
+        self.grabToggle = armController.getAButtonPressed()
+
+
+
+class DemoInputProfile(InputProfile):
+
+    def update(self,
+            driveController: wpilib.XboxController,
+            armController: wpilib.XboxController,
+            buttonPanel: wpilib.Joystick
+            ):
+
+        self.driveLeft = deadZone((-driveController.getLeftY()))
+        self.driveRight = deadZone((-driveController.getRightY()))
+
+
+
+class TestingInputProfile(InputProfile):
+
+    def update(self,
+            driveController: wpilib.XboxController,
+            armController: wpilib.XboxController,
+            buttonPanel: wpilib.Joystick):
+
+        self.stick = deadZone((-driveController.getRightY()))
+        self.buttonToggle = driveController.getAButtonPressed()
