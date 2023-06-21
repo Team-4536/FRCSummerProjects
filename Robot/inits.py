@@ -48,7 +48,7 @@ def sparkMaxAndEncoderPair(nodes: list[Node], isReal: bool, prefix: str, motorSp
 
 
 
-def makeFlymer(nodes: list[Node], isReal: bool):
+def makeFlymer(nodes: list[Node], data: dict[str, Any], isReal: bool):
 
     nodes.append(telemetryNode.TelemNode([
         tags.FLDrive + tags.ENCODER_READING,
@@ -112,7 +112,9 @@ def makeFlymer(nodes: list[Node], isReal: bool):
     # if not isReal: encoderSimNode.EncoderSimNode(tags.FLDrive, testMotor, testEncoder).addToo(nodes)
     # reportMsg(str(isReal))
 
-def makeDemo(nodes: list[Node], isReal: bool):
+
+
+def makeDemo(nodes: list[Node], data: dict[str, Any], isReal: bool):
 
     nodes.append(telemetryNode.TelemNode([
         tags.FLDrive + tags.ENCODER_READING,
@@ -134,12 +136,12 @@ def makeDemo(nodes: list[Node], isReal: bool):
         tags.OPMODE
     ]))
 
-    # -------------------------- DEFAULT PROFILE --------------------------------------------------
+    # -------------------------- DEFAULT CONTROLS --------------------------------------------------
 
-    hardware.Input.DemoInputNode().addToo(nodes)
+    # TODO: imperative refactor
+    data.update({ tags.INPUT : hardware.Input.DemoInputProfile() })
     tankController.TankProf().addToo(nodes)
     # motorTestNode.MotorTestNode(tags.FLDrive).addToo(nodes)
-
 
     # --------------------------- HARDWARE ---------------------------------------------------------
 
@@ -149,13 +151,11 @@ def makeDemo(nodes: list[Node], isReal: bool):
         ).addToo(nodes)
 
 
-    
     drivePrefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
     driveFlips = [ False, False, False, False]
     drivePorts = [ 2, 3, 1, 4 ]
     for i in range(0, 4):
 
-        motor = DCMotorNode(drive)
         motor, encoder = sparkMaxAndEncoderPair(nodes, isReal,
             prefix=drivePrefs[i],
             motorSpec=NEOSpec,
@@ -164,4 +164,3 @@ def makeDemo(nodes: list[Node], isReal: bool):
             motorFlipped=driveFlips[i])
 
         if not isReal: encoderSimNode.EncoderSimNode(drivePrefs[i], motor, encoder).addToo(nodes)
-        
