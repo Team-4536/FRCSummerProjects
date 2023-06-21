@@ -42,7 +42,9 @@ def sparkMaxAndEncoderPair(nodes: list[Node], isReal: bool, prefix: str, motorSp
 
 
 
+# A shortcut so every init doesn't have like 30 lines of telem shit
 standardPublishedTags = [
+
     tags.FLDrive + tags.ENCODER_READING,
     tags.FRDrive + tags.ENCODER_READING,
     tags.BLDrive + tags.ENCODER_READING,
@@ -75,8 +77,6 @@ def makeFlymer(nodes: list[Node], data: dict[str, Any], isReal: bool):
 
     data.update({ tags.INPUT : hardware.Input.FlymerInputProfile() })
     mechController.MechProf().addToo(nodes)
-    # motorTestNode.MotorTestNode(tags.FLDrive).addToo(nodes)
-
 
     # --------------------------- HARDWARE ---------------------------------------------------------
 
@@ -86,10 +86,6 @@ def makeFlymer(nodes: list[Node], data: dict[str, Any], isReal: bool):
         ).addToo(nodes)
 
 
-    # liftMotor, liftEncoder = sparkMaxAndEncoderPair(nodes, isReal, tags.LIFT_MOTOR, NEOSpec, False, 0, False)
-    # if not isReal: encoderSimNode.EncoderSimNode(tags.LIFT_MOTOR, liftMotor, liftEncoder).addToo(nodes)
-
-    
     drivePrefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
     driveFlips = [ False, False, False, False]
     drivePorts = [ 2, 18, 1, 0 ]
@@ -103,15 +99,6 @@ def makeFlymer(nodes: list[Node], data: dict[str, Any], isReal: bool):
             motorFlipped=driveFlips[i])
 
         if not isReal: encoderSimNode.EncoderSimNode(drivePrefs[i], motor, encoder).addToo(nodes)
-        
-
-
-    #testMotor = DCMotorNode(tags.FLDrive, NEOSpec, rev.CANSparkMax(3, rev.CANSparkMax.MotorType.kBrushless)).addToo(nodes)
-    #self.motor = rev.CANSparkMax(3, rev.CANSparkMax.MotorType.kBrushless)
-
-    testMotor, testEncoder = sparkMaxAndEncoderPair(nodes, isReal, tags.FLDrive, NEOSpec, False, 3, False)
-    # if not isReal: encoderSimNode.EncoderSimNode(tags.FLDrive, testMotor, testEncoder).addToo(nodes)
-    # reportMsg(str(isReal))
 
 
 
@@ -126,10 +113,8 @@ def makeDemo(nodes: list[Node], data: dict[str, Any], isReal: bool):
 
     # -------------------------- DEFAULT CONTROLS --------------------------------------------------
 
-    # TODO: imperative refactor
     data.update({ tags.INPUT : hardware.Input.DemoInputProfile() })
     tankController.TankProf().addToo(nodes)
-    # motorTestNode.MotorTestNode(tags.FLDrive).addToo(nodes)
 
     # --------------------------- HARDWARE ---------------------------------------------------------
 
@@ -152,3 +137,8 @@ def makeDemo(nodes: list[Node], data: dict[str, Any], isReal: bool):
             motorFlipped=driveFlips[i])
 
         if not isReal: encoderSimNode.EncoderSimNode(drivePrefs[i], motor, encoder).addToo(nodes)
+
+
+
+
+
