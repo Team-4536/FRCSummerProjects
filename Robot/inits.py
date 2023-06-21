@@ -72,7 +72,7 @@ def makeFlymer(nodes: list[Node], data: dict[str, Any], isReal: bool):
 
     # -------------------------- DEFAULT PROFILE --------------------------------------------------
 
-    hardware.Input.FlymerInputNode().addToo(nodes)
+    data.update({ tags.INPUT : hardware.Input.FlymerInputProfile() })
     mechController.MechProf().addToo(nodes)
     # motorTestNode.MotorTestNode(tags.FLDrive).addToo(nodes)
 

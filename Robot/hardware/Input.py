@@ -27,7 +27,7 @@ because inputs need to be logged, and defining publishing functions for every on
 type schenanigans are being used.
 
 Every single prop in an input prof are looped over and sent over
-Props that arent floats or ints with raise an assertion error
+Props that arent floats or ints or bools with raise an assertion error
 """
 class InputProfile:
 
@@ -36,8 +36,13 @@ class InputProfile:
 
     def publish(self, name: str, table: ntcore.NetworkTable) -> None:
         for propKV in self.__dict__.items():
-            assert(type(propKV[1]) == float or type(propKV[1]) == int)
-            table.putValue(name + "/" + propKV[0], propKV[1])
+
+            if type(propKV[1]) == float:
+                table.putNumber(name + "/" + propKV[0], propKV[1])
+            elif type(propKV[1]) == int:
+                table.putNumber(name + "/" + propKV[0], propKV[1])
+            elif type(propKV[1]) == bool:
+                table.putBoolean(name + "/" + propKV[0], propKV[1])
 
 
 
@@ -51,7 +56,8 @@ class FlymerInputProfile(InputProfile):
 
     def update(self, driveController: wpilib.XboxController, armController: wpilib.XboxController, buttonPanel: wpilib.Joystick):
 
-        self.drive = (deadZone(driveController.getLeftX()), deadZone((-driveController.getLeftY())))
+        self.driveX = deadZone(driveController.getLeftX())
+        self.driveY = deadZone((-driveController.getLeftY()))
         self.turning = deadZone(driveController.getRightX())
         self.brakeToggle = driveController.getAButtonPressed()
 
@@ -75,3 +81,12 @@ class DemoInputProfile(InputProfile):
 
 
 
+class TestingInputProfile(InputProfile):
+
+    def update(self,
+            driveController: wpilib.XboxController,
+            armController: wpilib.XboxController,
+            buttonPanel: wpilib.Joystick):
+
+        self.stick = deadZone((-driveController.getRightY()))
+        self.buttonToggle = driveController.getAButtonPressed()

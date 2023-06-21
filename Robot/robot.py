@@ -68,7 +68,7 @@ class Robot(wpilib.TimedRobot):
 
         # TODO: imperative refactor
         inits.makeDemo(self.procs, self.data, not self.isSimulation())
-        # inits.makeFlymer(self.procs, not self.isSimulation())
+        # inits.makeFlymer(self.procs, self.data, not self.isSimulation())
 
 
         # CLEANUP: move telem into the robot class
@@ -275,6 +275,18 @@ class Robot(wpilib.TimedRobot):
 
 if __name__ == "__main__":
     wpilib.run(Robot)
+
+    """
+    driveController = wpilib.XboxController(0)
+    armController = wpilib.XboxController(1)
+    buttonPanel = wpilib.Joystick(2)
+
+    inp = Input.FlymerInputProfile()
+    inp.update(driveController, armController, buttonPanel)
+
+    t = telemetryNode.TelemNode([tags.INPUT])
+    t.tick({ tags.INPUT : inp })
+    """
 
     # uncomment these for debugging the init func
     # x = Robot()

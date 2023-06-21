@@ -16,8 +16,8 @@ class MechProf(Node):
         input = getOrAssert(tags.INPUT, FlymerInputProfile, data)
 
 
-        x = input.drive[0]
-        y = input.drive[1]
+        x = input.driveX
+        y = input.driveY
         t = input.turning
 
         speeds = [
