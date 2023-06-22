@@ -45,12 +45,18 @@ class DemoBot(wpilib.TimedRobot):
         self.BRDrive = wpilib.Spark(4)
         self.FRDrive.setInverted(True)
         self.BRDrive.setInverted(True)
+        self.shooter = wpilib.Spark(0)
+        self.shooter.setInverted(True)
+
+        self.acceleration = 0
         # self.FLEncoder = self.FLDrive.getEncoder()
+
 
         # GYRO ==========================================================
         self.gyro = navx.AHRS(wpilib.SPI.Port.kMXP)
 
         # CONTROLLERS ====================================================
+
         self.driveCtrlr = wpilib.XboxController(0)
         self.armCtrlr = wpilib.XboxController(1)
 
@@ -77,6 +83,7 @@ class DemoBot(wpilib.TimedRobot):
         self.telemTable.putNumber("FRSpeed", self.FRDrive.get())
         self.telemTable.putNumber("BLSpeed", self.BLDrive.get())
         self.telemTable.putNumber("BRSpeed", self.BRDrive.get())
+        self.telemTable.putNumber("ShooterSpeed", self.shooter.get())
 
 
     def teleopPeriodic(self) -> None:
@@ -87,10 +94,15 @@ class DemoBot(wpilib.TimedRobot):
         self.driveSpeeds = drive.scaleSpeeds(self.driveSpeeds, 0.3)
         drive.setMotors(self.driveSpeeds, self.FLDrive, self.FRDrive, self.BLDrive, self.BRDrive)
 
+        target = 1 if self.driveCtrlr.getAButton() else 0
+        self.acceleration += (target - self.acceleration) * .05
+        self.shooter.set(self.acceleration)
+
 
 
     def disabledPeriodic(self) -> None:
         drive.setMotors([0, 0, 0, 0], self.FLDrive, self.FRDrive, self.BLDrive, self.BRDrive)
+        self.shooter.set(0)
 
 
 
