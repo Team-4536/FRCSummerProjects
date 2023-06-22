@@ -94,9 +94,9 @@ class DemoBot(wpilib.TimedRobot):
         self.driveSpeeds = drive.scaleSpeeds(self.driveSpeeds, 0.3)
         drive.setMotors(self.driveSpeeds, self.FLDrive, self.FRDrive, self.BLDrive, self.BRDrive)
 
-        target = 1 if self.driveCtrlr.getAButton() else 0
-        self.acceleration += (target - self.acceleration) * .05
-        self.shooter.set(self.acceleration)
+        target = 0.6 if self.driveCtrlr.getAButton() else 0
+        # self.acceleration += (target - self.acceleration) * .05
+        self.shooter.set(target)
 
 
 
