@@ -89,7 +89,6 @@ def makeFlymer(nodes: list[Node], data: dict[str, Any], isReal: bool):
     # liftMotor, liftEncoder = sparkMaxAndEncoderPair(nodes, isReal, tags.LIFT_MOTOR, NEOSpec, False, 0, False)
     # if not isReal: encoderSimNode.EncoderSimNode(tags.LIFT_MOTOR, liftMotor, liftEncoder).addToo(nodes)
 
-    
     drivePrefs = [ tags.FLDrive, tags.FRDrive, tags.BLDrive, tags.BRDrive ]
     driveFlips = [ False, True, False, True]
     drivePorts = [ 4, 1, 3, 2 ]

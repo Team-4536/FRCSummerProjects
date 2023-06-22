@@ -1,8 +1,10 @@
+import ntcore
 import wpilib
 import rev
 import navx
 
 import mechController
+import inputs
 
 
 
@@ -12,6 +14,8 @@ class Robot(wpilib.TimedRobot):
 
 
     def robotInit(self) -> None:
+
+        self.telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
 
         # DRIVE MOTORS ==================================================
         driveType = rev.CANSparkMax.MotorType.kBrushless
@@ -29,12 +33,26 @@ class Robot(wpilib.TimedRobot):
         # GYRO ==========================================================
         self.gyro = navx.AHRS(wpilib.SPI.Port.kMXP)
 
+        # CONTROLLERS ====================================================
+        self.driveCtrlr = wpilib.XboxController(0)
+        self.armCtrlr = wpilib.XboxController(1)
+
 
 
 
     def robotPeriodic(self) -> None:
+        self.input = inputs.FlymerInputs(self.driveCtrlr, self.armCtrlr)
 
-        driveSpeeds = mechController.mechController()
+        self.driveSpeeds = mechController.mechController(
+            self.input.driveX,
+            self.input.driveY,
+            self.input.turning)
+
+        self.FLDrive.set(self.driveSpeeds[0])
+        self.FRDrive.set(self.driveSpeeds[1])
+        self.BLDrive.set(self.driveSpeeds[2])
+        self.BRDrive.set(self.driveSpeeds[3])
+
 
     def teleopInit(self) -> None:
         return super().teleopInit()
