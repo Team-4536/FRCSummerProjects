@@ -10,9 +10,7 @@ def deadZone(input: float) -> float:
 
 
 class FlymerInputs():
-
     def __init__(self, driveCtrlr: wpilib.XboxController, armCtrlr: wpilib.XboxController) -> None:
-
         self.driveX = deadZone(driveCtrlr.getLeftX())
         self.driveY = deadZone((-driveCtrlr.getLeftY()))
         self.turning = deadZone(driveCtrlr.getRightX())
@@ -23,3 +21,10 @@ class FlymerInputs():
         self.retract = deadZone(armCtrlr.getRightY())
         self.grabToggle = armCtrlr.getAButtonPressed()
 
+
+class DemoInputs():
+    def __init__(self, driveCtrlr: wpilib.XboxController) -> None:
+        self.driveX = deadZone(driveCtrlr.getLeftX())
+        self.driveY = -deadZone(driveCtrlr.getLeftY())
+        self.pistonToggle = driveCtrlr.getAButtonPressed()
+        self.shooter = -deadZone(driveCtrlr.getRightY())

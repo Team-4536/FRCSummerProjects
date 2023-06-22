@@ -3,14 +3,25 @@ import wpilib
 
 
 
-def publishExpression(exp: str, root: str, table: ntcore.NetworkTable) -> None:
+def publishExpression(exp: str, root: object, table: ntcore.NetworkTable) -> None:
+
+    isFunc = exp.endswith("()")
+    exp = exp.removesuffix("()")
+    # TODO: array indexing
 
     try:
         val = getExp(root, exp.split('.'))
     except Exception as e:
-        val = None
+        print(f"exception while publishing exp \'{exp}\': {repr(e)}")
+        return None
 
-    # NOTE: none of this works lol
+
+    try:
+        if isFunc: table.putValue("expr", val())
+        else: table.putValue("expr", val)
+    except Exception as e:
+        print(f"{type(val)}")
+        print(f"Exception while publishing value of expression \'{exp}\': {repr(e)}")
 
 
 def getExp(root, propList):

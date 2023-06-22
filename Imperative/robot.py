@@ -1,16 +1,37 @@
 import ntcore
 import wpilib
+import wpimath.system.plant as plant
 import rev
 import navx
 
-import mechController
+import drive
 import inputs
+from telemetryHelp import publishExpression
+import sim
+
+
+
+class TimeData:
+    def __init__(self, prev) -> None:
+        time = wpilib.getTime()
+
+        if prev is None:
+            self.initTime = time
+            self.prevTime = time
+            self.dt = 0
+            self.timeSinceInit = 0
+        else:
+            self.dt = time - prev.prevTime
+            self.timeSinceInit = time - prev.initTime
+            self.prevTime = time
+            self.initTime = prev.initTime
 
 
 
 
 
-class Robot(wpilib.TimedRobot):
+
+class DemoBot(wpilib.TimedRobot):
 
 
     def robotInit(self) -> None:
@@ -18,17 +39,13 @@ class Robot(wpilib.TimedRobot):
         self.telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
 
         # DRIVE MOTORS ==================================================
-        driveType = rev.CANSparkMax.MotorType.kBrushless
-        self.FLDrive = rev.CANSparkMax(0, driveType)
-        self.FRDrive = rev.CANSparkMax(0, driveType)
-        self.BLDrive = rev.CANSparkMax(0, driveType)
-        self.BRDrive = rev.CANSparkMax(0, driveType)
-        self.FLEncoder = self.FLDrive.getEncoder()
-        self.FREncoder = self.FRDrive.getEncoder()
-        self.BLEncoder = self.BLDrive.getEncoder()
-        self.BREncoder = self.BRDrive.getEncoder()
+        self.FLDrive = wpilib.Spark(2)
+        self.FRDrive = wpilib.Spark(3)
+        self.BLDrive = wpilib.Spark(1)
+        self.BRDrive = wpilib.Spark(4)
         self.FRDrive.setInverted(True)
         self.BRDrive.setInverted(True)
+        # self.FLEncoder = self.FLDrive.getEncoder()
 
         # GYRO ==========================================================
         self.gyro = navx.AHRS(wpilib.SPI.Port.kMXP)
@@ -37,34 +54,60 @@ class Robot(wpilib.TimedRobot):
         self.driveCtrlr = wpilib.XboxController(0)
         self.armCtrlr = wpilib.XboxController(1)
 
+        # TIME =========================================================
+        self.time = TimeData(None)
+
+
+    def _simulationInit(self) -> None:
+        pass
+    def _simulationPeriodic(self) -> None:
+        pass
+
+
 
 
 
     def robotPeriodic(self) -> None:
-        self.input = inputs.FlymerInputs(self.driveCtrlr, self.armCtrlr)
 
-        self.driveSpeeds = mechController.mechController(
-            self.input.driveX,
-            self.input.driveY,
-            self.input.turning)
+        self.time = TimeData(self.time)
 
-        self.FLDrive.set(self.driveSpeeds[0])
-        self.FRDrive.set(self.driveSpeeds[1])
-        self.BLDrive.set(self.driveSpeeds[2])
-        self.BRDrive.set(self.driveSpeeds[3])
+        publishExpression("__class__.__name__", self, self.telemTable)
 
+        self.telemTable.putNumber("FLSpeed", self.FLDrive.get())
+        self.telemTable.putNumber("FRSpeed", self.FRDrive.get())
+        self.telemTable.putNumber("BLSpeed", self.BLDrive.get())
+        self.telemTable.putNumber("BRSpeed", self.BRDrive.get())
 
-    def teleopInit(self) -> None:
-        return super().teleopInit()
 
     def teleopPeriodic(self) -> None:
-        return super().teleopPeriodic()
 
+        self.input = inputs.DemoInputs(self.driveCtrlr)
+
+        self.driveSpeeds = drive.tankController(self.input.driveY, self.input.driveX)
+        self.driveSpeeds = drive.scaleSpeeds(self.driveSpeeds, 0.3)
+        drive.setMotors(self.driveSpeeds, self.FLDrive, self.FRDrive, self.BLDrive, self.BRDrive)
+
+
+
+    def disabledPeriodic(self) -> None:
+        drive.setMotors([0, 0, 0, 0], self.FLDrive, self.FRDrive, self.BLDrive, self.BRDrive)
 
 
 
 
 if __name__ == "__main__":
-    wpilib.run(Robot)
+    wpilib.run(DemoBot)
+
+    """
+    r = Robot()
+    r.robotInit()
+    r._simulationInit()
+    r.teleopInit()
+
+    while True:
+        r.robotPeriodic()
+        r._simulationPeriodic()
+        r.teleopPeriodic()
+    # """
 
 
