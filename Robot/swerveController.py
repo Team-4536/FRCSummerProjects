@@ -9,11 +9,9 @@ from utils.PIDController import PIDController
 
 #next thing to do: change brake mode from toggle to happen until input received
 
-class SwerveProf(Node):
+class SwerveProf:
 
-    def __init__(self) -> None:
-        self.name = "SwerveProfile"
-        self.priority = NODE_PROF
+    def __init__(self, turnList, driveList, turnEncoders, driveEncoders) -> None:
 
         self.brakes = 1
 
@@ -24,6 +22,16 @@ class SwerveProf(Node):
         self.FRPID = PIDController(10.0, 0.0, 0.0)
         self.BLPID = PIDController(10.0, 0.0, 0.0)
         self.BRPID = PIDController(10.0, 0.0, 0.0)
+
+        assert len(turnList) == 4
+        assert len(driveList) == 4
+        assert len(turnEncoders) == 4
+        assert len(driveEncoders) == 4
+        
+        self.turnList = turnList
+        self.driveList = driveList
+        self.turnEncoders = turnEncoders
+        self.driveEncoders = driveEncoders
 
     def tick(self, data: dict[str, Any]) -> None:
 
@@ -52,6 +60,7 @@ class SwerveProf(Node):
 
         #assign inputs to vectors
         leftStick = V2(inputX, inputY)
+
         FLTurningVector = V2(math.cos(45) * inputZ, math.cos(45) * inputZ)
         FRTurningVector = V2(-math.cos(45) * inputZ, math.cos(45) * inputZ)
         BLTurningVector = V2(math.cos(45) * inputZ, -math.cos(45) * inputZ)
@@ -128,61 +137,26 @@ class SwerveProf(Node):
 
         #calculate error
 
-        #FL
-        FLFakeError = FLTarget - FLPosAngle
-        FLTarget = 0
-        FLPos = -(FLFakeError)
-        while FLPos > 90:
-            FLPos = FLPos - 180
-            FLPower = -(FLPower)
-        FLSteeringError = FLTarget - FLPos
-        while FLSteeringError > 90:
-            FLSteeringError = FLSteeringError - 180
-            FLPower = -(FLPower)
-        if FLSteeringError > 180:
-            FLSteeringError = FLSteeringError - 360
+        #Function test
+        def getSteeringError(Target, PosAngle, Power):
+            FakeError = Target - PosAngle
+            Pos = -(FakeError)
+            while Pos > 90:
+                Pos = Pos - 180
+                Power = -(Power)
+            SteeringError = -Pos
+            while SteeringError > 90:
+                SteeringError = SteeringError - 180
+                Power = -(Power)
+            if SteeringError > 180:
+                SteeringError = SteeringError - 360
 
-        #FR
-        FRFakeError = FRTarget - FRPosAngle
-        FRTarget = 0
-        FRPos = -(FRFakeError)
-        while FRPos > 90:
-            FRPos = FRPos - 180
-            FRPower = -(FRPower)
-        FRSteeringError = FRTarget - FRPos
-        while FRSteeringError > 90:
-            FRSteeringError = FRSteeringError - 180
-            FRPower = -(FRPower)
-        if FRSteeringError > 180:
-            FRSteeringError = FRSteeringError - 360
-
-        #BL
-        BLFakeError = BLTarget -BLPosAngle
-        BLTarget = 0
-        BLPos = -(BLFakeError)
-        while BLPos > 90:
-            BLPos = BLPos - 180
-            BLPower = -(BLPower)
-        BLSteeringError = BLTarget - BLPos
-        while BLSteeringError > 90:
-            BLSteeringError = BLSteeringError - 180
-            BLPower = -(BLPower)
-        if BLSteeringError > 180:
-            BLSteeringError = BLSteeringError - 360
-
-        #BR
-        BRFakeError = BRTarget - BRPosAngle
-        BRTarget = 0
-        BRPos = -(BRFakeError)
-        while BRPos > 90:
-            BRPos = BRPos - 180
-            BRPower = -(BRPower)
-        BRSteeringError = BRTarget - BRPos
-        while BRSteeringError > 90:
-            BRSteeringError = BRSteeringError - 180
-            BRPower = -(BRPower)
-        if BRSteeringError > 180:
-            BRSteeringError = BRSteeringError - 360
+            return SteeringError
+        
+        FLSteeringError = getSteeringError(FLTarget, FLPosAngle, FLPower)
+        FRSteeringError = getSteeringError(FRTarget, FRPosAngle, FRPower)
+        BLSteeringError = getSteeringError(BLTarget, BLPosAngle, BLPower)
+        BRSteeringError = getSteeringError(BRTarget, BRPosAngle, BRPower)
 
         #hold position if no input is given
         if self.brakeDefault == False:
