@@ -97,7 +97,7 @@ class DemoBot(wpilib.TimedRobot):
 
         self.input = inputs.DemoInputs(self.driveCtrlr)
 
-        self.driveSpeeds = drive.tankController(self.input.driveY, self.input.driveX)
+        self.driveSpeeds = drive.tankController(self.input.drive, self.input.turning)
         self.driveSpeeds = drive.scaleSpeeds(self.driveSpeeds, 0.3)
         drive.setMotors(self.driveSpeeds, self.FLDrive, self.FRDrive, self.BLDrive, self.BRDrive)
 
