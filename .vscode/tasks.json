@@ -12,19 +12,19 @@
         {
             "label": "Run robot sim",
             "type": "shell",
-            "command": "py -3 robot/robot.py sim",
+            "command": "py -3 imperative/robot.py sim",
             "problemMatcher": []
         },
         {
             "label": "Deploy robot code",
             "type": "shell",
-            "command": "py -3 robot/robot.py deploy",
+            "command": "py -3 imperative/robot.py deploy",
             "problemMatcher": []
         },
         {
             "label": "Debug deploy robot code",
             "type": "shell",
-            "command": "py -3 robot/robot.py deploy --nc",
+            "command": "py -3 imperative/robot.py deploy --nc",
             "problemMatcher": []
         }
     ]
