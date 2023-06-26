@@ -2,10 +2,10 @@
 
 
 
-FLDrive = "FLDrive"
-FRDrive = "FRDrive"
-BLDrive = "BLDrive"
-BRDrive = "BRDrive"
+FLDrive = "FL"
+FRDrive = "FR"
+BLDrive = "BL"
+BRDrive = "BR"
 
 FLSteering = "FLSteering"
 FRSteering = "FRSteering"

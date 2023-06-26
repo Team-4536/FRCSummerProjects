@@ -8,7 +8,7 @@ from widgets.visuals import swerveWidget
 from widgets.visuals import mechWidget
 from widgets import ntPlot
 from widgets import client
-from widgets import cmdWidget
+import widgets.demoControlWidget
 from widgets import botLog
 import fileLogging
 
@@ -56,8 +56,7 @@ class sundial:
             mechWidget.mechWidget(),
             client.clientWidget(),
             ntPlot.ntPlot(),
-            cmdWidget.cmdWidget(),
-            botLog.botLogWidget()
+            widgets.demoControlWidget.DemoControlWidget()
         ]
 
         dpg.show_viewport()
