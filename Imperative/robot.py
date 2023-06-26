@@ -45,12 +45,9 @@ class DemoBot(wpilib.TimedRobot):
         self.BRDrive = wpilib.Spark(4)
         self.FRDrive.setInverted(True)
         self.BRDrive.setInverted(True)
+
         self.shooter = wpilib.Spark(0)
         self.shooter.setInverted(True)
-
-        self.acceleration = 0
-        # self.FLEncoder = self.FLDrive.getEncoder()
-
 
         # GYRO ==========================================================
         self.gyro = navx.AHRS(wpilib.SPI.Port.kMXP)
@@ -62,6 +59,7 @@ class DemoBot(wpilib.TimedRobot):
 
         # TIME =========================================================
         self.time = TimeData(None)
+
 
 
     def _simulationInit(self) -> None:
@@ -86,17 +84,22 @@ class DemoBot(wpilib.TimedRobot):
         self.telemTable.putNumber("ShooterSpeed", self.shooter.get())
 
 
+        self.shooterEnabled: bool = self.telemTable.getBoolean("shooter enabled", True) # type: ignore
+        self.shooterSpeed: float = self.telemTable.getNumber("shooter speed", 0.6) # type: ignore
+
+
     def teleopPeriodic(self) -> None:
 
         self.input = inputs.DemoInputs(self.driveCtrlr)
 
-        self.driveSpeeds = drive.tankController(self.input.driveY, self.input.driveX)
+        self.driveSpeeds = drive.tankController(self.input.drive, self.input.turning)
         self.driveSpeeds = drive.scaleSpeeds(self.driveSpeeds, 0.3)
         drive.setMotors(self.driveSpeeds, self.FLDrive, self.FRDrive, self.BLDrive, self.BRDrive)
 
-        target = 1 if self.driveCtrlr.getAButton() else 0
-        self.acceleration += (target - self.acceleration) * .05
-        self.shooter.set(self.acceleration)
+
+        target = 0.0
+        if self.shooterEnabled: target = self.shooterSpeed if self.driveCtrlr.getAButton() else 0.0
+        self.shooter.set(target)
 
 
 
