@@ -84,13 +84,8 @@ class DemoBot(wpilib.TimedRobot):
         self.telemTable.putNumber("ShooterSpeed", self.shooter.get())
 
 
-        val = self.telemTable.getBoolean("shooter enabled", None)
-        if val is not None: self.shooterEnabled = val
-        else: self.shooterEnabled = True
-
-        val = self.telemTable.getNumber("shooter speed", None)
-        if type(val) is float: self.shooterSpeed = val
-        else: self.shooterSpeed = 0.6
+        self.shooterEnabled: bool = self.telemTable.getBoolean("shooter enabled", True) # type: ignore
+        self.shooterSpeed: float = self.telemTable.getNumber("shooter speed", 0.6) # type: ignore
 
 
     def teleopPeriodic(self) -> None:
@@ -102,8 +97,8 @@ class DemoBot(wpilib.TimedRobot):
         drive.setMotors(self.driveSpeeds, self.FLDrive, self.FRDrive, self.BLDrive, self.BRDrive)
 
 
-        target = 0
-        if self.shooterEnabled: target = self.shooterSpeed if self.driveCtrlr.getAButton() else 0
+        target = 0.0
+        if self.shooterEnabled: target = self.shooterSpeed if self.driveCtrlr.getAButton() else 0.0
         self.shooter.set(target)
 
 
