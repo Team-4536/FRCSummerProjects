@@ -10,6 +10,7 @@ class V2f:
 
 
     def rotateDegrees(self, d):
+        d *= -1
         cos = math.cos(d * (math.pi / 180))
         sin = math.sin(d * (math.pi / 180))
 

@@ -1,6 +1,7 @@
 import wpilib
 import rev
 import ntcore
+import navx
 
 import sim
 from real import V2f
@@ -62,7 +63,9 @@ class SwerveBot(wpilib.TimedRobot):
 
             self.telemTable.putNumber("PosX", self.sim.position.x)
             self.telemTable.putNumber("PosY", self.sim.position.y)
-            self.telemTable.putNumber("Angle", self.sim.rotation)
+            self.telemTable.putNumber("Yaw", self.sim.rotation)
+            # TODO: simulated gyro readings
+
 
 
 
@@ -74,7 +77,7 @@ class SwerveBot(wpilib.TimedRobot):
         steer = self.driveCtrlr.getLeftX()
         drive = -self.driveCtrlr.getLeftY()
 
-        for i in range(0, 4):
+        for i in range(0, 3):
             self.steerMotors[i].set(steer)
             self.driveMotors[i].set(drive)
 

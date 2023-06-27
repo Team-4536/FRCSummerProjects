@@ -18,7 +18,7 @@ class EncoderSim:
         self.inertia = inertia
         self.linearSys = plant.LinearSystemId.DCMotorSystem(self.motorSpec, self.inertia, 1)
         # NOTE: state[0] is position, state[1] is velocity
-        self.state = [ 0, 0 ]
+        self.state: list[float] = [ 0, 0 ]
 
     def update(self, dt: float):
 
@@ -57,34 +57,41 @@ class SwerveSim:
         self.wheelCirc = wheelCirc
         self.wheelPositions = podPositions
 
+        self.posDeltas: list[V2f] = [] # DEBUG
+
     # TODO: get real swerve gearings
-    # TODO: add friction to wheel sims
+    # TODO: add real friction to wheel sims
     # TODO: get real measurements for wheel inertia/friction
     # TODO: vary the "inertia" of each mechanism with speed/rotation speed of drive // add extra resistance when braking and going against current speed somehow
 
     def update(self, dt: float):
 
-        posDeltas: list[V2f] = []
+        self.posDeltas: list[V2f] = []
 
         for i in range(0, 4):
             sim = self.driveSims[i]
             sim.update(dt)
             driveDelta = sim.state[1] * dt
 
+            sim.state[1] *= 0.8 # CLEANUP: friction hack
+
             sim = self.steerSims[i]
             sim.update(dt)
             steerPos = sim.state[0]
 
-            posDeltas.append((V2f(0, 1) * driveDelta * self.wheelCirc).rotateDegrees(steerPos * 360))
+            sim.state[1] *= 0.8
 
-        self.position += (posDeltas[0] + posDeltas[1] + posDeltas[2] + posDeltas[3]) / 4
+            self.posDeltas.append((V2f(0, 1) * driveDelta * self.wheelCirc).rotateDegrees(steerPos * 360))
+
+        posChange = (self.posDeltas[0] + self.posDeltas[1] + self.posDeltas[2] + self.posDeltas[3]) / 4
+        self.position += posChange.rotateDegrees(self.rotation)
 
         # TODO: right now position and angle are beign updated via averaging wheel deltas. Find out if this is correct
 
         angleDeltas: list[float] = [ ]
         for i in range(0, 4):
             inital = self.wheelPositions[i]
-            new = inital + posDeltas[i]
+            new = inital + self.posDeltas[i]
             angle = angleWrap(inital.getAngle() - new.getAngle())
             angleDeltas.append(angle)
 
