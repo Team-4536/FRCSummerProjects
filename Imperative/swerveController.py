@@ -1,19 +1,14 @@
-from node import *
 import wpilib
 import math
-import utils.tags as tags
-from hardware.Input import FlymerInputProfile
-from utils.V2 import V2
+from real import V2f
 from typing import Any
-from utils.PIDController import PIDController
+from PIDController import PIDController
 
 #next thing to do: change brake mode from toggle to happen until input received
 
-class SwerveProf(Node):
+class SwerveController:
 
-    def __init__(self) -> None:
-        self.name = "SwerveProfile"
-        self.priority = NODE_PROF
+    def __init__(self, turnList, driveList, turnEncoders, driveEncoders) -> None:
 
         self.brakes = 1
 
@@ -25,58 +20,55 @@ class SwerveProf(Node):
         self.BLPID = PIDController(10.0, 0.0, 0.0)
         self.BRPID = PIDController(10.0, 0.0, 0.0)
 
-    def tick(self, data: dict[str, Any]) -> None:
+        assert len(turnList) == 4
+        assert len(driveList) == 4
+        assert len(turnEncoders) == 4
+        assert len(driveEncoders) == 4
+        
+        self.turnList = turnList
+        self.driveList = driveList
+        self.turnEncoders = turnEncoders
+        self.driveEncoders = driveEncoders
 
-
-        #grab controller inputs
-        input = getOrAssert(tags.INPUT, FlymerInputProfile, data)
-
-        #raw inputs
+    def tick(self, yaw, inputY, inputX, inputZ, dt, brakeButtonPressed) -> None:
 
         # Y = Up/Down
         # X = Left/Right
         # Z = Turning
         # Brakes are nothing right now
 
-        inputY = input.driveY
-        inputX = input.driveX
-        inputZ = input.turning
-
         #brake input toggle
-        brake = input.brakeToggle
-        if brake == True:
+        if brakeButtonPressed == True:
             self.brakes = self.brakes * -1
 
-        #gyro input
-        inputGyro = 0 #constant for testing, can be changed to simulate gyro input
-
         #assign inputs to vectors
-        leftStick = V2(inputX, inputY)
-        FLTurningVector = V2(math.cos(45) * inputZ, math.cos(45) * inputZ)
-        FRTurningVector = V2(-math.cos(45) * inputZ, math.cos(45) * inputZ)
-        BLTurningVector = V2(math.cos(45) * inputZ, -math.cos(45) * inputZ)
-        BRTurningVector = V2(-math.cos(45) * inputZ, -math.cos(45) * inputZ)
+        leftStick = V2f(inputX, inputY)
+
+        FLTurningVector = V2f(math.cos(45) * inputZ, math.cos(45) * inputZ)
+        FRTurningVector = V2f(-math.cos(45) * inputZ, math.cos(45) * inputZ)
+        BLTurningVector = V2f(math.cos(45) * inputZ, -math.cos(45) * inputZ)
+        BRTurningVector = V2f(-math.cos(45) * inputZ, -math.cos(45) * inputZ)
 
         #field oriented offset (change later to gyro readings)
-        leftStick = leftStick.rotateDegrees(-data[tags.GYRO_YAW])
+        leftStick = leftStick.rotateDegrees(-yaw)
 
         #joystick scalar (adjusts speed depending on how far you move the joysticks)
         inputScalar = leftStick.getLength() + abs(inputZ)
         if inputScalar > 1:
             inputScalar = 1
 
-        FLVector = leftStick.avg(FLTurningVector)
-        FRVector = leftStick.avg(FRTurningVector)
-        BLVector = leftStick.avg(BLTurningVector)
-        BRVector = leftStick.avg(BRTurningVector)
+        FLVector = (leftStick + FLTurningVector) / 2
+        FRVector = (leftStick + FRTurningVector) / 2
+        BLVector = (leftStick + BLTurningVector) / 2
+        BRVector = (leftStick + BRTurningVector) / 2
 
         """-----------------------------------------"""
 
         #read encoder positions and set them angles
-        FLPosAngle = (data[tags.FLSteering + tags.ENCODER_READING] % 1) * 360
-        FRPosAngle = (data[tags.FRSteering + tags.ENCODER_READING] % 1) * 360
-        BLPosAngle = (data[tags.BLSteering + tags.ENCODER_READING] % 1) * 360
-        BRPosAngle = (data[tags.BRSteering + tags.ENCODER_READING] % 1) * 360
+        FLPosAngle = (self.turnEncoders[0].getPosition() % 1) * 360
+        FRPosAngle = (self.turnEncoders[1].getPosition() % 1) * 360
+        BLPosAngle = (self.turnEncoders[2].getPosition() % 1) * 360
+        BRPosAngle = (self.turnEncoders[3].getPosition() % 1) * 360
 
         #wrap angles (0, 90, 180, -90)
         if FLPosAngle > 180:
@@ -121,85 +113,44 @@ class SwerveProf(Node):
 
         """---------------------------------------"""
 
-        #PID Controller for steering
-        
-
-        """---------------------------------------"""
-
         #calculate error
 
-        #FL
-        FLFakeError = FLTarget - FLPosAngle
-        FLTarget = 0
-        FLPos = -(FLFakeError)
-        while FLPos > 90:
-            FLPos = FLPos - 180
-            FLPower = -(FLPower)
-        FLSteeringError = FLTarget - FLPos
-        while FLSteeringError > 90:
-            FLSteeringError = FLSteeringError - 180
-            FLPower = -(FLPower)
-        if FLSteeringError > 180:
-            FLSteeringError = FLSteeringError - 360
+        def getSteeringError(Target, PosAngle, Power):
+            FakeError = Target - PosAngle
+            Pos = -(FakeError)
+            while Pos > 90:
+                Pos = Pos - 180
+                Power = -(Power)
+            SteeringError = -Pos
+            while SteeringError > 90:
+                SteeringError = SteeringError - 180
+                Power = -(Power)
+            if SteeringError > 180:
+                SteeringError = SteeringError - 360
 
-        #FR
-        FRFakeError = FRTarget - FRPosAngle
-        FRTarget = 0
-        FRPos = -(FRFakeError)
-        while FRPos > 90:
-            FRPos = FRPos - 180
-            FRPower = -(FRPower)
-        FRSteeringError = FRTarget - FRPos
-        while FRSteeringError > 90:
-            FRSteeringError = FRSteeringError - 180
-            FRPower = -(FRPower)
-        if FRSteeringError > 180:
-            FRSteeringError = FRSteeringError - 360
-
-        #BL
-        BLFakeError = BLTarget -BLPosAngle
-        BLTarget = 0
-        BLPos = -(BLFakeError)
-        while BLPos > 90:
-            BLPos = BLPos - 180
-            BLPower = -(BLPower)
-        BLSteeringError = BLTarget - BLPos
-        while BLSteeringError > 90:
-            BLSteeringError = BLSteeringError - 180
-            BLPower = -(BLPower)
-        if BLSteeringError > 180:
-            BLSteeringError = BLSteeringError - 360
-
-        #BR
-        BRFakeError = BRTarget - BRPosAngle
-        BRTarget = 0
-        BRPos = -(BRFakeError)
-        while BRPos > 90:
-            BRPos = BRPos - 180
-            BRPower = -(BRPower)
-        BRSteeringError = BRTarget - BRPos
-        while BRSteeringError > 90:
-            BRSteeringError = BRSteeringError - 180
-            BRPower = -(BRPower)
-        if BRSteeringError > 180:
-            BRSteeringError = BRSteeringError - 360
+            return SteeringError, Power
+        
+        FLSteeringError, FLPower = getSteeringError(FLTarget, FLPosAngle, FLPower)
+        FRSteeringError, FRPower = getSteeringError(FRTarget, FRPosAngle, FRPower)
+        BLSteeringError, BLPower = getSteeringError(BLTarget, BLPosAngle, BLPower)
+        BRSteeringError, BRPower = getSteeringError(BRTarget, BRPosAngle, BRPower)
 
         #hold position if no input is given
         if self.brakeDefault == False:
-            if FLVector.noValue() == True and self.brakes != -1:
+            if FLVector == V2f() and self.brakes != -1:
                 FLSteeringError = 0
-            if FRVector.noValue() == True and self.brakes != -1:
+            if FRVector == V2f() and self.brakes != -1:
                 FRSteeringError = 0
-            if BLVector.noValue() == True and self.brakes != -1:
+            if BLVector == V2f() and self.brakes != -1:
                 BLSteeringError  = 0
-            if BRVector.noValue() == True and self.brakes != -1:
+            if BRVector == V2f() and self.brakes != -1:
                 BRSteeringError = 0
 
         #assign motor powers
-        FLSteeringPower = self.FLPID.tickErr(FLSteeringError / 360, data[tags.DT])
-        FRSteeringPower = self.FRPID.tickErr(FRSteeringError / 360, data[tags.DT])
-        BLSteeringPower = self.BLPID.tickErr(BLSteeringError / 360, data[tags.DT])
-        BRSteeringPower = self.BRPID.tickErr(BRSteeringError / 360, data[tags.DT])
+        FLSteeringPower = self.FLPID.tickErr(FLSteeringError / 360, dt)
+        FRSteeringPower = self.FRPID.tickErr(FRSteeringError / 360, dt)
+        BLSteeringPower = self.BLPID.tickErr(BLSteeringError / 360, dt)
+        BRSteeringPower = self.BRPID.tickErr(BRSteeringError / 360, dt)
 
         """--------------------------------------------------"""
 
@@ -261,15 +212,16 @@ class SwerveProf(Node):
         BRSteeringPower = BRSteeringPower * steeringScalar
 
         """============================================="""
-
+        
         #drive values (power)
-        data[tags.FLDrive + tags.MOTOR_SPEED_CONTROL] = FLPower
-        data[tags.FRDrive + tags.MOTOR_SPEED_CONTROL] = FRPower
-        data[tags.BLDrive + tags.MOTOR_SPEED_CONTROL] = BLPower
-        data[tags.BRDrive + tags.MOTOR_SPEED_CONTROL] = BRPower
+        self.driveList[0].set(FLPower)
+        self.driveList[1].set(FRPower)
+        self.driveList[2].set(BLPower)
+        self.driveList[3].set(BRPower)
 
         #target steering values (in rotaions)
-        data[tags.FLSteering + tags.MOTOR_SPEED_CONTROL] = FLSteeringPower
-        data[tags.FRSteering + tags.MOTOR_SPEED_CONTROL] = FRSteeringPower
-        data[tags.BLSteering + tags.MOTOR_SPEED_CONTROL] = BLSteeringPower
-        data[tags.BRSteering + tags.MOTOR_SPEED_CONTROL] = BRSteeringPower
+        self.turnList[0].set(FLSteeringPower)
+        self.turnList[1].set(FRSteeringPower)
+        self.turnList[2].set(BLSteeringPower)
+        self.turnList[3].set(BRSteeringPower)
+        
