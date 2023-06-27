@@ -53,10 +53,9 @@ class sundial:
 
         self.widgets: list[widget] = [
 
-            mechWidget.mechWidget(),
+            swerveWidget.swerveWidget(),
             client.clientWidget(),
             ntPlot.ntPlot(),
-            widgets.demoControlWidget.DemoControlWidget()
         ]
 
         dpg.show_viewport()

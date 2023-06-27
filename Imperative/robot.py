@@ -8,23 +8,8 @@ import drive
 import inputs
 from telemetryHelp import publishExpression
 import sim
+import timing
 
-
-
-class TimeData:
-    def __init__(self, prev) -> None:
-        time = wpilib.getTime()
-
-        if prev is None:
-            self.initTime = time
-            self.prevTime = time
-            self.dt = 0
-            self.timeSinceInit = 0
-        else:
-            self.dt = time - prev.prevTime
-            self.timeSinceInit = time - prev.initTime
-            self.prevTime = time
-            self.initTime = prev.initTime
 
 
 
@@ -58,26 +43,15 @@ class DemoBot(wpilib.TimedRobot):
         self.armCtrlr = wpilib.XboxController(1)
 
         # TIME =========================================================
-        self.time = TimeData(None)
+        self.time = timing.TimeData(None)
 
 
 
     def _simulationInit(self) -> None:
-        self.FLEncoder = rev.RelativeEncoder()
-        self.FREncoder = rev.RelativeEncoder()
-        self.BLEncoder = rev.RelativeEncoder()
-        self.BREncoder = rev.RelativeEncoder()
-
-        self.FLEncSim = sim.EncoderSim(plant.DCMotor.NEO(1), 1)
-        self.FREncSim = sim.EncoderSim(plant.DCMotor.NEO(1), 1)
-        self.BLEncSim = sim.EncoderSim(plant.DCMotor.NEO(1), 1)
-        self.BREncSim = sim.EncoderSim(plant.DCMotor.NEO(1), 1)
+        pass
 
     def _simulationPeriodic(self) -> None:
-        self.FLEncSim.update(self.FLDrive, self.FLEncoder, self.time.dt)
-        self.FREncSim.update(self.FLDrive, self.FLEncoder, self.time.dt)
-        self.BLEncSim.update(self.FLDrive, self.FLEncoder, self.time.dt)
-        self.BREncSim.update(self.FLDrive, self.FLEncoder, self.time.dt)
+        pass
 
 
 
@@ -85,7 +59,7 @@ class DemoBot(wpilib.TimedRobot):
 
     def robotPeriodic(self) -> None:
 
-        self.time = TimeData(self.time)
+        self.time = timing.TimeData(self.time)
 
         publishExpression("__class__.__name__", self, self.telemTable)
 
@@ -112,7 +86,6 @@ class DemoBot(wpilib.TimedRobot):
         target = 0.0
         if self.shooterEnabled: target = self.shooterSpeed if self.driveCtrlr.getAButton() else 0.0
         self.shooter.set(target)
-
 
 
     def disabledPeriodic(self) -> None:

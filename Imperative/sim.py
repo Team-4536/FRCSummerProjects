@@ -16,7 +16,7 @@ class EncoderSim:
 
         self.motorSpec = motorSpec
         self.inertia = inertia
-        self.linearSys = plant.LinearSystemId.flywheelSystem(self.motorSpec, self.inertia, 1)
+        self.linearSys = plant.LinearSystemId.DCMotorSystem(self.motorSpec, self.inertia, 1)
         # NOTE: state[0] is position, state[1] is velocity
         self.state = [ 0, 0 ]
 
@@ -53,7 +53,7 @@ class SwerveSim:
            self.steerSims.append(sim)
 
         self.position = V2f(0, 0)
-        self.rotation = 0
+        self.rotation: float = 0.0
         self.wheelCirc = wheelCirc
         self.wheelPositions = podPositions
 
@@ -69,7 +69,7 @@ class SwerveSim:
         for i in range(0, 4):
             sim = self.driveSims[i]
             sim.update(dt)
-            driveDelta = sim.state[0]
+            driveDelta = sim.state[1] * dt
 
             sim = self.steerSims[i]
             sim.update(dt)
