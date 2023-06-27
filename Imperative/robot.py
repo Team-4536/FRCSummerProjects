@@ -63,9 +63,21 @@ class DemoBot(wpilib.TimedRobot):
 
 
     def _simulationInit(self) -> None:
-        pass
+        self.FLEncoder = rev.RelativeEncoder()
+        self.FREncoder = rev.RelativeEncoder()
+        self.BLEncoder = rev.RelativeEncoder()
+        self.BREncoder = rev.RelativeEncoder()
+
+        self.FLEncSim = sim.EncoderSim(plant.DCMotor.NEO(1), 1)
+        self.FREncSim = sim.EncoderSim(plant.DCMotor.NEO(1), 1)
+        self.BLEncSim = sim.EncoderSim(plant.DCMotor.NEO(1), 1)
+        self.BREncSim = sim.EncoderSim(plant.DCMotor.NEO(1), 1)
+
     def _simulationPeriodic(self) -> None:
-        pass
+        self.FLEncSim.update(self.FLDrive, self.FLEncoder, self.time.dt)
+        self.FREncSim.update(self.FLDrive, self.FLEncoder, self.time.dt)
+        self.BLEncSim.update(self.FLDrive, self.FLEncoder, self.time.dt)
+        self.BREncSim.update(self.FLDrive, self.FLEncoder, self.time.dt)
 
 
 
