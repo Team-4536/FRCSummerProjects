@@ -1,26 +1,17 @@
 import PIDController
-
+from wpilib import DigitalInput
 class dualLimitSwitchMoterController:
-    def __init__(self, limitSwitch1, limitSwitch2, kp: float = 0, ki: float = 0, kd:float = 0) -> None:
-        if limitSwitch1 > limitSwitch2:
-            self.upperSwitch = limitSwitch1
-            self.lowerSwitch = limitSwitch2
-        else:
-            self.upperSwitch = limitSwitch2
-            self.lowerSwitch = limitSwitch1
+    def __init__(self, knownEncoderPoz, encoderDistance, kp: float = 0, ki: float = 0, kd:float = 0) -> None:
+        self.encoderBase = knownEncoderPoz
+        self.encoderDistance = encoderDistance
         self.PID = PIDController.PIDController(kp, ki, kd)
-    
-    def resetSwitch(self, position) -> None:
-    
 
-    def tick(self, target: float, position: float, dt: float, isTouchingSwitch) -> float:
-        if isTouchingSwitch:
-            self.resetSwitch(position)
+    def tick(self, target: float, position: float, dt: float, limitSwitch1, limitSwitch2) -> float:
         out = None
-        if position > self.upperSwitch:
-            out = self.PID.tick(target, self.upperSwitch, dt)
-        elif position < self.lowerSwitch:
-            out = self.PID.tick(target, self.lowerSwitch, dt)
+        if position > self.encoderBase + self.encoderDistance:
+            out = self.PID.tick(target, self.encoderBase + self.encoderDistance, dt)
+        elif position < self.encoderBase:
+            out = self.PID.tick(target, self.encoderBase, dt)
         else:
             out = self.PID.tick(target, position, dt)
         return out
