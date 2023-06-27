@@ -73,13 +73,13 @@ class SwerveSim:
             sim.update(dt)
             driveDelta = sim.state[1] * dt
 
-            sim.state[1] *= 0.8 # CLEANUP: friction hack
+            sim.state[1] *= 0.9 # CLEANUP: friction hack
 
             sim = self.steerSims[i]
             sim.update(dt)
             steerPos = sim.state[0]
 
-            sim.state[1] *= 0.8
+            sim.state[1] *= 0.9
 
             self.posDeltas.append((V2f(0, 1) * driveDelta * self.wheelCirc).rotateDegrees(steerPos * 360))
 
