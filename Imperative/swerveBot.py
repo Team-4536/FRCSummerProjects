@@ -1,11 +1,14 @@
 import wpilib
 import rev
 import ntcore
+import math
 import navx
+from inputs import FlymerInputs
 
 import sim
 from real import V2f
 import timing
+from swerveController import SwerveController
 
 class SwerveBot(wpilib.TimedRobot):
 
@@ -14,7 +17,9 @@ class SwerveBot(wpilib.TimedRobot):
 
         self.telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
         self.driveCtrlr = wpilib.XboxController(0)
+        self.armCtrlr = wpilib.XboxController(1)
         self.time = timing.TimeData(None)
+        self.gyro = navx.AHRS(wpilib.SPI.Port.kMXP)
 
 
         driveType = rev.CANSparkMax.MotorType.kBrushless
@@ -43,7 +48,7 @@ class SwerveBot(wpilib.TimedRobot):
             self.steerMotors,
             self.steerEncoders,
             [ V2f(-1, 1), V2f(1, 1), V2f(-1, -1), V2f(1, -1) ],
-            1
+            4 * math.pi #this in in inches, it's the wheel circ 
         )
 
     def _simulationPeriodic(self) -> None:
@@ -70,16 +75,23 @@ class SwerveBot(wpilib.TimedRobot):
 
 
     def teleopInit(self) -> None:
-        return super().teleopInit()
+        self.swerveController = SwerveController(
+            self.steerMotors, 
+            self.driveMotors, 
+            self.steerEncoders, 
+            self.driveEncoders)
 
     def teleopPeriodic(self) -> None:
 
-        steer = self.driveCtrlr.getLeftX()
-        drive = -self.driveCtrlr.getLeftY()
+        self.input = FlymerInputs(self.driveCtrlr, self.armCtrlr)
 
-        for i in range(0, 3):
-            self.steerMotors[i].set(steer)
-            self.driveMotors[i].set(drive)
+        self.swerveController.tick(
+            self.gyro.getAngle(), 
+            self.input.driveX, 
+            self.input.driveY, 
+            self.input.turning, 
+            self.time.dt, 
+            self.input.brakeToggle)
 
 
 
