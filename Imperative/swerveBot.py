@@ -48,7 +48,7 @@ class SwerveBot(wpilib.TimedRobot):
             self.steerMotors,
             self.steerEncoders,
             [ V2f(-1, 1), V2f(1, 1), V2f(-1, -1), V2f(1, -1) ],
-            4 * math.pi #this in in inches, it's the wheel circ 
+            4 * math.pi #this in in inches, it's the wheel circ
         )
 
     def _simulationPeriodic(self) -> None:

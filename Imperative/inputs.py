@@ -13,7 +13,8 @@ class FlymerInputs():
     def __init__(self, driveCtrlr: wpilib.XboxController, armCtrlr: wpilib.XboxController) -> None:
         self.driveX = deadZone(driveCtrlr.getLeftX())
         self.driveY = deadZone((-driveCtrlr.getLeftY()))
-        self.turning = deadZone(driveCtrlr.getRightX())
+        # self.turning = deadZone(driveCtrlr.getRightX())
+        self.turning = deadZone(armCtrlr.getLeftX())
         self.brakeToggle = driveCtrlr.getAButtonPressed()
 
         self.lift = deadZone(armCtrlr.getLeftY())

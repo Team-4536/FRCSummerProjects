@@ -7,13 +7,15 @@ import math
 
 scWidth = 500
 scHeight = 500
-
-botSizeX = 50
-botSizeY = 50
-
 backColor = [ 0, 0, 0, 255 ]
+botColor = [ 255, 255, 255, 255 ]
 
-scale = 1/100
+botSizeX = 0.711
+botSizeY = 0.711
+
+fieldWidth = 16.4846
+fieldHeight = 8.1026
+
 
 
 
@@ -33,6 +35,9 @@ class fieldWidget(widget):
 
     def __init__(self):
 
+        self.camX = 0
+        self.camY = 0
+        self.scale = 1
 
         with dpg.window(label="Field", width=scWidth, height=scHeight, no_scrollbar=True) as window:
             self.windowTag: int|str = window # type: ignore
@@ -46,7 +51,6 @@ class fieldWidget(widget):
                 dpg.bind_item_theme(window, item_theme) # type: ignore
 
 
-
             with dpg.drawlist(width=scWidth, height=scHeight) as drawList:
                 self.drawListTag: int|str = drawList # type: ignore
 
@@ -58,11 +62,26 @@ class fieldWidget(widget):
                 with dpg.draw_node() as root:
                     self.rootNode: int|str = root # type: ignore
 
-                    with dpg.draw_node() as botNodeTag:
-                        self.botNodeTag: int|str = botNodeTag
-                        with dpg.draw_node() as botRotTag:
-                            self.botRotTag: int|str = botRotTag
-                            drawPolyRect([-botSizeX/2, -botSizeY/2], [botSizeX/2, botSizeY/2], [255, 255, 255, 255], backColor, 4)
+                    with dpg.draw_node() as camScaleTag:
+                        self.camScaleTag: int|str = camScaleTag
+
+                        with dpg.draw_node() as camTranslateTag:
+                            self.camTranslateTag: int|str = camTranslateTag
+
+                            dpg.draw_line([0, 1], [0, -1])
+                            dpg.draw_line([1, 0], [-1, 0])
+
+                            dpg.draw_rectangle([-fieldWidth/2, fieldHeight/2], [fieldWidth/2, -fieldHeight/2])
+
+                            with dpg.draw_node() as botTranslateTag:
+                                self.botTranslateTag: int|str = botTranslateTag
+
+                                with dpg.draw_node() as botRotateTag:
+                                    self.botRotateTag: int|str = botRotateTag
+
+                                    drawPolyRect(
+                                        [-botSizeX/2, -botSizeY/2],
+                                        [botSizeX/2, botSizeY/2], botColor, backColor, 4)
 
 
         dpg.apply_transform(self.rootNode, dpg.create_translation_matrix([scWidth / 2, scHeight / 2])) # type: ignore
@@ -77,11 +96,27 @@ class fieldWidget(widget):
 
         x: float = telemTable.getNumber("PosX", 0.0) # type: ignore
         y: float = telemTable.getNumber("PosY", 0.0) # type: ignore
-        dpg.apply_transform(self.botNodeTag, dpg.create_translation_matrix([x / scale, -y / scale]))
+        dpg.apply_transform(self.botTranslateTag, dpg.create_translation_matrix([x, -y]))
 
         angle: float = telemTable.getNumber("Yaw", 0.0) # type: ignore
         angle *= math.pi / 180
-        dpg.apply_transform(self.botRotTag, dpg.create_rotation_matrix(angle, [0, 0, 1]))
+        dpg.apply_transform(self.botRotateTag, dpg.create_rotation_matrix(angle, [0, 0, 1]))
+
+
+
+        sc = dpg.is_key_down(dpg.mvKey_E) - dpg.is_key_down(dpg.mvKey_Q)
+        self.scale += sc * self.scale * 0.01 # TODO: time correction
+        self.scale = max(self.scale, 0.01)
+        self.scale = min(self.scale, 1)
+        dpg.apply_transform(self.camScaleTag, dpg.create_scale_matrix([1/self.scale, 1/self.scale]))
+
+
+        self.camX += (dpg.is_key_down(dpg.mvKey_D) - dpg.is_key_down(dpg.mvKey_A)) * self.scale * 3
+        self.camY += (dpg.is_key_down(dpg.mvKey_W) - dpg.is_key_down(dpg.mvKey_S)) * self.scale * 3
+        dpg.apply_transform(self.camTranslateTag, dpg.create_translation_matrix([-self.camX, self.camY]))
+        #                                                                                     dumbass down positive drawing system
+
+
 
         dpg.apply_transform(self.rootNode, dpg.create_translation_matrix([width / 2, height / 2]))
         dpg.set_item_width(self.drawListTag, width=width)

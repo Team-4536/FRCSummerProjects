@@ -49,7 +49,7 @@ class SwerveSim:
 
         self.steerSims: list[EncoderSim] = [ ]
         for i in range(4):
-           sim = EncoderSim(steeringMotors[i], plant.DCMotor.NEO(1), steeringEncoders[i], 1)
+           sim = EncoderSim(steeringMotors[i], plant.DCMotor.NEO(1), steeringEncoders[i], 0.4) # TODO: get real friction vals
            self.steerSims.append(sim)
 
         self.position = V2f(0, 0)

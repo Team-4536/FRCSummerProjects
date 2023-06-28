@@ -15,10 +15,13 @@ class SwerveController:
         #choose between brake or hold position when no input is given (if false brake will be a toggle on button "A")
         self.brakeDefault = False
 
-        self.FLPID = PIDController(10.0, 0.0, 0.0)
-        self.FRPID = PIDController(10.0, 0.0, 0.0)
-        self.BLPID = PIDController(10.0, 0.0, 0.0)
-        self.BRPID = PIDController(10.0, 0.0, 0.0)
+        kp = 3.0
+        ki = 0
+        kd = -0.1
+        self.FLPID = PIDController(kp, ki, kd)
+        self.FRPID = PIDController(kp, ki, kd)
+        self.BLPID = PIDController(kp, ki, kd)
+        self.BRPID = PIDController(kp, ki, kd)
 
         assert len(turnList) == 4
         assert len(driveList) == 4
