@@ -70,10 +70,9 @@ class SwerveBot(wpilib.TimedRobot):
             self.telemTable.putNumber(prefs[i] + "SteerSpeed", self.steerMotors[i].get())
             self.telemTable.putNumber(prefs[i] + "SteerPos", self.steerEncoders[i].getPosition())
 
-            self.telemTable.putNumber("PosX", self.sim.position.x)
-            self.telemTable.putNumber("PosY", self.sim.position.y)
-            self.telemTable.putNumber("Yaw", self.gyro.getYaw())
-
+        self.telemTable.putNumber("PosX", self.sim.position.x)
+        self.telemTable.putNumber("PosY", self.sim.position.y)
+        self.telemTable.putNumber("Yaw", self.gyro.getYaw())
 
 
 

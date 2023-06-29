@@ -27,13 +27,13 @@ class SwerveController:
         assert len(driveList) == 4
         assert len(turnEncoders) == 4
         assert len(driveEncoders) == 4
-        
+
         self.turnList = turnList
         self.driveList = driveList
         self.turnEncoders = turnEncoders
         self.driveEncoders = driveEncoders
 
-    def tick(self, yaw, inputY, inputX, inputZ, dt, brakeButtonPressed) -> None:
+    def tick(self, yaw, inputX, inputY, inputZ, dt, brakeButtonPressed) -> None:
 
         # Y = Up/Down
         # X = Left/Right

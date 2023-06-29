@@ -26,7 +26,7 @@ class V2f:
 
     #angle
     def getAngle(self):
-        angle = (math.atan2(self.y, self.x)) * 57.2958 #radians to angle conversion factor
+        angle = (math.atan2(self.x, self.y)) * 57.2958 #radians to angle conversion factor
         return float(angle)
 
 

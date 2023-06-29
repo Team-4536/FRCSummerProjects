@@ -31,25 +31,25 @@ class V2:
     #angle
     def getAngle(self):
 
-        angle = (math.atan2(self.y, self.x)) * 57.2958 #radians to angle conversion factor
+        angle = (math.atan2(self.x, self.y)) * 57.2958 #radians to angle conversion factor
 
         return float(angle)
-    
+
     #add
     def add(self, newV2):
 
         return V2(self.x + newV2.x, self.y + newV2.y)
-    
+
     #subtract
     def subtract(self, newV2):
 
         return V2(self.x - newV2.x, self.y - newV2.y)
-    
+
     #multiply
     def multiplyBy(self, factor):
 
         return V2(self.x * factor, self.y * factor)
-    
+
     #average
     def avg(self, newV2):
 
@@ -57,17 +57,17 @@ class V2:
         averageY  = (self.y + newV2.y) / 2
 
         return V2(averageX, averageY)
-    
+
     #there's probably an easier way to do this
     def noValue(self):
-        
+
         if self.x == 0 and self.y == 0:
             noValue = True
         else:
             noValue = False
 
         return noValue
-  
+
 #Flymer = V2(1.0, 0.6)
 #Flymer = Flymer.rotateDegrees(90)
 
