@@ -61,8 +61,6 @@ class DemoBot(wpilib.TimedRobot):
 
         self.time = timing.TimeData(self.time)
 
-        publishExpression("__class__.__name__", self, self.telemTable)
-
         self.telemTable.putNumber("FLSpeed", self.FLDrive.get())
         self.telemTable.putNumber("FRSpeed", self.FRDrive.get())
         self.telemTable.putNumber("BLSpeed", self.BLDrive.get())

@@ -1,9 +1,11 @@
-from real import V2f, angleWrap
 import rev
 import wpimath.system.plant as plant
 import wpimath.system as sys
 import wpilib
+import navx
 
+from virtualGyro import VirtualGyro
+from real import V2f, angleWrap
 
 
 
@@ -38,6 +40,7 @@ class SwerveSim:
                  driveEncoders: list[rev.RelativeEncoder],
                  steeringMotors: list[rev.CANSparkMax],
                  steeringEncoders: list[rev.RelativeEncoder],
+                 gyro: VirtualGyro,
                  podPositions: list[V2f], # in meters
                  wheelCirc: float) -> None: # also in meters
 
@@ -51,6 +54,8 @@ class SwerveSim:
         for i in range(4):
            sim = EncoderSim(steeringMotors[i], plant.DCMotor.NEO(1), steeringEncoders[i], 0.03, 1) # TODO: get real inertia vals #TODO: is this the corect gearing?
            self.steerSims.append(sim)
+
+        self.gyro = gyro
 
         self.position = V2f(0, 0)
         self.rotation: float = 0.0
@@ -95,5 +100,7 @@ class SwerveSim:
             angleDeltas.append(angle)
 
         self.rotation += (angleDeltas[0] + angleDeltas[1] + angleDeltas[2] + angleDeltas[3]) / 4
+
+        self.gyro.setYaw(self.rotation)
 
 

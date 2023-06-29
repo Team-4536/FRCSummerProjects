@@ -37,7 +37,7 @@ class fieldWidget(widget):
 
         self.camX = 0
         self.camY = 0
-        self.scale = 1
+        self.scale = 0.02
 
         with dpg.window(label="Field", width=scWidth, height=scHeight, no_scrollbar=True) as window:
             self.windowTag: int|str = window # type: ignore
