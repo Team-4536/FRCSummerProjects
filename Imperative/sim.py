@@ -44,12 +44,12 @@ class SwerveSim:
 
         self.driveSims: list[EncoderSim] = [ ]
         for i in range(4):
-           sim = EncoderSim(driveMotors[i], plant.DCMotor.NEO(1), driveEncoders[i], 1)
+           sim = EncoderSim(driveMotors[i], plant.DCMotor.NEO(1), driveEncoders[i], 0.1)
            self.driveSims.append(sim)
 
         self.steerSims: list[EncoderSim] = [ ]
         for i in range(4):
-           sim = EncoderSim(steeringMotors[i], plant.DCMotor.NEO(1), steeringEncoders[i], 0.4) # TODO: get real friction vals
+           sim = EncoderSim(steeringMotors[i], plant.DCMotor.NEO(1), steeringEncoders[i], 0.03) # TODO: get real inertia vals
            self.steerSims.append(sim)
 
         self.position = V2f(0, 0)
