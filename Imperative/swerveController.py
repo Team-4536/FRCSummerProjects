@@ -38,7 +38,6 @@ class SwerveController:
         # Y = Up/Down
         # X = Left/Right
         # Z = Turning
-        # Brakes are nothing right now
 
         #brake input toggle
         if brakeButtonPressed == True:
@@ -52,7 +51,7 @@ class SwerveController:
         BLTurningVector = V2f(math.cos(45) * inputZ, -math.cos(45) * inputZ)
         BRTurningVector = V2f(-math.cos(45) * inputZ, -math.cos(45) * inputZ)
 
-        #field oriented offset (change later to gyro readings)
+        #field oriented offset
         leftStick = leftStick.rotateDegrees(-yaw)
 
         #joystick scalar (adjusts speed depending on how far you move the joysticks)

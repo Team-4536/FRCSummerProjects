@@ -9,6 +9,8 @@ import sim
 from real import V2f
 import timing
 from swerveController import SwerveController
+from telemetryHelp import publishExpression
+from virtualGyro import VirtualGyro
 
 class SwerveBot(wpilib.TimedRobot):
 
@@ -19,7 +21,8 @@ class SwerveBot(wpilib.TimedRobot):
         self.driveCtrlr = wpilib.XboxController(0)
         self.armCtrlr = wpilib.XboxController(1)
         self.time = timing.TimeData(None)
-        self.gyro = navx.AHRS(wpilib.SPI.Port.kMXP)
+        self.gyro = VirtualGyro()
+        # self.gyro = navx.AHRS(wpilib.SPI.Port.kMXP)
 
 
         driveType = rev.CANSparkMax.MotorType.kBrushless
@@ -47,6 +50,7 @@ class SwerveBot(wpilib.TimedRobot):
             self.driveEncoders,
             self.steerMotors,
             self.steerEncoders,
+            self.gyro,
             [ V2f(-1, 1), V2f(1, 1), V2f(-1, -1), V2f(1, -1) ],
             0.1016 * math.pi #this 4in in meters, it's the wheel circ
         )
@@ -68,17 +72,16 @@ class SwerveBot(wpilib.TimedRobot):
 
             self.telemTable.putNumber("PosX", self.sim.position.x)
             self.telemTable.putNumber("PosY", self.sim.position.y)
-            self.telemTable.putNumber("Yaw", self.sim.rotation)
-            # TODO: simulated gyro readings
+            self.telemTable.putNumber("Yaw", self.gyro.getYaw())
 
 
 
 
     def teleopInit(self) -> None:
         self.swerveController = SwerveController(
-            self.steerMotors, 
-            self.driveMotors, 
-            self.steerEncoders, 
+            self.steerMotors,
+            self.driveMotors,
+            self.steerEncoders,
             self.driveEncoders)
 
     def teleopPeriodic(self) -> None:
@@ -86,13 +89,15 @@ class SwerveBot(wpilib.TimedRobot):
         self.input = FlymerInputs(self.driveCtrlr, self.armCtrlr)
 
         self.swerveController.tick(
-            self.gyro.getAngle(), 
-            self.input.driveX, 
-            self.input.driveY, 
-            self.input.turning, 
-            self.time.dt, 
+            -self.gyro.getYaw(),
+            self.input.driveX,
+            self.input.driveY,
+            self.input.turning,
+            self.time.dt,
             self.input.brakeToggle)
 
+        # publishExpression("swerveController.leftStick.x", "x", self, self.telemTable)
+        # publishExpression("swerveController.leftStick.y", "y", self, self.telemTable)
 
 
     def disabledPeriodic(self) -> None:
