@@ -12,11 +12,12 @@ class PogoBot(wpilib.TimedRobot):
 
         self.controller = wpilib.XboxController(0)
 
-        self.FLPiston = wpilib.DoubleSolenoid(0, wpilib.PneumaticsModuleType.CTREPCM, 0, 1)
-        self.FRPiston = wpilib.DoubleSolenoid(0, wpilib.PneumaticsModuleType.CTREPCM, 2, 3)
-        self.BLPiston = wpilib.DoubleSolenoid(0, wpilib.PneumaticsModuleType.CTREPCM, 4, 5)
-        self.BRPiston = wpilib.DoubleSolenoid(0, wpilib.PneumaticsModuleType.CTREPCM, 6, 7)
+        self.FLPiston = wpilib.DoubleSolenoid(0, wpilib.PneumaticsModuleType.CTREPCM, 0, 7)
+        self.FRPiston = wpilib.DoubleSolenoid(0, wpilib.PneumaticsModuleType.CTREPCM, 1, 6)
+        self.BLPiston = wpilib.DoubleSolenoid(0, wpilib.PneumaticsModuleType.CTREPCM, 2, 5)
+        self.BRPiston = wpilib.DoubleSolenoid(0, wpilib.PneumaticsModuleType.CTREPCM, 3, 4)
 
+        # self.telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
         self.extended = False
 
 
