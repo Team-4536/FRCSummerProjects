@@ -9,14 +9,14 @@ import wpilib
 
 class EncoderSim:
 
-    def __init__(self, motor: rev.CANSparkMax, motorSpec: plant.DCMotor, encoder: rev.RelativeEncoder, inertia: float) -> None:
+    def __init__(self, motor: rev.CANSparkMax, motorSpec: plant.DCMotor, encoder: rev.RelativeEncoder, inertia: float, gearing: float) -> None:
 
         self.motor = motor
         self.encoder = encoder
 
         self.motorSpec = motorSpec
         self.inertia = inertia
-        self.linearSys = plant.LinearSystemId.DCMotorSystem(self.motorSpec, self.inertia, 1)
+        self.linearSys = plant.LinearSystemId.DCMotorSystem(self.motorSpec, self.inertia, gearing)
         # NOTE: state[0] is position, state[1] is velocity
         self.state: list[float] = [ 0, 0 ]
 
@@ -44,12 +44,12 @@ class SwerveSim:
 
         self.driveSims: list[EncoderSim] = [ ]
         for i in range(4):
-           sim = EncoderSim(driveMotors[i], plant.DCMotor.NEO(1), driveEncoders[i], 0.1)
+           sim = EncoderSim(driveMotors[i], plant.DCMotor.NEO(1), driveEncoders[i], 0.1, 6.12) # TODO: VVVVVVVVVVVVVVVVVVVVVVVVV
            self.driveSims.append(sim)
 
         self.steerSims: list[EncoderSim] = [ ]
         for i in range(4):
-           sim = EncoderSim(steeringMotors[i], plant.DCMotor.NEO(1), steeringEncoders[i], 0.03) # TODO: get real inertia vals
+           sim = EncoderSim(steeringMotors[i], plant.DCMotor.NEO(1), steeringEncoders[i], 0.03, 1) # TODO: get real inertia vals #TODO: is this the corect gearing?
            self.steerSims.append(sim)
 
         self.position = V2f(0, 0)
@@ -59,9 +59,8 @@ class SwerveSim:
 
         self.posDeltas: list[V2f] = [] # DEBUG
 
-    # TODO: get real swerve gearings
-    # TODO: add real friction to wheel sims
-    # TODO: get real measurements for wheel inertia/friction
+    # TODO: add friction to wheel sims
+    # TODO: get measurements for wheel inertia/friction
     # TODO: vary the "inertia" of each mechanism with speed/rotation speed of drive // add extra resistance when braking and going against current speed somehow
 
     def update(self, dt: float):
@@ -79,7 +78,7 @@ class SwerveSim:
             sim.update(dt)
             steerPos = sim.state[0]
 
-            sim.state[1] *= 0.9
+            sim.state[1] *= 0.5
 
             self.posDeltas.append((V2f(0, 1) * driveDelta * self.wheelCirc).rotateDegrees(steerPos * 360))
 
