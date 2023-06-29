@@ -36,3 +36,7 @@ class PogoBot(wpilib.TimedRobot):
             self.FRPiston.set(toggle)
             self.BLPiston.set(toggle)
             self.BRPiston.set(toggle)
+
+
+if __name__ == "__main__":
+    wpilib.run(PogoBot)
