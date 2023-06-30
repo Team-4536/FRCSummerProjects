@@ -26,6 +26,7 @@ THE CHECKLIST:
         [X] floating
     [X] themeing system that is slick af
     [X] fonts????
+        [ ] text center
     [ ] input
         [ ] drag flag and ordering
     [X] custom textures
@@ -35,12 +36,14 @@ THE CHECKLIST:
     [ ] tooltips/dropdowns
     [ ] text input
 
+
     [ ] hover cursor change
     [ ] rounding
     [ ] borders
     [ ] drop shadows
     [ ] batching
     [ ] cleanup
+        [ ] hide engine guts
 
 TESTING CHECKLIST:
 [ ] test hashmap collsions

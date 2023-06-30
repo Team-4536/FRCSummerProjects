@@ -298,6 +298,7 @@ void net_update() {
         if(WSAGetLastError() != WSAEWOULDBLOCK) {
             printf("Error recieving message! WSA code: %i\n", WSAGetLastError());
             globs.connected = false;
+            closesocket(globs.simSocket->s);
         }
     }
     // buffer received
@@ -305,7 +306,10 @@ void net_update() {
         _net_processMessage(recvBuffer, recvSize); }
     // size is 0, indicating shutdown
     else {
-        globs.connected = false; }
+        globs.connected = false;
+        closesocket(globs.simSocket->s);
+        // TODO: proper reconnection procedure
+    }
 }
 
 void net_cleanup() {
