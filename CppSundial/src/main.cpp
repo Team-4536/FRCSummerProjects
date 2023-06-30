@@ -184,6 +184,7 @@ int main() {
 
                 a = blu_areaMake(STR("left"), blu_areaFlags_DRAW_BACKGROUND);
                 a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 200 };
+                a->style.childLayoutAxis = blu_axis_Y;
                 blu_parentScope(a) {
                     blu_styleScope {
                     blu_style_add_sizeX({ blu_sizeKind_TEXT, 0 });
@@ -194,6 +195,11 @@ int main() {
                         char* buf = BUMP_PUSH_ARR(frameArena, 32, char);
                         gcvt(1/dt, 6, buf);
                         blu_areaAddDisplayStr(a, str_join(STR("FPS: "), STR(buf), frameArena));
+
+                        a = blu_areaMake(STR("OK?"), blu_areaFlags_DRAW_TEXT);
+                        str ok = STR("NO");
+                        if(net_getOk()) { ok = STR("YES"); }
+                        blu_areaAddDisplayStr(a, str_join(STR("OK: "), ok, frameArena));
                     }
                 }
 

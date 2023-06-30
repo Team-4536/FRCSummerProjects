@@ -27,8 +27,8 @@
             "args": [],
             "stopAtEntry": false,
             "externalConsole": false,
-            "cwd": "c:/Users/Rob/OneDrive/Dev/ITW",
-            "program": "c:/Users/Rob/OneDrive/Dev/ITW/out/ITW.exe",
+            "cwd": "${workspaceFolder}/cppsundial",
+            "program": "${workspaceFolder}/cppsundial/out/sun.exe",
             "MIMode": "gdb",
             "miDebuggerPath": "gdb",
             "setupCommands": [
