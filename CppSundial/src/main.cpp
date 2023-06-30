@@ -183,7 +183,7 @@ int main() {
 
 
                 a = blu_areaMake(STR("left"), blu_areaFlags_DRAW_BACKGROUND);
-                a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 200 };
+                a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 300 };
                 a->style.childLayoutAxis = blu_axis_Y;
                 blu_parentScope(a) {
                     blu_styleScope {
@@ -196,10 +196,28 @@ int main() {
                         gcvt(1/dt, 6, buf);
                         blu_areaAddDisplayStr(a, str_join(STR("FPS: "), STR(buf), frameArena));
 
-                        a = blu_areaMake(STR("OK?"), blu_areaFlags_DRAW_TEXT);
-                        str ok = STR("NO");
-                        if(net_getOk()) { ok = STR("YES"); }
-                        blu_areaAddDisplayStr(a, str_join(STR("OK: "), ok, frameArena));
+
+                        a = blu_areaMake(STR("connectionPar"), blu_areaFlags_DRAW_BACKGROUND);
+                        a->style.childLayoutAxis = blu_axis_X;
+                        a->style.sizes[blu_axis_X] = { blu_sizeKind_PERCENT, 1 };
+                        blu_parentScope(a) {
+                            a = blu_areaMake(STR("networkConnLabel"), blu_areaFlags_DRAW_TEXT);
+                            blu_areaAddDisplayStr(a, STR("Network status: "));
+
+                            a = blu_areaMake(STR("connSpacer"), 0);
+                            a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
+
+
+                            a = blu_areaMake(STR("connection"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT);
+                            a->style.backgroundColor = col_red;
+                            a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 75 };
+                            str ok = STR("NO");
+                            if(net_getConnected()) {
+                                ok = STR("YES");
+                                a->style.backgroundColor = col_green;
+                            }
+                            blu_areaAddDisplayStr(a, ok);
+                        } // end connection parent
                     }
                 }
 

@@ -1,12 +1,22 @@
 #pragma once
-#include <stdio.h>
-#include <winsock2.h>
-#include <WS2tcpip.h>
-#include <iphlpapi.h>
 
 #include "base/str.h"
 #include "base/typedefs.h"
 #include "base/allocators.h"
+
+
+
+
+enum net_SockErr {
+    net_sockErr_none,
+    net_sockErr_failedAddrInfo,
+    net_sockErr_failedCreation,
+    net_sockErr_failedConnection,
+    net_sockErr_errSending,
+};
+
+
+
 
 enum net_PropType {
     net_propType_S32,
@@ -19,7 +29,6 @@ enum net_MsgKind {
     net_msgKind_EVENT
 };
 
-
 struct net_Prop {
     net_PropType type;
     void* data;
@@ -30,34 +39,24 @@ struct net_Prop {
 
 
 
-enum err_sock {
-    err_sock_none,
-    err_sock_failedAddrInfo,
-    err_sock_failedCreation,
-    err_sock_failedConnection,
-    err_sock_errSending,
-};
-
-
-struct Sock {
-    SOCKET s = INVALID_SOCKET;
-    addrinfo* addrInfo = nullptr; // NOTE: expected to be managed
-    err_sock err = err_sock_none;
-};
-
-
 
 
 void net_init();
 void net_update();
 void net_cleanup();
 
-bool net_getOk();
+bool net_getConnected();
 
 net_Prop* net_getProp(str name);
 
 
 #ifdef NET_IMPL
+
+#include <stdio.h>
+#include <winsock2.h>
+#include <WS2tcpip.h>
+#include <iphlpapi.h>
+
 
 #include "base/hashtable.h"
 #include "base/arr.h"
@@ -68,28 +67,22 @@ net_Prop* net_getProp(str name);
 #define NET_RES_SIZE 10000
 #define NET_RECV_SIZE 1024
 
-struct net_Globs {
-    WSADATA wsaData;
-    bool ok = true;
-    Sock* socket;
 
-    BumpAlloc resArena;
-    net_Prop** hash = nullptr;
+
+
+
+
+
+struct net_Sock {
+    SOCKET s = INVALID_SOCKET;
+    addrinfo* addrInfo = nullptr; // NOTE: expected to be managed
 };
 
-static net_Globs globs = net_Globs();
-
-
-bool net_getOk() { return globs.ok; }
-
-
-
-
-Sock* sock_createAndConnect(str ip, str port, BumpAlloc& arena) {
-    U32 err;
-
-    Sock* sock = BUMP_PUSH_NEW(arena, Sock);
-    *sock = Sock();
+// Returns pointer to new Sock struct in <arena> if successful.
+// Errors: failedAddrInfo, failedCreation
+net_Sock* _net_sockCreate(str ip, str port, BumpAlloc& arena, net_SockErr* outError) {
+    int err;
+    *outError = net_sockErr_none;
 
     addrinfo hints;
     ZeroMemory( &hints, sizeof(hints) );
@@ -97,61 +90,55 @@ Sock* sock_createAndConnect(str ip, str port, BumpAlloc& arena) {
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
 
-    err = getaddrinfo(str_cstyle(ip, arena), str_cstyle(port, arena), &hints, &sock->addrInfo);
-    if(err != 0) { sock->err = err_sock_failedAddrInfo; }
-
-    if(!sock->err) {
-        sock->s = socket(sock->addrInfo->ai_family, sock->addrInfo->ai_socktype, sock->addrInfo->ai_protocol);
-        if(sock->s == INVALID_SOCKET) { sock->err = err_sock_failedCreation; }
+    addrinfo* resInfo;
+    // CLEANUP: perma allocations here
+    err = getaddrinfo(str_cstyle(ip, arena), str_cstyle(port, arena), &hints, &resInfo);
+    if(err != 0) {
+        *outError = net_sockErr_failedAddrInfo;
+        return nullptr;
     }
 
-    if(!sock->err) {
-        err = connect(sock->s, sock->addrInfo->ai_addr, (int)sock->addrInfo->ai_addrlen);
-        if (err == SOCKET_ERROR) { sock->err = err_sock_failedConnection; }
+
+    SOCKET s = socket(resInfo->ai_family, resInfo->ai_socktype, resInfo->ai_protocol);
+    if(s == INVALID_SOCKET) {
+        freeaddrinfo(resInfo); // windows is a terrible platform
+        *outError = net_sockErr_failedCreation;
+        return nullptr;
     }
 
     // https://stackoverflow.com/questions/17227092/how-to-make-send-non-blocking-in-winsock
     u_long mode = 1;  // 1 to enable non-blocking socket
-    ioctlsocket(sock->s, FIONBIO, &mode);
+    ioctlsocket(s, FIONBIO, &mode);
+
+    net_Sock* sock = BUMP_PUSH_NEW(arena, net_Sock);
+    *sock = net_Sock();
+    sock->addrInfo = resInfo;
+    sock->s = s;
 
     return sock;
 }
 
 
+// return value indicates if socket has finished connecting to server
+// Errors: net_sockErr_failedConnection
+bool _net_sockAttemptConnect(net_Sock* s, net_SockErr* outError) {
+    *outError = net_sockErr_none;
+    int err = connect(s->s, s->addrInfo->ai_addr, (int)s->addrInfo->ai_addrlen);
 
-
-void net_init() {
-
-    bump_allocate(globs.resArena, NET_RES_SIZE + (sizeof(net_Prop) * NET_MAX_PROP_COUNT));
-    globs.hash = (net_Prop**)arr_allocate0(sizeof(net_Prop*), NET_HASH_COUNT);
-
-
-    // Initialize Winsock
-    int err = WSAStartup(MAKEWORD(2,2), &globs.wsaData);
-    if (err != 0) {
-        printf("WSAStartup failed: %d\n", err);
-        globs.ok = false;
+    if (err == SOCKET_ERROR) {
+        err = WSAGetLastError();
+        if(err == WSAEWOULDBLOCK) { return false; }
+        else if(err == WSAEISCONN) { return true; }
+        else {
+            *outError = net_sockErr_failedConnection;
+            return false;
+        }
     }
 
-    globs.socket = sock_createAndConnect(STR("127.0.0.1"), STR("7000"), globs.resArena);
-
-    if(globs.socket->err == err_sock_failedConnection) { printf("Error connecting to server!\n"); }
-    if(globs.socket->err != err_sock_none) {
-        printf("Error creating/connecting socket!\n");
-        globs.ok = false;
-    }
+    return false;
 }
 
-
-
-
-
-
-
-
-
-
-void sock_free(Sock* s) {
+void _net_sockFree(net_Sock* s) {
     if(s->addrInfo) { freeaddrinfo(s->addrInfo); }
     if(s->s != INVALID_SOCKET) { closesocket(s->s); }
 }
@@ -159,6 +146,23 @@ void sock_free(Sock* s) {
 
 
 
+
+
+
+
+struct net_Globs {
+
+    WSADATA wsaData;
+
+    net_Sock* simSocket;
+    bool connected = false;
+
+    BumpAlloc resArena; // sockets, props, misc stuff
+    net_Prop** hash = nullptr; // array of ptrs for hash access
+};
+
+static net_Globs globs = net_Globs();
+bool net_getConnected() { return globs.connected; }
 
 
 
@@ -200,68 +204,112 @@ net_Prop* _net_hashGet(str string) {
 
 
 
+void _net_processMessage(U8* buffer, U32 size) {
 
-void _net_getMessage() {
+    ASSERT(size >= 2);
 
-    U8 recvBuffer[NET_RECV_SIZE] = { 0 };
-    int recvSize = recv(globs.socket->s, (char*)recvBuffer, NET_RECV_SIZE, 0);
 
-    if (recvSize == SOCKET_ERROR) {
-       if(WSAGetLastError() == WSAEWOULDBLOCK) {
-            // .. waiting
-            // printf("waiting...\n");
-        } else {
-            printf("Error recieving message! %i\n", WSAGetLastError());
-            globs.ok = false;
+    U8 msgKind = buffer[0];
+    U8 nameLen = buffer[1];
+    str name = { &buffer[2], nameLen };
+    str_printf(STR("%s\n"), name);
+
+    ASSERT(size >= 2 + nameLen);
+    U8 valType = buffer[2 + nameLen];
+    ASSERT(valType == net_propType_S32 || valType == net_propType_F64); // TODO: str
+    str_printf(STR("Type: %i\n"), valType);
+
+    if(msgKind == net_msgKind_UPDATE) {
+        net_Prop* prop = _net_hashGet(name);
+        if(!prop) {
+            prop = BUMP_PUSH_NEW(globs.resArena, net_Prop);
+            _net_hashInsert(name, prop);
         }
-        return;
-    }
-    else if (recvSize > 0) {
-        ASSERT(recvSize >= 2);
 
-
-        U8 msgKind = recvBuffer[0];
-        U8 nameLen = recvBuffer[1];
-        str name = { &recvBuffer[2], nameLen };
-        str_printf(STR("%s\n"), name);
-
-        ASSERT(recvSize >= 2 + nameLen);
-        U8 valType = recvBuffer[2 + nameLen];
-        ASSERT(valType == net_propType_S32 || valType == net_propType_F64); // TODO: str
-        str_printf(STR("Type: %i\n"), valType);
-
-        if(msgKind == net_msgKind_UPDATE) {
-            net_Prop* prop = _net_hashGet(name);
-            if(!prop) {
-                prop = BUMP_PUSH_NEW(globs.resArena, net_Prop);
-                _net_hashInsert(name, prop);
-            }
-
-            prop->type = (net_PropType)valType;
-            if(prop->type == net_propType_F64) {
-                printf("%f\n", *((double*)&recvBuffer[2+nameLen+1]));
-            }
+        prop->type = (net_PropType)valType;
+        if(prop->type == net_propType_F64) {
+            printf("%f\n", *((double*)&buffer[2+nameLen+1]));
         }
-        // TODO: events
-        else { ASSERT(false); }
     }
-    else {
-        printf("Socket closed!");
-        globs.ok = false;
+    // TODO: events
+    else { ASSERT(false); }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+// Asserts on failures
+void net_init() {
+
+    bump_allocate(globs.resArena, NET_RES_SIZE + (sizeof(net_Prop) * NET_MAX_PROP_COUNT));
+    globs.hash = (net_Prop**)arr_allocate0(sizeof(net_Prop*), NET_HASH_COUNT);
+
+
+    // Initialize Winsock
+    int err = WSAStartup(MAKEWORD(2,2), &globs.wsaData);
+    if (err != 0) {
+        printf("WSAStartup failed: %d\n", err);
+        ASSERT(false);
+    }
+
+
+    net_SockErr sockErr;
+    globs.simSocket = _net_sockCreate(STR("127.0.0.1"), STR("7000"), globs.resArena, &sockErr);
+    if(sockErr) {
+        printf("Error creating socket! Code: %i\n", sockErr);
+        ASSERT(false);
     }
 }
+
+
 
 
 
 
 
 void net_update() {
-    if(!globs.ok) { return; }
-    _net_getMessage();
+
+    net_SockErr err;
+
+    if(!globs.connected) {
+        bool connected = _net_sockAttemptConnect(globs.simSocket, &err);
+
+        if(err != net_sockErr_none) { /* failed */ }
+        else if(connected) { globs.connected = true; }
+        return;
+    }
+
+
+
+
+
+    U8 recvBuffer[NET_RECV_SIZE] = { 0 };
+    int recvSize = recv(globs.simSocket->s, (char*)recvBuffer, NET_RECV_SIZE, 0);
+
+    if (recvSize == SOCKET_ERROR) {
+        if(WSAGetLastError() != WSAEWOULDBLOCK) {
+            printf("Error recieving message! WSA code: %i\n", WSAGetLastError());
+            globs.connected = false;
+        }
+    }
+    // buffer received
+    else if (recvSize > 0) {
+        _net_processMessage(recvBuffer, recvSize); }
+    // size is 0, indicating shutdown
+    else {
+        globs.connected = false; }
 }
 
 void net_cleanup() {
-    sock_free(globs.socket);
+    _net_sockFree(globs.simSocket);
     WSACleanup();
 }
 
