@@ -40,7 +40,6 @@ THE CHECKLIST:
     [ ] borders
     [ ] drop shadows
     [ ] batching
-    [ ] shortcuts
     [ ] cleanup
 
 TESTING CHECKLIST:

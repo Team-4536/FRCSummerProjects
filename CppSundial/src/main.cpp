@@ -11,6 +11,7 @@
 #include "base/arr.h"
 #include "graphics.h"
 #include "blue/blue.h"
+#include "network/network.h"
 
 #include "colors.h"
 
@@ -97,7 +98,7 @@ int main() {
     blu_loadFont("C:/windows/fonts/consola.ttf");
 
 
-
+    net_init();
 
 
     gfx_Shader* blueShader;
@@ -154,6 +155,7 @@ int main() {
         F64 dt = time - prevTime;
         prevTime = time;
 
+        net_update();
 
 
         // UI ///////////////////////////////////////////////////////////////////////
@@ -287,6 +289,7 @@ int main() {
     }
 
 
+    net_cleanup();
     glfwDestroyWindow(window);
     glfwTerminate();
 
