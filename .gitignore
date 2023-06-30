@@ -4,3 +4,10 @@
 /simgui.json
 __pycache__/
 Sundial/res/log.txt
+
+
+*.o
+*.exe
+!gl.o
+!stb_image.o
+!stb_truetype.o
