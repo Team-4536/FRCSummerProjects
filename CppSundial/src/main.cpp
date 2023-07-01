@@ -208,7 +208,7 @@ int main() {
                             a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
 
 
-                            a = blu_areaMake(STR("connection"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT);
+                            a = blu_areaMake(STR("connection"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
                             a->style.backgroundColor = col_red;
                             a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 75 };
                             str ok = STR("NO");
@@ -254,7 +254,7 @@ int main() {
                                 U32 stdSize = 30;
                                 U32 wideSize = 100;
 
-                                a = blu_areaMake(STR("b1"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM);
+                                a = blu_areaMake(STR("b1"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CENTER_TEXT);
                                 blu_areaAddDisplayStr(a, STR("-"));
                                 a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, col_white, a->target_hoverAnim);
                                 a->style.textColor = v4f_lerp(a->style.textColor, col_darkBlue, a->target_hoverAnim);

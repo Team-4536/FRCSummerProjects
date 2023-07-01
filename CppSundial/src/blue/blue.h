@@ -74,6 +74,7 @@ enum blu_AreaFlags {
     // TODO: draggable flag
     blu_areaFlags_FLOATING =        (1 << 3),
     blu_areaFlags_HOVER_ANIM =      (1 << 4),
+    blu_areaFlags_CENTER_TEXT =     (1 << 5),
 };
 
 struct blu_Size {
@@ -570,6 +571,16 @@ void blu_beginFrame() {
 
 
 
+float _blu_sizeOfString(str s) {
+    float size = 0;
+    for(int i = 0; i < s.length; i++) {
+        size += globs.fontGlyphs[s.chars[i] - BLU_FONT_FIRST].advance; // CLEANUP: char oob assertion
+    }
+
+    return size;
+}
+
+
 
 void _blu_solveRemainders(blu_Area* parent, int axis) {
 
@@ -673,8 +684,7 @@ void blu_layout(V2f scSize) {
                 else if(axis == blu_axis_X) {
 
                     float s = elem->style.textPadding.x * 2;
-                    for(int i = 0; i < elem->displayString.length; i++) {
-                        s += globs.fontGlyphs[elem->displayString.chars[i] - BLU_FONT_FIRST].advance; }
+                    s += _blu_sizeOfString(elem->displayString);
 
                     elem->calculatedSizes[axis] = s;
                 }
@@ -731,7 +741,6 @@ void blu_layout(V2f scSize) {
 
 
 
-// TODO: optimize rendering
 // NOTE: start is UL of text, not baseline
 // CLEANUP: that lol ^^^^^^^^^^^^^^^^^^^^^
 void _blu_renderString(str string, V2f start, V4f color, gfx_Pass* pass) {
@@ -784,7 +793,17 @@ void _blu_genRenderCallsRecurse(blu_Area* area, gfx_Pass* pass) {
             block->texture = globs.solidTex;
         }
         if (area->flags & blu_areaFlags_DRAW_TEXT) {
-            _blu_renderString(area->displayString, pos + area->style.textPadding, area->style.textColor, pass);
+
+            V2f off = V2f(0, 0);
+
+            if(area->flags & blu_areaFlags_CENTER_TEXT) {
+                float size = area->calculatedSizes[blu_axis_X];
+                float strSize = _blu_sizeOfString(area->displayString);
+                off.x = (size - strSize) / 2;
+                off.x -= area->style.textPadding.x;
+            }
+
+            _blu_renderString(area->displayString, off + pos + area->style.textPadding, area->style.textColor, pass);
         }
 
         if (area->flags & blu_areaFlags_DRAW_TEXTURE) {
