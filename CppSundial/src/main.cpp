@@ -146,7 +146,7 @@ int main() {
 
 
 
-    V2f windowPos = V2f(400, 100);
+    V2f windowPos = V2f(300, 100);
 
 
     F64 prevTime = glfwGetTime();
@@ -165,7 +165,6 @@ int main() {
             bool leftPressed = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)? true : false;
 
             blu_beginFrame();
-            blu_input(V2f((F32)mx, (F32)my), leftPressed);
 
 
             blu_Area* a;
@@ -182,7 +181,81 @@ int main() {
 
 
 
-                a = blu_areaMake(STR("left"), blu_areaFlags_DRAW_BACKGROUND);
+
+
+
+                a = blu_areaMake(STR("window"),
+                        blu_areaFlags_DRAW_BACKGROUND |
+                        blu_areaFlags_DRAW_TEXT |
+                        blu_areaFlags_FLOATING |
+                        blu_areaFlags_CLICKABLE);
+
+                blu_Area* win = a;
+                blu_areaAddDisplayStr(a, STR("window"));
+                a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 350 };
+                a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, 250 };
+                a->style.childLayoutAxis = blu_axis_Y;
+
+                blu_parentScope(a) {
+                    blu_styleScope {
+                    blu_style_add_sizeX({ blu_sizeKind_TEXT, 0 });
+                    blu_style_add_sizeY({ blu_sizeKind_TEXT, 0 });
+                    blu_style_add_backgroundColor(col_darkGray);
+
+                        a = blu_areaMake(STR("titlebar"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
+                        blu_areaAddDisplayStr(a, STR("titlebar"));
+                        a->style.backgroundColor += V4f(1, 1, 1, 1) * blu_interactionFromWidget(a).hovered;
+                        a->style.sizes[blu_axis_X] = { blu_sizeKind_PERCENT, 1 };
+                        windowPos += blu_interactionFromWidget(a).dragDelta;
+                        blu_parentScope(a) {
+
+                            a = blu_areaMake(STR("hi there"), blu_areaFlags_DRAW_TEXT);
+                            blu_areaAddDisplayStr(a, STR("q"));
+                            a = blu_areaMake(STR("hi3there"), blu_areaFlags_DRAW_TEXT);
+                            blu_areaAddDisplayStr(a, STR("w"));
+                            a = blu_areaMake(STR("hi4there"), blu_areaFlags_DRAW_TEXT);
+                            blu_areaAddDisplayStr(a, STR("e"));
+
+                            a = blu_areaMake(STR("space"), 0);
+                            a->style.sizes[blu_axis_X].kind = blu_sizeKind_REMAINDER;
+
+
+                            blu_styleScope {
+                                U32 stdSize = 30;
+                                U32 wideSize = 40;
+
+                                a = blu_areaMake(STR("b1"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
+                                blu_areaAddDisplayStr(a, STR("AAAAA"));
+                                a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, col_white, a->target_hoverAnim);
+                                a->style.textColor = v4f_lerp(a->style.textColor, col_darkBlue, a->target_hoverAnim);
+                                a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, lerp(stdSize, wideSize, a->target_hoverAnim) };
+
+                                a = blu_areaMake(STR("b2"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
+                                blu_areaAddDisplayStr(a, STR("O"));
+                                a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, col_white, a->target_hoverAnim);
+                                a->style.textColor = v4f_lerp(a->style.textColor, col_darkBlue, a->target_hoverAnim);
+                                a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, lerp(stdSize, wideSize, a->target_hoverAnim) };
+
+                                a = blu_areaMake(STR("b3"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
+                                blu_areaAddDisplayStr(a, STR("X"));
+                                a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, col_red, a->target_hoverAnim);
+                                a->style.textColor = v4f_lerp(a->style.textColor, col_darkBlue, a->target_hoverAnim);
+                                a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, lerp(stdSize, wideSize, a->target_hoverAnim) };
+                            }
+                        } // end title bar
+
+
+                    }
+                } // end window
+                win->offset = windowPos;
+
+
+
+
+
+
+
+                a = blu_areaMake(STR("left"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
                 a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 300 };
                 a->style.childLayoutAxis = blu_axis_Y;
                 blu_parentScope(a) {
@@ -222,64 +295,11 @@ int main() {
                 }
 
 
-                a = blu_areaMake(STR("window"),
-                        blu_areaFlags_DRAW_BACKGROUND |
-                        blu_areaFlags_DRAW_TEXT |
-                        blu_areaFlags_FLOATING);
-
-                windowPos += blu_inputFromWidget(a).dragDelta;
-                a->offset = windowPos;
-                a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 350 };
-                a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, 250 };
-                a->style.childLayoutAxis = blu_axis_Y;
-
-                blu_parentScope(a) {
-                    blu_styleScope {
-                    blu_style_add_sizeX({ blu_sizeKind_TEXT, 0 });
-                    blu_style_add_sizeY({ blu_sizeKind_TEXT, 0 });
-                    blu_style_add_backgroundColor(col_darkGray);
-
-                        a = blu_areaMake(STR("titlebar"), blu_areaFlags_DRAW_BACKGROUND);
-                        a->style.sizes[blu_axis_X] = { blu_sizeKind_PERCENT, 1 };
-                        blu_parentScope(a) {
-
-                            a = blu_areaMake(STR("title"), blu_areaFlags_DRAW_TEXT);
-                            blu_areaAddDisplayStr(a, STR("Hello window!"));
-
-                            a = blu_areaMake(STR("space"), 0);
-                            a->style.sizes[blu_axis_X].kind = blu_sizeKind_REMAINDER;
-
-
-                            blu_styleScope {
-                                U32 stdSize = 30;
-                                U32 wideSize = 100;
-
-                                a = blu_areaMake(STR("b1"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CENTER_TEXT);
-                                blu_areaAddDisplayStr(a, STR("-"));
-                                a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, col_white, a->target_hoverAnim);
-                                a->style.textColor = v4f_lerp(a->style.textColor, col_darkBlue, a->target_hoverAnim);
-                                a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, lerp(stdSize, wideSize, a->target_hoverAnim) };
-
-                                a = blu_areaMake(STR("b2"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM);
-                                blu_areaAddDisplayStr(a, STR("O"));
-                                a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, col_white, a->target_hoverAnim);
-                                a->style.textColor = v4f_lerp(a->style.textColor, col_darkBlue, a->target_hoverAnim);
-                                a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, lerp(stdSize, wideSize, a->target_hoverAnim) };
-
-                                a = blu_areaMake(STR("b3"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM);
-                                blu_areaAddDisplayStr(a, STR("X"));
-                                a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, col_red, a->target_hoverAnim);
-                                a->style.textColor = v4f_lerp(a->style.textColor, col_darkBlue, a->target_hoverAnim);
-                                a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, lerp(stdSize, wideSize, a->target_hoverAnim) };
-                            }
-                        }
-
-
-                    }
-                }
 
 
             } // end main style
+
+            blu_input(V2f((F32)mx, (F32)my), leftPressed);
         } // end UI
 
 

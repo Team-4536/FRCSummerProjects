@@ -26,13 +26,13 @@ THE CHECKLIST:
         [X] floating
     [X] themeing system that is slick af
     [X] fonts????
-        [ ] text center
-    [ ] input
-        [ ] drag flag and ordering
+        [X] text center
+    [X] input
+        [X] ordering
     [X] custom textures
     [X] animations
-    [ ] scrolling/overflow
     [ ] clipping
+    [ ] scrolling/overflow
     [ ] tooltips/dropdowns
     [ ] text input
 
@@ -71,10 +71,10 @@ enum blu_AreaFlags {
     blu_areaFlags_DRAW_BACKGROUND = (1 << 0),
     blu_areaFlags_DRAW_TEXT =       (1 << 1),
     blu_areaFlags_DRAW_TEXTURE =    (1 << 2),
-    // TODO: draggable flag
     blu_areaFlags_FLOATING =        (1 << 3),
     blu_areaFlags_HOVER_ANIM =      (1 << 4),
     blu_areaFlags_CENTER_TEXT =     (1 << 5),
+    blu_areaFlags_CLICKABLE =       (1 << 6),
 };
 
 struct blu_Size {
@@ -135,6 +135,7 @@ struct blu_Area {
     blu_Area* firstChild[2] = { 0 };
     blu_Area* lastChild = nullptr;
     blu_Area* nextSibling[2] = { 0 };
+    blu_Area* prevSibling = nullptr;
 
 
     // hashing
@@ -162,13 +163,18 @@ struct blu_Area {
 
     // persistant shit for input / anim
     F32 target_hoverAnim = 1;
+
+
+    // input
+    bool prevHovered = false;
+    bool prevPressed = false;
 };
 
 
 // TODO: name?
 struct blu_WidgetInputs {
     bool hovered = false;
-    bool pressed = false;
+    bool held = false;
     bool clicked = false;
 
     bool dragged = false;
@@ -205,7 +211,7 @@ void blu_style_add_animationStrength(F32 s);
 void blu_pushStyle();
 void blu_popStyle();
 
-blu_WidgetInputs blu_inputFromWidget(blu_Area* area);
+blu_WidgetInputs blu_interactionFromWidget(blu_Area* area);
 
 
 
@@ -403,6 +409,7 @@ void _blu_areaReset(blu_Area* a) {
     a->firstChild[globs.linkSide] = nullptr;
     a->lastChild = nullptr;
     a->nextSibling[globs.linkSide] = nullptr;
+    a->prevSibling = nullptr;
 
     // NOTE: this could be bad for perf, but who cares
     a->flags = 0;
@@ -412,8 +419,7 @@ void _blu_areaReset(blu_Area* a) {
 }
 
 void _blu_areaUpdate(blu_Area* a) {
-    // TODO: cache interaction data?
-    bool hover = blu_inputFromWidget(a).hovered;
+    bool hover = a->prevHovered;
 
     if(a->flags & blu_areaFlags_HOVER_ANIM) {
         a->target_hoverAnim += (hover - a->target_hoverAnim) * a->style.animationStrength; }
@@ -497,6 +503,7 @@ blu_Area* blu_areaMake(str string, U32 flags) {
     if(parent != nullptr) {
         if(parent->firstChild[globs.linkSide] == nullptr) { parent->firstChild[globs.linkSide] = area; }
         else { parent->lastChild->nextSibling[globs.linkSide] = area; }
+        area->prevSibling = parent->lastChild;
         parent->lastChild = area;
     }
     area->parent = parent;
@@ -889,52 +896,86 @@ void blu_popStyle() {
 
 
 
+
+// return indicates if parent has been blocked
+// never touch this code again
+bool _blu_genInteractionsRecurse(blu_Area* area, bool covered) {
+
+
+    blu_Area* elem = area->lastChild;
+    while(elem) {
+
+        if(_blu_genInteractionsRecurse(elem, covered)) {
+            covered = true; }
+
+        elem = elem->prevSibling;
+    }
+
+    bool containsMouse = false;
+    if(!covered) {
+        V2f pos = globs.inputMousePos;
+        if(area->calculatedPosition[blu_axis_X] <= pos.x &&
+            area->calculatedPosition[blu_axis_X] + area->calculatedSizes[blu_axis_X] > pos.x) {
+            if(area->calculatedPosition[blu_axis_Y] <= pos.y &&
+                area->calculatedPosition[blu_axis_Y] + area->calculatedSizes[blu_axis_Y] > pos.y) {
+
+                containsMouse = true;
+            }
+        }
+    }
+
+
+    bool clickable = area->flags & blu_areaFlags_CLICKABLE;
+    if(clickable) {
+        area->prevHovered = containsMouse;
+        area->prevPressed = globs.inputCurLButton && !globs.inputPrevLButton && containsMouse;
+
+        if(area->prevPressed) {
+            globs.dragged = area; }
+    }
+    else {
+        area->prevHovered = false;
+        area->prevPressed = false;
+    }
+
+    return (clickable && containsMouse) || covered;
+}
+
 void blu_input(V2f npos, bool lmbState) {
 
     if(!globs.inputCurLButton && globs.inputPrevLButton) {
-        globs.dragged = nullptr; }
-
+        globs.dragged = nullptr;
+    }
 
     globs.dragDelta = npos - globs.inputMousePos;
     globs.inputMousePos = npos;
 
     globs.inputPrevLButton = globs.inputCurLButton;
     globs.inputCurLButton = lmbState;
+
+
+    bool x;
+    _blu_genInteractionsRecurse(globs.ogParent, globs.dragged != nullptr);
 }
 
 
-blu_WidgetInputs blu_inputFromWidget(blu_Area* area) {
+blu_WidgetInputs blu_interactionFromWidget(blu_Area* area) {
+    ASSERT(area->flags & blu_areaFlags_CLICKABLE);
+
     blu_WidgetInputs out;
 
-    // contains check
-    {
-        out.hovered = false;
-        V2f pos = globs.inputMousePos;
-        if(area->calculatedPosition[blu_axis_X] <= pos.x &&
-           area->calculatedPosition[blu_axis_X] + area->calculatedSizes[blu_axis_X] > pos.x) {
-            if(area->calculatedPosition[blu_axis_Y] <= pos.y &&
-               area->calculatedPosition[blu_axis_Y] + area->calculatedSizes[blu_axis_Y] > pos.y) {
-
-                if(globs.dragged == area || globs.dragged == nullptr) { out.hovered = true; }
-            }
-        }
-    }
-
-    if(out.hovered) {
-
-        if(globs.inputCurLButton && !globs.inputPrevLButton) {
-            globs.dragged = area; }
+    if(globs.dragged && globs.dragged != area) {
+        return out; }
 
 
-        if(globs.dragged == area) {
-            if(!globs.inputCurLButton && globs.inputPrevLButton) {
-                out.clicked = true; }
-        }
-    }
+    out.hovered = area->prevHovered;
 
     if(globs.dragged == area) {
-        out.pressed = true;
+        out.held = true;
         out.dragDelta = globs.dragDelta;
+
+        if(!globs.inputCurLButton && globs.inputPrevLButton) {
+            out.clicked = true; }
     }
 
     return out;
