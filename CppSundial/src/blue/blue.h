@@ -9,7 +9,7 @@
 
 
 /*
-THE PLAN: build an immediate mode UI library that is as portable as as possible, for use in personal projects
+THE PLAN: build an immediate mode UI library that is as portable as as possible, for use in future projects
 
 THE CHECKLIST:
 
@@ -36,14 +36,13 @@ THE CHECKLIST:
     [ ] tooltips/dropdowns
     [ ] text input
 
-    [ ] hover cursor change
+    [ ] cursor changes
     [ ] padding
     [ ] rounding
     [ ] borders
     [ ] drop shadows
     [ ] batching
     [ ] cleanup
-        [ ] hide engine guts
 
 TESTING CHECKLIST:
 [ ] test hashmap collsions
