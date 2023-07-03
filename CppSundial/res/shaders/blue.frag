@@ -2,7 +2,7 @@
 
 out vec4 color;
 
-in vec4 gl_FragCoord;
+layout(origin_upper_left) in vec4 gl_FragCoord;
 
 in vec2 vUv;
 
@@ -23,6 +23,8 @@ void main()
     vec4 texColor = texture(uTexture, nUv);
     vec4 fontColor = vec4(1.0, 1.0, 1.0, texture(uFontTexture, vUv).r);
     color = uColor * texColor * fontColor;
+
+    // color = vec4(gl_FragCoord.x / 100, gl_FragCoord.y / 100, 0, 1);
 
     // color = vec4(vUv.x, vUv.y, 1.0, 1.0);
     if (color.a <= 0.01) { discard; }

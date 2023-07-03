@@ -31,11 +31,10 @@ THE CHECKLIST:
         [X] ordering
     [X] custom textures
     [X] animations
+    [ ] scrolling
     [ ] clipping
-    [ ] scrolling/overflow
     [ ] tooltips/dropdowns
     [ ] text input
-
 
     [ ] hover cursor change
     [ ] rounding
@@ -104,6 +103,7 @@ enum blu_StyleFlags {
     blu_styleFlags_textPadding      = (1 << 6),
     blu_styleFlags_animationStrength= (1 << 7),
 };
+
 struct blu_Style {
     U32 overrideFlags = 0; // NOTE: override flags don't do shit inside the areas, they are only used to construct the final styles
 
@@ -591,21 +591,19 @@ float _blu_sizeOfString(str s) {
 
 void _blu_solveRemainders(blu_Area* parent, int axis) {
 
+
+
     float wantedSize = parent->calculatedSizes[axis];
     float totalSize = 0;
     U32 remainderCount = 0;
 
     blu_Area* elem = parent->firstChild[globs.linkSide];
     for(; elem; elem = elem->nextSibling[globs.linkSide]) {
-        _blu_solveRemainders(elem, axis);
-
         if((elem->flags & blu_areaFlags_FLOATING)) { continue; }
-
 
         float elemSize = elem->calculatedSizes[axis];
         if(elem->style.sizes[axis].kind == blu_sizeKind_REMAINDER) {
             remainderCount++;
-            totalSize += elemSize;
         }
         else {
             if(parent->style.childLayoutAxis == axis) {
@@ -617,19 +615,22 @@ void _blu_solveRemainders(blu_Area* parent, int axis) {
         }
     }
 
-    float error = totalSize - wantedSize;
-    if(error <= 0) { return; }
-    // str_printf(STR("Error for element %s on axis %i was %i\n"), parent->displayString, axis, (int)error);
+    float error = wantedSize - totalSize;
+    if(error > 0) {
+        float remSize = error / remainderCount;
 
-    float sub = error / remainderCount;
-
-    elem = parent->firstChild[globs.linkSide];
-    while(elem) {
-        if(elem->style.sizes[axis].kind == blu_sizeKind_REMAINDER) {
-            elem->calculatedSizes[axis] -= sub; }
-        elem = elem->nextSibling[globs.linkSide];
+        elem = parent->firstChild[globs.linkSide];
+        while(elem) {
+            if(elem->style.sizes[axis].kind == blu_sizeKind_REMAINDER) {
+                elem->calculatedSizes[axis] = remSize; }
+            elem = elem->nextSibling[globs.linkSide];
+        }
     }
 
+    elem = parent->firstChild[globs.linkSide];
+    for(; elem; elem = elem->nextSibling[globs.linkSide]) {
+        _blu_solveRemainders(elem, axis);
+    }
 }
 
 
@@ -716,11 +717,6 @@ void blu_layout(V2f scSize) {
 
             if(elem->style.sizes[axis].kind == blu_sizeKind_PERCENT) {
                 elem->calculatedSizes[axis] = elem->parent->calculatedSizes[axis] * elem->style.sizes[axis].value; }
-
-            // NOTE: the remainder flag is the same as a percent 1 strictness 0 element,
-            // but a violation system seemed like a lot of work so i did this
-            else if (elem->style.sizes[axis].kind == blu_sizeKind_REMAINDER) {
-                elem->calculatedSizes[axis] = elem->parent->calculatedSizes[axis]; }
 
 
             blu_Area* child = elem->firstChild[globs.linkSide];

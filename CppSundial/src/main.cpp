@@ -52,7 +52,7 @@ int main() {
         glfwWindowHint(GLFW_RESIZABLE, true);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-        glfwWindowHint(GLFW_SAMPLES, 1);
+        glfwWindowHint(GLFW_SAMPLES, 4);
 
         window = glfwCreateWindow(512, 512, "Sundial", NULL, NULL);
         ASSERT(window);
@@ -147,6 +147,7 @@ int main() {
 
 
     V2f windowPos = V2f(300, 100);
+    float lsize = 300;
 
 
     F64 prevTime = glfwGetTime();
@@ -184,6 +185,70 @@ int main() {
 
 
 
+
+
+                a = blu_areaMake(STR("left"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
+                blu_areaAddDisplayStr(a, STR("left"));
+                a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, lsize };
+                a->style.childLayoutAxis = blu_axis_X;
+                blu_parentScope(a) {
+
+
+                    a = blu_areaMake(STR("clip"), 0);
+                    blu_areaAddDisplayStr(a, STR("blip"));
+                    a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
+                    a->style.childLayoutAxis = blu_axis_Y;
+                    blu_parentScope(a) {
+
+                        blu_styleScope {
+                        blu_style_add_sizeX({ blu_sizeKind_TEXT, 0 });
+                        blu_style_add_sizeY({ blu_sizeKind_TEXT, 0 });
+                        blu_style_add_backgroundColor(col_darkGray);
+
+                            a = blu_areaMake(STR("FPS"), blu_areaFlags_DRAW_TEXT);
+                            char* buf = BUMP_PUSH_ARR(frameArena, 32, char);
+                            gcvt(1/dt, 6, buf);
+                            blu_areaAddDisplayStr(a, str_join(STR("FPS: "), STR(buf), frameArena));
+
+
+                            a = blu_areaMake(STR("connectionPar"), blu_areaFlags_DRAW_BACKGROUND);
+                            blu_areaAddDisplayStr(a, STR("conPar"));
+                            a->style.childLayoutAxis = blu_axis_X;
+                            a->style.sizes[blu_axis_X] = { blu_sizeKind_PERCENT, 1 };
+                            blu_parentScope(a) {
+                                a = blu_areaMake(STR("networkConnLabel"), blu_areaFlags_DRAW_TEXT);
+                                blu_areaAddDisplayStr(a, STR("Network status: "));
+
+                                a = blu_areaMake(STR("connSpacer"), 0);
+                                blu_areaAddDisplayStr(a, STR("conspace"));
+                                a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
+
+
+                                a = blu_areaMake(STR("connection"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
+                                a->style.backgroundColor = col_red;
+                                a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 100 };
+                                str ok = STR("NO");
+                                if(net_getConnected()) {
+                                    ok = STR("YES");
+                                    a->style.backgroundColor = col_green;
+                                }
+                                blu_areaAddDisplayStr(a, ok);
+                            } // end connection parent
+                        } // end text styling
+
+                    } // end of clip
+
+                    a = blu_areaMake(STR("scrollbar"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
+                    a->style.backgroundColor = col_darkGray;
+                    a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 10 };
+                    lsize += blu_interactionFromWidget(a).dragDelta.x;
+
+
+                } // end left
+
+
+
+                //*
                 a = blu_areaMake(STR("window"),
                         blu_areaFlags_DRAW_BACKGROUND |
                         blu_areaFlags_DRAW_TEXT |
@@ -202,19 +267,11 @@ int main() {
                     blu_style_add_sizeY({ blu_sizeKind_TEXT, 0 });
                     blu_style_add_backgroundColor(col_darkGray);
 
-                        a = blu_areaMake(STR("titlebar"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
+                        a = blu_areaMake(STR("titlebar"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE | blu_areaFlags_DRAW_TEXT);
                         blu_areaAddDisplayStr(a, STR("titlebar"));
-                        a->style.backgroundColor += V4f(1, 1, 1, 1) * blu_interactionFromWidget(a).hovered;
                         a->style.sizes[blu_axis_X] = { blu_sizeKind_PERCENT, 1 };
                         windowPos += blu_interactionFromWidget(a).dragDelta;
                         blu_parentScope(a) {
-
-                            a = blu_areaMake(STR("hi there"), blu_areaFlags_DRAW_TEXT);
-                            blu_areaAddDisplayStr(a, STR("q"));
-                            a = blu_areaMake(STR("hi3there"), blu_areaFlags_DRAW_TEXT);
-                            blu_areaAddDisplayStr(a, STR("w"));
-                            a = blu_areaMake(STR("hi4there"), blu_areaFlags_DRAW_TEXT);
-                            blu_areaAddDisplayStr(a, STR("e"));
 
                             a = blu_areaMake(STR("space"), 0);
                             a->style.sizes[blu_axis_X].kind = blu_sizeKind_REMAINDER;
@@ -248,56 +305,14 @@ int main() {
                     }
                 } // end window
                 win->offset = windowPos;
+                //*/
 
-
-
-
-
-
-
-                a = blu_areaMake(STR("left"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
-                a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 300 };
-                a->style.childLayoutAxis = blu_axis_Y;
-                blu_parentScope(a) {
-                    blu_styleScope {
-                    blu_style_add_sizeX({ blu_sizeKind_TEXT, 0 });
-                    blu_style_add_sizeY({ blu_sizeKind_TEXT, 0 });
-                    blu_style_add_backgroundColor(col_darkGray);
-
-                        a = blu_areaMake(STR("FPS"), blu_areaFlags_DRAW_TEXT);
-                        char* buf = BUMP_PUSH_ARR(frameArena, 32, char);
-                        gcvt(1/dt, 6, buf);
-                        blu_areaAddDisplayStr(a, str_join(STR("FPS: "), STR(buf), frameArena));
-
-
-                        a = blu_areaMake(STR("connectionPar"), blu_areaFlags_DRAW_BACKGROUND);
-                        a->style.childLayoutAxis = blu_axis_X;
-                        a->style.sizes[blu_axis_X] = { blu_sizeKind_PERCENT, 1 };
-                        blu_parentScope(a) {
-                            a = blu_areaMake(STR("networkConnLabel"), blu_areaFlags_DRAW_TEXT);
-                            blu_areaAddDisplayStr(a, STR("Network status: "));
-
-                            a = blu_areaMake(STR("connSpacer"), 0);
-                            a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
-
-
-                            a = blu_areaMake(STR("connection"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
-                            a->style.backgroundColor = col_red;
-                            a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 75 };
-                            str ok = STR("NO");
-                            if(net_getConnected()) {
-                                ok = STR("YES");
-                                a->style.backgroundColor = col_green;
-                            }
-                            blu_areaAddDisplayStr(a, ok);
-                        } // end connection parent
-                    }
-                }
 
 
 
 
             } // end main style
+
 
             blu_input(V2f((F32)mx, (F32)my), leftPressed);
         } // end UI
