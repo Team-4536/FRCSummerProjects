@@ -975,7 +975,8 @@ blu_WidgetInputs blu_interactionFromWidget(blu_Area* area) {
 
 
     out.hovered = area->prevHovered;
-    out.scrollDelta = globs.mouseDelta;
+    if(out.hovered) {
+        out.scrollDelta = globs.mouseDelta; }
 
     if(globs.dragged == area) {
         out.held = true;

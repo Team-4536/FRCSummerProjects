@@ -192,8 +192,6 @@ int main() {
 
 
 
-
-
                 a = blu_areaMake(STR("left"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
                 clipSize = a->calculatedSizes[blu_axis_Y];
                 blu_areaAddDisplayStr(a, STR("left"));
@@ -201,12 +199,11 @@ int main() {
                 a->style.childLayoutAxis = blu_axis_X;
                 blu_parentScope(a) {
 
-
                     a = blu_areaMake(STR("clip"), blu_areaFlags_VIEW_OFFSET | blu_areaFlags_CLICKABLE);
+                    blu_Area* clip = a;
                     blu_areaAddDisplayStr(a, STR("blip"));
                     a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
                     a->style.childLayoutAxis = blu_axis_Y;
-                    a->viewOffset = { 0, clipPos };
                     clipPos += blu_interactionFromWidget(a).scrollDelta * 40;
                     blu_parentScope(a) {
 
@@ -264,12 +261,13 @@ int main() {
                             a->style.sizes[blu_axis_Y] = { blu_sizeKind_PERCENT, clipSize / clipMax };
                             clipPos += blu_interactionFromWidget(a).dragDelta.y / clipSize * clipMax;
 
-                            clipPos = max(clipPos, 0);
-                            clipPos = min(clipPos, clipMax - (clipSize));
                         }
                     } else { clipPos = 0; }
 
 
+                    clipPos = max(clipPos, 0);
+                    clipPos = min(clipPos, clipMax - (clipSize));
+                    clip->viewOffset = { 0, clipPos };
                 } // end left
 
 
