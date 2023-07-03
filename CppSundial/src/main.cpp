@@ -31,6 +31,11 @@ gfx_Texture* loadTextureFromFile(const char* path) {
 }
 
 
+float windowScrollDelta = 0;
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    windowScrollDelta -= (F32)yoffset;
+}
+
 
 int main() {
 
@@ -62,6 +67,7 @@ int main() {
 
 
         hoverCursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
+        glfwSetScrollCallback(window, scroll_callback);
         // glfwSetKeyCallback(window, updateInput);
         // glfwSetCursorPosCallback(window, updateMousePos);
         // glfwSetMouseButtonCallback(window, updateMouseButton);
@@ -147,8 +153,9 @@ int main() {
 
 
     V2f windowPos = V2f(300, 100);
-    float lsize = 300;
-
+    float clipPos = 0;
+    float clipMax = 1400;
+    float clipSize = 0;
 
     F64 prevTime = glfwGetTime();
     while(!glfwWindowShouldClose(window)) {
@@ -188,16 +195,19 @@ int main() {
 
 
                 a = blu_areaMake(STR("left"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
+                clipSize = a->calculatedSizes[blu_axis_Y];
                 blu_areaAddDisplayStr(a, STR("left"));
-                a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, lsize };
+                a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 300 };
                 a->style.childLayoutAxis = blu_axis_X;
                 blu_parentScope(a) {
 
 
-                    a = blu_areaMake(STR("clip"), 0);
+                    a = blu_areaMake(STR("clip"), blu_areaFlags_VIEW_OFFSET | blu_areaFlags_CLICKABLE);
                     blu_areaAddDisplayStr(a, STR("blip"));
                     a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
                     a->style.childLayoutAxis = blu_axis_Y;
+                    a->viewOffset = { 0, clipPos };
+                    clipPos += blu_interactionFromWidget(a).scrollDelta * 40;
                     blu_parentScope(a) {
 
                         blu_styleScope {
@@ -224,24 +234,40 @@ int main() {
                                 a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
 
 
-                                a = blu_areaMake(STR("connection"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
+                                a = blu_areaMake(STR("connection"), blu_areaFlags_DRAW_BACKGROUND);
                                 a->style.backgroundColor = col_red;
                                 a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 100 };
-                                str ok = STR("NO");
                                 if(net_getConnected()) {
-                                    ok = STR("YES");
-                                    a->style.backgroundColor = col_green;
-                                }
-                                blu_areaAddDisplayStr(a, ok);
+                                    a->style.backgroundColor = col_green; }
                             } // end connection parent
                         } // end text styling
 
                     } // end of clip
 
-                    a = blu_areaMake(STR("scrollbar"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
-                    a->style.backgroundColor = col_darkGray;
-                    a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 10 };
-                    lsize += blu_interactionFromWidget(a).dragDelta.x;
+
+
+                    if(clipMax > clipSize) {
+                        a = blu_areaMake(STR("scrollpar"), blu_areaFlags_DRAW_BACKGROUND);
+                        a->style.backgroundColor = col_darkGray;
+                        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 10 };
+                        a->style.childLayoutAxis = blu_axis_Y;
+
+                        blu_parentScope(a) {
+
+                            a = blu_areaMake(STR("scspace"), 0);
+                            a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, (clipPos / clipMax) * clipSize };
+
+                            a = blu_areaMake(STR("scroll"),
+                                blu_areaFlags_DRAW_BACKGROUND |
+                                blu_areaFlags_CLICKABLE);
+                            a->style.backgroundColor = col_lightGray;
+                            a->style.sizes[blu_axis_Y] = { blu_sizeKind_PERCENT, clipSize / clipMax };
+                            clipPos += blu_interactionFromWidget(a).dragDelta.y / clipSize * clipMax;
+
+                            clipPos = max(clipPos, 0);
+                            clipPos = min(clipPos, clipMax - (clipSize));
+                        }
+                    } else { clipPos = 0; }
 
 
                 } // end left
@@ -314,7 +340,8 @@ int main() {
             } // end main style
 
 
-            blu_input(V2f((F32)mx, (F32)my), leftPressed);
+            blu_input(V2f((F32)mx, (F32)my), leftPressed, windowScrollDelta);
+            windowScrollDelta = 0;
         } // end UI
 
 

@@ -31,12 +31,13 @@ THE CHECKLIST:
         [X] ordering
     [X] custom textures
     [X] animations
-    [ ] scrolling
+    [X] scrolling
     [ ] clipping
     [ ] tooltips/dropdowns
     [ ] text input
 
     [ ] hover cursor change
+    [ ] padding
     [ ] rounding
     [ ] borders
     [ ] drop shadows
@@ -74,6 +75,7 @@ enum blu_AreaFlags {
     blu_areaFlags_HOVER_ANIM =      (1 << 4),
     blu_areaFlags_CENTER_TEXT =     (1 << 5),
     blu_areaFlags_CLICKABLE =       (1 << 6),
+    blu_areaFlags_VIEW_OFFSET =     (1 << 7),
 };
 
 struct blu_Size {
@@ -154,6 +156,7 @@ struct blu_Area {
     gfx_Texture* texture = nullptr;
 
     V2f offset = { 0, 0 };
+    V2f viewOffset = { 0, 0 };
 
     // layout pass data
     F32 calculatedSizes[blu_axis_COUNT];
@@ -179,6 +182,8 @@ struct blu_WidgetInputs {
 
     bool dragged = false;
     V2f dragDelta = V2f();
+
+    float scrollDelta = 0;
 };
 
 
@@ -195,7 +200,7 @@ void blu_pushParent(blu_Area* parent);
 void blu_popParent();
 
 void blu_beginFrame(); // cull
-void blu_input(V2f npos, bool lmbState); // set current and update prev input // CLEANUP: merge with begin?
+void blu_input(V2f npos, bool lmbState, float mouseDelta); // set current and update prev input // CLEANUP: merge with begin?
 void blu_layout(V2f scSize); // calculate layout shit
 void blu_createPass(gfx_Pass* normalPass);
 
@@ -292,6 +297,7 @@ struct blu_Globs {
     bool inputPrevLButton = false;
     blu_Area* dragged = nullptr;
     V2f dragDelta = V2f();
+    float mouseDelta = 0;
 };
 
 static blu_Globs globs = blu_Globs();
@@ -639,6 +645,9 @@ void _blu_calculateOffsetsAndRect(blu_Area* parent) {
     bool x = parent->style.childLayoutAxis == blu_axis_X;
     V2f off = { 0, 0 };
 
+    if(parent->flags & blu_areaFlags_VIEW_OFFSET) {
+        off = -parent->viewOffset; }
+
     blu_Area* elem = parent->firstChild[globs.linkSide];
     while(elem) {
 
@@ -805,7 +814,7 @@ void _blu_genRenderCallsRecurse(blu_Area* area, gfx_Pass* pass) {
                 off.x = (size - strSize) / 2;
                 off.x -= area->style.textPadding.x;
             }
-
+            // CLEANUP: this
             _blu_renderString(area->displayString, off + pos + area->style.textPadding, area->style.textColor, pass);
         }
 
@@ -937,7 +946,7 @@ bool _blu_genInteractionsRecurse(blu_Area* area, bool covered) {
     return (clickable && containsMouse) || covered;
 }
 
-void blu_input(V2f npos, bool lmbState) {
+void blu_input(V2f npos, bool lmbState, float mouseDelta) {
 
     if(!globs.inputCurLButton && globs.inputPrevLButton) {
         globs.dragged = nullptr;
@@ -949,6 +958,7 @@ void blu_input(V2f npos, bool lmbState) {
     globs.inputPrevLButton = globs.inputCurLButton;
     globs.inputCurLButton = lmbState;
 
+    globs.mouseDelta = mouseDelta;
 
     bool x;
     _blu_genInteractionsRecurse(globs.ogParent, globs.dragged != nullptr);
@@ -965,10 +975,11 @@ blu_WidgetInputs blu_interactionFromWidget(blu_Area* area) {
 
 
     out.hovered = area->prevHovered;
+    out.scrollDelta = globs.mouseDelta;
 
     if(globs.dragged == area) {
         out.held = true;
-        out.dragDelta = globs.dragDelta;
+        out.dragDelta = globs.dragDelta; // TODO: this isn't actually a drag delta, its a pos change
 
         if(!globs.inputCurLButton && globs.inputPrevLButton) {
             out.clicked = true; }
