@@ -78,52 +78,50 @@ struct net_Sock {
     addrinfo* addrInfo = nullptr; // NOTE: expected to be managed
 };
 
-// Returns pointer to new Sock struct in <arena> if successful.
-// Errors: failedAddrInfo, failedCreation
-net_Sock* _net_sockCreate(str ip, str port, BumpAlloc& arena, net_SockErr* outError) {
-    int err;
-    *outError = net_sockErr_none;
-
-    addrinfo hints;
-    ZeroMemory( &hints, sizeof(hints) );
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-
-    addrinfo* resInfo;
-    // CLEANUP: perma allocations here
-    err = getaddrinfo(str_cstyle(ip, arena), str_cstyle(port, arena), &hints, &resInfo);
-    if(err != 0) {
-        *outError = net_sockErr_failedAddrInfo;
-        return nullptr;
-    }
 
 
-    SOCKET s = socket(resInfo->ai_family, resInfo->ai_socktype, resInfo->ai_protocol);
-    if(s == INVALID_SOCKET) {
-        freeaddrinfo(resInfo); // windows is a terrible platform
-        *outError = net_sockErr_failedCreation;
-        return nullptr;
-    }
-
-    // https://stackoverflow.com/questions/17227092/how-to-make-send-non-blocking-in-winsock
-    u_long mode = 1;  // 1 to enable non-blocking socket
-    ioctlsocket(s, FIONBIO, &mode);
-
-    net_Sock* sock = BUMP_PUSH_NEW(arena, net_Sock);
-    *sock = net_Sock();
-    sock->addrInfo = resInfo;
-    sock->s = s;
-
-    return sock;
-}
-
-
+// windows is a terrible platform
 // return value indicates if socket has finished connecting to server
-// Errors: net_sockErr_failedConnection
-bool _net_sockAttemptConnect(net_Sock* s, net_SockErr* outError) {
+// Errors: net_sockErr_failedConnection, failedAddrInfo, failedCreation
+bool _net_sockCreateConnect(const char* ip, const char* port, net_Sock* sock, net_SockErr* outError) {
     *outError = net_sockErr_none;
-    int err = connect(s->s, s->addrInfo->ai_addr, (int)s->addrInfo->ai_addrlen);
+    int err;
+
+    // create new
+    if(sock->s == INVALID_SOCKET) {
+        addrinfo hints;
+        ZeroMemory( &hints, sizeof(hints) );
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_protocol = IPPROTO_TCP;
+
+        addrinfo* resInfo;
+        // CLEANUP: perma allocations here
+        err = getaddrinfo(ip, port, &hints, &resInfo);
+        if(err != 0) {
+            *outError = net_sockErr_failedAddrInfo;
+            return false;
+        }
+
+
+        SOCKET s = socket(resInfo->ai_family, resInfo->ai_socktype, resInfo->ai_protocol);
+        if(s == INVALID_SOCKET) {
+            freeaddrinfo(resInfo); // windows is a terrible platform
+            *outError = net_sockErr_failedCreation;
+            return false;
+        }
+
+        // https://stackoverflow.com/questions/17227092/how-to-make-send-non-blocking-in-winsock
+        u_long mode = 1;  // 1 to enable non-blocking socket
+        ioctlsocket(s, FIONBIO, &mode);
+
+        sock->addrInfo = resInfo;
+        sock->s = s;
+    }
+
+
+
+    err = connect(sock->s, sock->addrInfo->ai_addr, (int)sock->addrInfo->ai_addrlen);
 
     if (err == SOCKET_ERROR) {
         err = WSAGetLastError();
@@ -138,11 +136,13 @@ bool _net_sockAttemptConnect(net_Sock* s, net_SockErr* outError) {
     return false;
 }
 
-void _net_sockFree(net_Sock* s) {
+// windows is a terrible platform
+void _net_sockCloseFree(net_Sock* s) {
     if(s->addrInfo) { freeaddrinfo(s->addrInfo); }
+    s->addrInfo = nullptr;
     if(s->s != INVALID_SOCKET) { closesocket(s->s); }
+    s->s = INVALID_SOCKET;
 }
-
 
 
 
@@ -154,18 +154,15 @@ struct net_Globs {
 
     WSADATA wsaData;
 
-    net_Sock* simSocket;
+    net_Sock simSocket = net_Sock();
     bool connected = false;
 
-    BumpAlloc resArena; // sockets, props, misc stuff
+    BumpAlloc resArena; // props, misc stuff
     net_Prop** hash = nullptr; // array of ptrs for hash access
 };
 
 static net_Globs globs = net_Globs();
 bool net_getConnected() { return globs.connected; }
-
-
-
 
 
 
@@ -202,8 +199,6 @@ net_Prop* _net_hashGet(str string) {
 }
 
 
-
-
 void _net_processMessage(U8* buffer, U32 size) {
 
     ASSERT(size >= 2);
@@ -237,15 +232,6 @@ void _net_processMessage(U8* buffer, U32 size) {
 }
 
 
-
-
-
-
-
-
-
-
-
 // Asserts on failures
 void net_init() {
 
@@ -259,20 +245,7 @@ void net_init() {
         printf("WSAStartup failed: %d\n", err);
         ASSERT(false);
     }
-
-
-    net_SockErr sockErr;
-    globs.simSocket = _net_sockCreate(STR("127.0.0.1"), STR("7000"), globs.resArena, &sockErr);
-    if(sockErr) {
-        printf("Error creating socket! Code: %i\n", sockErr);
-        ASSERT(false);
-    }
 }
-
-
-
-
-
 
 
 void net_update() {
@@ -280,9 +253,10 @@ void net_update() {
     net_SockErr err;
 
     if(!globs.connected) {
-        bool connected = _net_sockAttemptConnect(globs.simSocket, &err);
+        bool connected = _net_sockCreateConnect("127.0.0.1", "7000", &globs.simSocket, &err);
 
-        if(err != net_sockErr_none) { /* failed */ }
+        if(err != net_sockErr_none) {
+            _net_sockCloseFree(&globs.simSocket); }
         else if(connected) { globs.connected = true; }
         return;
     }
@@ -292,13 +266,13 @@ void net_update() {
 
 
     U8 recvBuffer[NET_RECV_SIZE] = { 0 };
-    int recvSize = recv(globs.simSocket->s, (char*)recvBuffer, NET_RECV_SIZE, 0);
+    int recvSize = recv(globs.simSocket.s, (char*)recvBuffer, NET_RECV_SIZE, 0);
 
     if (recvSize == SOCKET_ERROR) {
         if(WSAGetLastError() != WSAEWOULDBLOCK) {
             printf("Error recieving message! WSA code: %i\n", WSAGetLastError());
             globs.connected = false;
-            closesocket(globs.simSocket->s);
+            _net_sockCloseFree(&globs.simSocket);
         }
     }
     // buffer received
@@ -307,13 +281,12 @@ void net_update() {
     // size is 0, indicating shutdown
     else {
         globs.connected = false;
-        closesocket(globs.simSocket->s);
-        // TODO: proper reconnection procedure
+        _net_sockCloseFree(&globs.simSocket);
     }
 }
 
 void net_cleanup() {
-    _net_sockFree(globs.simSocket);
+    _net_sockCloseFree(&globs.simSocket);
     WSACleanup();
 }
 
