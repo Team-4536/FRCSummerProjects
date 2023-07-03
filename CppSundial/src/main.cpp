@@ -208,8 +208,9 @@ int main() {
                     blu_parentScope(a) {
 
                         blu_styleScope {
-                        blu_style_add_sizeX({ blu_sizeKind_TEXT, 0 });
+                        blu_style_add_sizeX({ blu_sizeKind_PERCENT, 1 });
                         blu_style_add_sizeY({ blu_sizeKind_TEXT, 0 });
+                        blu_style_add_childLayoutAxis(blu_axis_X);
                         blu_style_add_backgroundColor(col_darkGray);
 
                             a = blu_areaMake(STR("FPS"), blu_areaFlags_DRAW_TEXT);
@@ -220,16 +221,14 @@ int main() {
 
                             a = blu_areaMake(STR("connectionPar"), blu_areaFlags_DRAW_BACKGROUND);
                             blu_areaAddDisplayStr(a, STR("conPar"));
-                            a->style.childLayoutAxis = blu_axis_X;
-                            a->style.sizes[blu_axis_X] = { blu_sizeKind_PERCENT, 1 };
                             blu_parentScope(a) {
                                 a = blu_areaMake(STR("networkConnLabel"), blu_areaFlags_DRAW_TEXT);
                                 blu_areaAddDisplayStr(a, STR("Network status: "));
+                                a->style.sizes[blu_axis_X] = { blu_sizeKind_TEXT, 0 };
 
                                 a = blu_areaMake(STR("connSpacer"), 0);
                                 blu_areaAddDisplayStr(a, STR("conspace"));
                                 a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
-
 
                                 a = blu_areaMake(STR("connection"), blu_areaFlags_DRAW_BACKGROUND);
                                 a->style.backgroundColor = col_red;
@@ -237,12 +236,37 @@ int main() {
                                 if(net_getConnected()) {
                                     a->style.backgroundColor = col_green; }
                             } // end connection parent
+
+
+                            net_Prop** tracked;
+                            U32 tCount = 0;
+                            net_getTracked(&tracked, &tCount);
+                            for(int i = 0; i < tCount; i++) {
+                                net_Prop* prop = tracked[i];
+
+                                a = blu_areaMake(prop->name, 0);
+
+                                blu_parentScope(a) {
+                                    blu_styleScope {
+                                    blu_style_add_sizeX({ blu_sizeKind_PERCENT, 0.5 });
+                                        a = blu_areaMake(str_join(prop->name, STR("label"), frameArena), blu_areaFlags_DRAW_TEXT);
+                                        blu_areaAddDisplayStr(a, prop->name);
+
+                                        a = blu_areaMake(str_join(prop->name, STR("value"), frameArena), blu_areaFlags_DRAW_TEXT);
+                                        a->style.backgroundColor = col_darkGray;
+                                        if(prop->type == net_propType_S32) {
+                                            blu_areaAddDisplayStr(a, str_format(frameArena, STR("%i"), (prop->data->s32))); }
+                                    }
+                                }
+                            }
+
                         } // end text styling
 
                     } // end of clip
 
 
 
+                    blu_Area* spacer = nullptr;
                     if(clipMax > clipSize) {
                         a = blu_areaMake(STR("scrollpar"), blu_areaFlags_DRAW_BACKGROUND);
                         a->style.backgroundColor = col_darkGray;
@@ -252,7 +276,7 @@ int main() {
                         blu_parentScope(a) {
 
                             a = blu_areaMake(STR("scspace"), 0);
-                            a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, (clipPos / clipMax) * clipSize };
+                            spacer = a;
 
                             a = blu_areaMake(STR("scroll"),
                                 blu_areaFlags_DRAW_BACKGROUND |
@@ -268,6 +292,10 @@ int main() {
                     clipPos = max(clipPos, 0);
                     clipPos = min(clipPos, clipMax - (clipSize));
                     clip->viewOffset = { 0, clipPos };
+
+                    if(spacer) {
+                        spacer->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, (clipPos / clipMax) * clipSize };
+                    }
                 } // end left
 
 

@@ -29,9 +29,15 @@ enum net_MsgKind {
     net_msgKind_EVENT
 };
 
+union net_PropData {
+    S32 s32;
+    F64 f64;
+};
+
 struct net_Prop {
+    str name;
     net_PropType type;
-    void* data;
+    net_PropData* data;
 
     U64 hashKey;
     net_Prop* hashNext;
@@ -45,9 +51,13 @@ void net_init();
 void net_update();
 void net_cleanup();
 
-bool net_getConnected();
+void net_resetTracked();
 
-net_Prop* net_getProp(str name);
+// is net connected to anything?
+bool net_getConnected();
+void net_getTracked(net_Prop*** outArr, U32* outCount);
+
+net_Prop* net_hashGet(str string);
 
 
 #ifdef NET_IMPL
@@ -77,8 +87,6 @@ struct net_Sock {
     SOCKET s = INVALID_SOCKET;
     addrinfo* addrInfo = nullptr; // NOTE: expected to be managed
 };
-
-
 
 // windows is a terrible platform
 // return value indicates if socket has finished connecting to server
@@ -120,7 +128,6 @@ bool _net_sockCreateConnect(const char* ip, const char* port, net_Sock* sock, ne
     }
 
 
-
     err = connect(sock->s, sock->addrInfo->ai_addr, (int)sock->addrInfo->ai_addrlen);
 
     if (err == SOCKET_ERROR) {
@@ -148,8 +155,6 @@ void _net_sockCloseFree(net_Sock* s) {
 
 
 
-
-
 struct net_Globs {
 
     WSADATA wsaData;
@@ -157,13 +162,49 @@ struct net_Globs {
     net_Sock simSocket = net_Sock();
     bool connected = false;
 
-    BumpAlloc resArena; // props, misc stuff
+    BumpAlloc resArena; // props, names, data, tracking, hash
     net_Prop** hash = nullptr; // array of ptrs for hash access
+    net_Prop** tracked = nullptr; // array of ptrs for list based access
+    U32 trackedCount = 0;
 };
 
 static net_Globs globs = net_Globs();
+
+// Asserts on failures
+void net_init() {
+
+    bump_allocate(globs.resArena,
+        NET_RES_SIZE + // names / data
+        (sizeof(net_Prop) * NET_MAX_PROP_COUNT) + // props
+        (sizeof(net_Prop*) * NET_MAX_PROP_COUNT) + // tracked
+        (sizeof(net_Prop*) * NET_HASH_COUNT) // hash
+        );
+
+    net_resetTracked();
+
+    // Initialize Winsock
+    int err = WSAStartup(MAKEWORD(2,2), &globs.wsaData);
+    if (err != 0) {
+        printf("WSAStartup failed: %d\n", err);
+        ASSERT(false);
+    }
+}
+
+// clears and reallocs resArena
+// resets tracked vec also
+void net_resetTracked() {
+    bump_clear(globs.resArena);
+    globs.hash = BUMP_PUSH_ARR(globs.resArena, NET_HASH_COUNT, net_Prop*);
+    globs.tracked = BUMP_PUSH_ARR(globs.resArena, NET_MAX_PROP_COUNT, net_Prop*);
+    globs.trackedCount = 0;
+}
+
 bool net_getConnected() { return globs.connected; }
 
+//                  pointer to array of pointers
+void net_getTracked(net_Prop*** outArr, U32* outCount) {
+    *outArr = globs.tracked;
+    *outCount = globs.trackedCount; }
 
 
 void _net_hashInsert(str string, net_Prop* p) {
@@ -187,7 +228,7 @@ void _net_hashInsert(str string, net_Prop* p) {
 }
 
 // returns nullptr if no element, else pointer to elem
-net_Prop* _net_hashGet(str string) {
+net_Prop* net_hashGet(str string) {
 
     U64 key = hash_hashStr(string);
     net_Prop* elem = globs.hash[key % NET_HASH_COUNT];
@@ -197,6 +238,11 @@ net_Prop* _net_hashGet(str string) {
         elem = elem->hashNext;
     }
 }
+
+
+
+
+
 
 
 void _net_processMessage(U8* buffer, U32 size) {
@@ -212,41 +258,31 @@ void _net_processMessage(U8* buffer, U32 size) {
     ASSERT(size >= 2 + nameLen);
     U8 valType = buffer[2 + nameLen];
     ASSERT(valType == net_propType_S32 || valType == net_propType_F64); // TODO: str
-    str_printf(STR("Type: %i\n"), valType);
+    void* val = &(buffer[2+nameLen+1]);
 
     if(msgKind == net_msgKind_UPDATE) {
-        net_Prop* prop = _net_hashGet(name);
+        net_Prop* prop = net_hashGet(name);
         if(!prop) {
             prop = BUMP_PUSH_NEW(globs.resArena, net_Prop);
             _net_hashInsert(name, prop);
+            ARR_APPEND(globs.tracked, globs.trackedCount, prop);
+            prop->name = str_copy(name, globs.resArena);
+            prop->data = BUMP_PUSH_NEW(globs.resArena, net_PropData);
         }
 
         prop->type = (net_PropType)valType;
         if(prop->type == net_propType_F64) {
-            printf("%f\n", *((double*)&buffer[2+nameLen+1]));
+            prop->data->f64 = *((F64*)val);
+        }
+        else if (prop->type == net_propType_S32) {
+            prop->data->s32 = *((S32*)val);
+            // TODO: endianness
         }
     }
     // TODO: events
     else { ASSERT(false); }
 
 }
-
-
-// Asserts on failures
-void net_init() {
-
-    bump_allocate(globs.resArena, NET_RES_SIZE + (sizeof(net_Prop) * NET_MAX_PROP_COUNT));
-    globs.hash = (net_Prop**)arr_allocate0(sizeof(net_Prop*), NET_HASH_COUNT);
-
-
-    // Initialize Winsock
-    int err = WSAStartup(MAKEWORD(2,2), &globs.wsaData);
-    if (err != 0) {
-        printf("WSAStartup failed: %d\n", err);
-        ASSERT(false);
-    }
-}
-
 
 void net_update() {
 
@@ -255,13 +291,14 @@ void net_update() {
     if(!globs.connected) {
         bool connected = _net_sockCreateConnect("127.0.0.1", "7000", &globs.simSocket, &err);
 
-        if(err != net_sockErr_none) {
+        if(err != net_sockErr_none) { // attempt reconnection forever on errors
             _net_sockCloseFree(&globs.simSocket); }
-        else if(connected) { globs.connected = true; }
+        else if(connected) {
+            globs.connected = true;
+            net_resetTracked();
+        }
         return;
     }
-
-
 
 
 

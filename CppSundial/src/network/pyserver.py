@@ -39,7 +39,7 @@ class message():
 
         if(type(value) == int):
             valType = messageUpdateType.S32
-            encoded += value.to_bytes(4)
+            encoded += value.to_bytes(4, 'little', signed=True)
 
         elif(type(value) == float):
             valType = messageUpdateType.F64
@@ -104,8 +104,9 @@ class server():
     def sendShit(self):
         while True:
             s = input("Give me a message: ")
+            v = input("And a number: ")
             msg = message(messageKind.UPDATE, s)
-            msg.addValue(420.69)
+            msg.addValue(int(v))
             self.msgQueue.push(msg)
 
 

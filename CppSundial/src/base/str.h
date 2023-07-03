@@ -26,6 +26,8 @@ void str_print(str s);
 void str_println(str s);
 void str_printf(str fmt, ...);
 
+str str_format(BumpAlloc& arena, str fmt, ...);
+
 // TODO: float conversion magic
 
 
@@ -39,6 +41,68 @@ void str_printf(str fmt, ...);
 #include <stdarg.h>
 #include <cmath>
 #include "arr.h"
+
+
+// CLEANUP: reuse this code,
+// CLEANUP: bumpalloc default clear could slow it down a ton
+str str_format(BumpAlloc& arena, str fmt, ...) {
+    va_list argp;
+    va_start(argp, fmt);
+
+    str out = { (const U8*)arena.offset, 0 };
+
+    for(const U8* ptr = fmt.chars; ptr < (fmt.chars + fmt.length); ptr++) {
+
+        if(*ptr == '%'){
+            ptr++;
+
+            if(*ptr == 's') {
+                str st = va_arg(argp, str);
+                for(const U8* i = st.chars; i < st.chars + st.length; i++) {
+                    *BUMP_PUSH_NEW(arena, char) = *i;
+                    out.length++;
+                }
+            }
+            else if(*ptr == 'i') {
+                int i = va_arg(argp, int);
+                if(i == 0) {
+                    *BUMP_PUSH_NEW(arena, char) = '0';
+                    out.length++;
+                }
+                else if(i < 0) {
+                    *BUMP_PUSH_NEW(arena, char) = '-';
+                    out.length++;
+                    i = -i;
+                }
+
+                U8 mem[32] = { };
+                int digit = 0;
+
+                while(i > 0) {
+                    ARR_APPEND(mem, digit, '0' + (i%10));
+                    i /= 10;
+                }
+                while(U8 x = ARR_POP(mem, digit)) {
+                    *BUMP_PUSH_NEW(arena, char) = x;
+                    out.length++;
+                }
+            }
+            else {
+                *BUMP_PUSH_NEW(arena, char) = *ptr;
+                out.length++;
+            }
+        }
+        else {
+            *BUMP_PUSH_NEW(arena, char) = *ptr;
+            out.length++;
+        }
+
+
+    }
+    va_end(argp);
+
+    return out;
+}
 
 void str_printf(str fmt, ...) {
     va_list argp;
@@ -148,5 +212,6 @@ void str_println(str s) {
     str_print(s);
     putchar('\n');
 }
+
 
 #endif
