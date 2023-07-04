@@ -4,6 +4,7 @@
 #include "hashtable.h"
 #include "allocators.h"
 #include "arr.h"
+#include "utils.h"
 
 
 

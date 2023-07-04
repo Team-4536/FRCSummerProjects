@@ -9,6 +9,7 @@
 #include "GLAD/gl.h"
 
 #include "base/arr.h"
+#include "base/utils.h"
 #include "graphics.h"
 #include "blue/blue.h"
 #include "network/network.h"
@@ -152,7 +153,7 @@ int main() {
 
 
 
-    V2f windowPos = V2f(300, 100);
+    V2f windowPos = V2f(350, 100);
     float clipPos = 0;
     float clipMax = 1400;
     float clipSize = 0;
@@ -190,8 +191,6 @@ int main() {
 
 
 
-
-
                 a = blu_areaMake(STR("left"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
                 clipSize = a->calculatedSizes[blu_axis_Y];
                 blu_areaAddDisplayStr(a, STR("left"));
@@ -208,7 +207,6 @@ int main() {
                     blu_parentScope(a) {
 
                         blu_styleScope {
-                        blu_style_add_sizeX({ blu_sizeKind_PERCENT, 1 });
                         blu_style_add_sizeY({ blu_sizeKind_TEXT, 0 });
                         blu_style_add_childLayoutAxis(blu_axis_X);
                         blu_style_add_backgroundColor(col_darkGray);

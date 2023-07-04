@@ -101,19 +101,8 @@ class server():
 
         sock.close()
 
-    def sendShit(self):
-        while True:
-            s = input("Give me a message: ")
-            v = input("And a number: ")
-            msg = message(messageKind.UPDATE, s)
-            msg.addValue(int(v))
-            self.msgQueue.push(msg)
-
 
     def start(self):
-
-        printThread = Thread(target=self.sendShit, args=[])
-        printThread.start()
 
         while True:
             c, addr = self.sock.accept() # start client
