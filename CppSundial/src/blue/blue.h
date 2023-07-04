@@ -35,14 +35,14 @@ THE CHECKLIST:
     [ ] clipping
     [ ] tooltips/dropdowns
     [ ] text input
-
     [ ] cursor changes
     [ ] padding
     [ ] rounding
     [ ] borders
     [ ] drop shadows
-    [ ] batching
+
     [ ] cleanup
+    [ ] batching
 
 TESTING CHECKLIST:
 [ ] test hashmap collsions
@@ -159,8 +159,8 @@ struct blu_Area {
 
     // layout pass data
     F32 calculatedSizes[blu_axis_COUNT];
-    F32 calculatedOffsets[blu_axis_COUNT];
     F32 calculatedPosition[blu_axis_COUNT];
+    Rect2f rect;
 
 
     // persistant shit for input / anim
@@ -636,6 +636,7 @@ void _blu_solveRemainders(blu_Area* parent, int axis) {
 }
 
 
+// TODO: make recursive functions consistent
 void _blu_calculateOffsetsAndRect(blu_Area* parent) {
 
     bool x = parent->style.childLayoutAxis == blu_axis_X;
@@ -661,6 +662,14 @@ void _blu_calculateOffsetsAndRect(blu_Area* parent) {
             };
         }
 
+        elem->rect = Rect2f {
+            { elem->calculatedPosition[blu_axis_X], elem->calculatedPosition[blu_axis_Y] },
+            {
+                elem->calculatedPosition[blu_axis_X] + elem->calculatedSizes[blu_axis_X],
+                elem->calculatedPosition[blu_axis_Y] + elem->calculatedSizes[blu_axis_Y]
+            }
+        };
+
         _blu_calculateOffsetsAndRect(elem);
         elem = elem->nextSibling[globs.linkSide];
     }
@@ -670,6 +679,13 @@ void blu_layout(V2f scSize) {
 
     globs.ogParent->calculatedSizes[blu_axis_X] = scSize.x;
     globs.ogParent->calculatedSizes[blu_axis_Y] = scSize.y;
+    globs.ogParent->rect = {
+        { 0, 0 },
+        {
+            globs.ogParent->calculatedSizes[blu_axis_X] = scSize.x,
+            globs.ogParent->calculatedSizes[blu_axis_Y] = scSize.y
+        }
+    };
 
 
     U64 visitSize = BLU_MAX_AREA_COUNT * sizeof(blu_Area*);
@@ -751,7 +767,7 @@ void blu_layout(V2f scSize) {
 
 // NOTE: start is UL of text, not baseline
 // CLEANUP: that lol ^^^^^^^^^^^^^^^^^^^^^
-void _blu_renderString(str string, V2f start, V4f color, gfx_Pass* pass) {
+void _blu_renderString(str string, V2f start, Rect2f clip, V4f color, gfx_Pass* pass) {
 
 
     V2f cursor = start + V2f(0, +globs.fontAscent);
@@ -772,67 +788,84 @@ void _blu_renderString(str string, V2f start, V4f color, gfx_Pass* pass) {
         block->dstStart = V2f(cursor.x + data.xBearing, cursor.y - data.yBearing);
         block->dstEnd = block->dstStart + V2f(data.width, data.height);
 
+        block->clipStart = clip.start;
+        block->clipEnd = clip.end;
+
         cursor.x += data.advance;
     }
 }
 
 
-void _blu_genRenderCallsRecurse(blu_Area* area, gfx_Pass* pass) {
+void _blu_genRenderCallsRecurse(blu_Area* area, Rect2f clip, gfx_Pass* pass) {
+
+    Rect2f parentClip = clip;
 
     while(area) {
-
-            // CLEANUP:
-            V2f pos = V2f(
-                area->calculatedPosition[blu_axis_X],
-                area->calculatedPosition[blu_axis_Y]
-                );
-            V2f size = V2f(
-                area->calculatedSizes[blu_axis_X],
-                area->calculatedSizes[blu_axis_Y]);
+        clip.start.x = max(parentClip.start.x, area->rect.start.x);
+        clip.start.y = max(parentClip.start.y, area->rect.start.y);
+        clip.end.x = min(parentClip.end.x, area->rect.end.x);
+        clip.end.y = min(parentClip.end.y, area->rect.end.y);
 
         if(area->flags & blu_areaFlags_DRAW_BACKGROUND) {
 
             gfx_UniformBlock* block = gfx_registerCall(pass);
 
-            block->dstStart = pos;
-            block->dstEnd = pos + size;
+            block->dstStart = area->rect.start;
+            block->dstEnd = area->rect.end;
             block->color = area->style.backgroundColor;
             block->fontTexture = globs.solidTex;
             block->texture = globs.solidTex;
+            block->clipStart = clip.start;
+            block->clipEnd = clip.end;
         }
         if (area->flags & blu_areaFlags_DRAW_TEXT) {
 
-            V2f off = V2f(0, 0);
+            V2f off = area->style.textPadding;
 
             if(area->flags & blu_areaFlags_CENTER_TEXT) {
                 float size = area->calculatedSizes[blu_axis_X];
                 float strSize = _blu_sizeOfString(area->displayString);
                 off.x = (size - strSize) / 2;
-                off.x -= area->style.textPadding.x;
             }
-            // CLEANUP: this
-            _blu_renderString(area->displayString, off + pos + area->style.textPadding, area->style.textColor, pass);
-        }
 
+            _blu_renderString(
+                area->displayString,
+                off + area->rect.start,
+                clip,
+                area->style.textColor,
+                pass);
+        }
         if (area->flags & blu_areaFlags_DRAW_TEXTURE) {
 
             gfx_UniformBlock* block = gfx_registerCall(pass);
 
-            block->dstStart = pos;
-            block->dstEnd = pos + size;
+            block->dstStart = area->rect.start;
+            block->dstEnd = area->rect.end;
             block->color = V4f(1, 1, 1, 1);
             block->texture = area->texture;
             block->fontTexture = globs.solidTex;
+            block->clipStart = clip.start;
+            block->clipEnd = clip.end;
         }
 
 
-        _blu_genRenderCallsRecurse(area->firstChild[globs.linkSide], pass);
+        _blu_genRenderCallsRecurse(area->firstChild[globs.linkSide], clip, pass);
         area = area->nextSibling[globs.linkSide];
     }
 }
 // CLEANUP: rename
 void blu_createPass(gfx_Pass* normalPass) {
-    _blu_genRenderCallsRecurse(globs.ogParent, normalPass);
+
+    // CLEANUP: get a rect structure here
+    V2f start = V2f(
+        globs.ogParent->calculatedPosition[blu_axis_X],
+        globs.ogParent->calculatedPosition[blu_axis_Y]
+        );
+    V2f end = start + V2f(
+        globs.ogParent->calculatedSizes[blu_axis_X],
+        globs.ogParent->calculatedSizes[blu_axis_Y]);
+
+    _blu_genRenderCallsRecurse(globs.ogParent, { start, end }, normalPass);
 }
 
 

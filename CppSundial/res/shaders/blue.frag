@@ -10,6 +10,9 @@ uniform vec4 uColor;
 uniform sampler2D uTexture;
 uniform sampler2D uFontTexture;
 
+uniform vec2 uClipStart;
+uniform vec2 uClipEnd;
+
 void main()
 {
     vec2 nUv = vUv;
@@ -28,4 +31,10 @@ void main()
 
     // color = vec4(vUv.x, vUv.y, 1.0, 1.0);
     if (color.a <= 0.01) { discard; }
+
+    // probably bad for performance
+    if     (gl_FragCoord.x > uClipEnd.x) { discard; }
+    else if(gl_FragCoord.y > uClipEnd.y) { discard; }
+    else if(gl_FragCoord.x <= uClipStart.x) { discard; }
+    else if(gl_FragCoord.y <= uClipStart.y) { discard; }
 };

@@ -115,6 +115,11 @@ struct V4f {
     }
 };
 
+struct Rect2f {
+    V2f start = { 0, 0 };
+    V2f end = { 0, 0 };
+};
+
 
 V4f v4f_lerp(V4f a, V4f b, F32 t);
 

@@ -68,11 +68,17 @@ struct gfx_UniformBlock {
 
     V2f dstStart = V2f();
     V2f dstEnd = V2f();
+
     V2f srcStart = V2f();
     V2f srcEnd = V2f(1, 1);
+
+    V2f clipStart = V2f(0, 0);
+    V2f clipEnd = V2f();
+
     gfx_Texture* texture = nullptr;
     gfx_Texture* fontTexture = nullptr;
     V4f color = V4f(0, 0, 0, 1);
+
     Mat4f model = Mat4f();
 
     // PASS UNIS ========================
@@ -369,7 +375,6 @@ void gfx_drawPasses() {
         glBindVertexArray(globs.va2d.id);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, globs.ib2d.id);
 
-        // CLEANUP: max call assert
         gfx_UniformBlock* curBlock = pass->startCall;
         while(curBlock) {
 

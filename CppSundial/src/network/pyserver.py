@@ -101,8 +101,19 @@ class server():
 
         sock.close()
 
+    def getMessages(self):
+        while True:
+            title = input("Title: ")
+            content = int(input("Value: "))
+            msg = message(messageKind.UPDATE, title)
+            msg.addValue(content)
+            self.msgQueue.push(msg)
+
 
     def start(self):
+
+        t = Thread(target=self.getMessages)
+        t.start()
 
         while True:
             c, addr = self.sock.accept() # start client

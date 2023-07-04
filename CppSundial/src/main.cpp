@@ -132,6 +132,11 @@ int main() {
             loc = glGetUniformLocation(shader->id, "uSrcEnd");
             glUniform2f(loc, uniforms->srcEnd.x, uniforms->srcEnd.y);
 
+            loc = glGetUniformLocation(shader->id, "uClipStart");
+            glUniform2f(loc, uniforms->clipStart.x, uniforms->clipStart.y);
+            loc = glGetUniformLocation(shader->id, "uClipEnd");
+            glUniform2f(loc, uniforms->clipEnd.x, uniforms->clipEnd.y);
+
             loc = glGetUniformLocation(shader->id, "uColor");
             glUniform4f(loc, uniforms->color.x, uniforms->color.y, uniforms->color.z, uniforms->color.w);
 
@@ -194,6 +199,7 @@ int main() {
                 clipSize = a->calculatedSizes[blu_axis_Y];
                 blu_areaAddDisplayStr(a, STR("left"));
                 a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 300 };
+                a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, 100 };
                 a->style.childLayoutAxis = blu_axis_X;
                 blu_parentScope(a) {
 
