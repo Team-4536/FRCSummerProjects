@@ -315,13 +315,9 @@ void blu_init(gfx_Texture* solidTex) {
 
 void blu_loadFont(const char* path) {
 
-    FILE* fontFile = fopen(path, "rb");
-    fseek(fontFile, 0, SEEK_END);
-    U64 size = ftell(fontFile); /* how long is the file ? */
-    fseek(fontFile, 0, SEEK_SET); /* reset */
-    U8* fontBuffer = BUMP_PUSH_ARR(&globs.frameArena, size, U8);
-    fread(fontBuffer, size, 1, fontFile);
-    fclose(fontFile);
+    U64 size;
+    U8* fontBuffer = loadFileToBuffer(path, false, &size, &globs.frameArena);
+    ASSERT(fontBuffer);
 
     const U32 texSize = 512;
     U8* imgbuf = BUMP_PUSH_ARR(&globs.frameArena, texSize*texSize, U8);

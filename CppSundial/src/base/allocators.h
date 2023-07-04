@@ -13,10 +13,16 @@ struct BumpAlloc {
 
 
 BumpAlloc* bump_init(BumpAlloc* a, U64 size, void* memory);
+
 BumpAlloc* bump_allocate(BumpAlloc* a, U64 size);
 void bump_free(BumpAlloc* a);
+
+// asserts on failure
 void* bump_push(BumpAlloc* a, U64 size);
+
+// asserts on failure
 void bump_pop(BumpAlloc* a, U64 size);
+
 void bump_clear(BumpAlloc* a);
 
 // push new pushes sizeof(type) and initializes memory with default type ctor

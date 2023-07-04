@@ -152,7 +152,6 @@ static gfx_Globs globs = gfx_Globs();
 
 // NOTE: requires opengl already setup
 // NOTE: allocates 3 bumps
-// CLEANUP: figure out a way to share scratch arenas between modules
 void gfx_init() {
 
     bump_allocate(&globs.resArena, RES_SIZE);
@@ -211,53 +210,34 @@ void gfx_init() {
 }
 
 
-// TODO: move to utils
-U32 _gfx_loadTextFileToBuffer(const char* path, char** out, BumpAlloc* arena) {
 
-    FILE* file = fopen(path, "r");
-    if(file == NULL) { return -1; }
-
-    fseek(file, 0L, SEEK_END);
-    U64 numbytes = ftell(file);
-    fseek(file, 0L, SEEK_SET);
-
-    char* text = BUMP_PUSH_ARR(arena, numbytes, char);
-    assert(text);
-
-    fread(text, sizeof(char), numbytes, file);
-    fclose(file);
-
-    *out = text;
-    return 0;
-}
-
-
-// TODO: move to handles instead of pointers
 gfx_Shader* gfx_registerShader(gfx_VType vertLayout, const char* vertPath, const char* fragPath, BumpAlloc* scratch) {
-
     int err = 0;
 
-    char* vertSrc = nullptr;
-    err = _gfx_loadTextFileToBuffer(vertPath, &vertSrc, scratch);
-    if(err == -1) {
+
+    U64 vertSize;
+    U8* vertSrc = loadFileToBuffer(vertPath, true, &vertSize, scratch);
+    if(!vertSrc) {
         printf("Shader source file at \"%s\" could not be found\n", vertPath);
-        assert(false);
+        return nullptr;
     }
 
-    char* fragSrc = nullptr;
-    err = _gfx_loadTextFileToBuffer(fragPath, &fragSrc, scratch);
-    if(err == -1) {
+    U64 fragSize;
+    U8* fragSrc = loadFileToBuffer(fragPath, true, &fragSize, scratch);
+    if(!fragSrc) {
         printf("Shader source file at \"%s\" could not be found\n", fragPath);
-        assert(false);
+        return nullptr;
     }
 
     //compile src into shader code
     U32 v = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(v, 1, (const char* const*)&vertSrc, nullptr);
+    int smallVertSize = (int)vertSize;
+    glShaderSource(v, 1, (const char* const*)&vertSrc, &smallVertSize);
     glCompileShader(v);
 
     U32 f = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(f, 1, (const char* const*)&fragSrc, nullptr);
+    int smallFragSize = (int)fragSize; // CLEANUP: these could overflow
+    glShaderSource(f, 1, (const char* const*)&fragSrc, &smallFragSize);
     glCompileShader(f);
 
 

@@ -6,8 +6,8 @@
 
 #include "base/typedefs.h"
 #include "base/config.h"
-#include <math.h>
-
+#include "base/allocators.h"
+#include <math.h> // CLEANUP: get this out of here
 
 #define min(a, b) ((a)<(b)?(a):(b))
 #define max(a, b) ((a)>(b)?(a):(b))
@@ -15,6 +15,10 @@
 F32 lerp(F32 a, F32 b, F32 t);
 
 
+
+// returns nullptr on failed file open, else pointer to buffer
+// outsize can be nullptr
+U8* loadFileToBuffer(const char* path, bool asText, U64* outSize, BumpAlloc* arena);
 
 
 
@@ -242,9 +246,34 @@ void matrixTransform(V2f translation, F32 z, F32 deg, V2f scale, Mat4f& out);
 #include <stdio.h>
 
 
+
+U8* loadFileToBuffer(const char* path, bool asText, U64* outSize, BumpAlloc* arena) {
+    if(outSize) { *outSize = 0; }
+
+    const char* openStr = (asText)? "r" : "rb";
+    FILE* file = fopen(path, openStr);
+    if(file == NULL) { return nullptr; }
+
+    fseek(file, 0L, SEEK_END);
+    U64 size = ftell(file);
+    fseek(file, 0L, SEEK_SET);
+
+    U8* text = BUMP_PUSH_ARR(arena, size, U8);
+
+    fread(text, sizeof(U8), size, file);
+    fclose(file);
+
+    if(outSize) { *outSize = size; }
+    return text;
+}
+
+
+
+
 F32 lerp(F32 a, F32 b, F32 t) {
     return a + ((b-a) * t);
 }
+
 
 V4f v4f_lerp(V4f a, V4f b, F32 t) {
     return V4f(
