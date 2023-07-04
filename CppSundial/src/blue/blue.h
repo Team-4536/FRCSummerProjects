@@ -173,7 +173,7 @@ struct blu_Area {
 };
 
 
-// TODO: name?
+// CLEANUP: name?
 struct blu_WidgetInputs {
     bool hovered = false;
     bool held = false;
@@ -308,8 +308,8 @@ void blu_init(gfx_Texture* solidTex) {
 
     globs.solidTex = solidTex;
 
-    bump_allocate(globs.areaArena, BLU_MAX_AREA_COUNT * sizeof(blu_Area));
-    bump_allocate(globs.frameArena, BLU_MAX_ARENA_SIZE);
+    bump_allocate(&globs.areaArena, BLU_MAX_AREA_COUNT * sizeof(blu_Area));
+    bump_allocate(&globs.frameArena, BLU_MAX_ARENA_SIZE);
     globs.hash = (blu_Area**)arr_allocate0(sizeof(blu_Area*), BLU_AREA_HASH_COUNT);
 }
 
@@ -319,12 +319,12 @@ void blu_loadFont(const char* path) {
     fseek(fontFile, 0, SEEK_END);
     U64 size = ftell(fontFile); /* how long is the file ? */
     fseek(fontFile, 0, SEEK_SET); /* reset */
-    U8* fontBuffer = BUMP_PUSH_ARR(globs.frameArena, size, U8);
+    U8* fontBuffer = BUMP_PUSH_ARR(&globs.frameArena, size, U8);
     fread(fontBuffer, size, 1, fontFile);
     fclose(fontFile);
 
     const U32 texSize = 512;
-    U8* imgbuf = BUMP_PUSH_ARR(globs.frameArena, texSize*texSize, U8);
+    U8* imgbuf = BUMP_PUSH_ARR(&globs.frameArena, texSize*texSize, U8);
     stbtt_bakedchar glyphInfo[BLU_FONT_CHARCOUNT];
 
     // TODO: put stbtt allocations into arenas
@@ -358,7 +358,7 @@ void blu_loadFont(const char* path) {
     }
 
 
-    bump_clear(globs.frameArena);
+    bump_clear(&globs.frameArena);
 }
 
 
@@ -449,7 +449,7 @@ blu_Area* blu_areaMake(str string, U32 flags) {
         // GET NEW AREA STRUCT ////////////////////
         area = globs.firstFree;
         if(!area) { // push new to arena if free list is empty
-            area = BUMP_PUSH_NEW(globs.areaArena, blu_Area); }
+            area = BUMP_PUSH_NEW(&globs.areaArena, blu_Area); }
         else { // pop from free list otherwise
             globs.firstFree = area->nextFree;
             *area = blu_Area();
@@ -522,7 +522,7 @@ blu_Area* blu_areaMake(str string, U32 flags) {
 }
 
 void blu_areaAddDisplayStr(blu_Area* area, str s) {
-    str nstr = str_copy(s, globs.frameArena);
+    str nstr = str_copy(s, &globs.frameArena);
     area->displayString = nstr;
 }
 
@@ -564,7 +564,7 @@ void blu_beginFrame() {
 
     // U64 byteCount = (U64)(globs.frameArena.offset) - (U64)(globs.frameArena.start);
     // printf("%llu / %llu\n", byteCount, globs.frameArena.reserved);
-    bump_clear(globs.frameArena);
+    bump_clear(&globs.frameArena);
     _blu_cullRecursive(globs.ogParent);
 
     globs.frameIndex++;
@@ -677,7 +677,7 @@ void blu_layout(V2f scSize) {
 
 
     U64 visitSize = BLU_MAX_AREA_COUNT * sizeof(blu_Area*);
-    blu_Area** visitStack = BUMP_PUSH_ARR(globs.frameArena, BLU_MAX_AREA_COUNT, blu_Area*);
+    blu_Area** visitStack = BUMP_PUSH_ARR(&globs.frameArena, BLU_MAX_AREA_COUNT, blu_Area*);
     U32 visitStackDepth = 0;
 
     for(int axis = 0; axis < blu_axis_COUNT; axis++) {
@@ -742,7 +742,7 @@ void blu_layout(V2f scSize) {
 
     _blu_calculateOffsetsAndRect(globs.ogParent);
 
-    bump_pop(globs.frameArena, visitSize);
+    bump_pop(&globs.frameArena, visitSize);
 } // end layout
 
 
@@ -876,7 +876,7 @@ _BLU_DEFINE_STYLE_ADD(animationStrength, F32)
 
 void blu_pushStyle() {
 
-    blu_StyleStackNode* s = BUMP_PUSH_NEW(globs.frameArena, blu_StyleStackNode);
+    blu_StyleStackNode* s = BUMP_PUSH_NEW(&globs.frameArena, blu_StyleStackNode);
 
     if(!globs.ogStyle) {
         globs.currentStyle = s;

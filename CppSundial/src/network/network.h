@@ -173,7 +173,7 @@ static net_Globs globs = net_Globs();
 // Asserts on failures
 void net_init() {
 
-    bump_allocate(globs.resArena,
+    bump_allocate(&globs.resArena,
         NET_RES_SIZE + // names / data
         (sizeof(net_Prop) * NET_MAX_PROP_COUNT) + // props
         (sizeof(net_Prop*) * NET_MAX_PROP_COUNT) + // tracked
@@ -193,9 +193,9 @@ void net_init() {
 // clears and reallocs resArena
 // resets tracked vec also
 void net_resetTracked() {
-    bump_clear(globs.resArena);
-    globs.hash = BUMP_PUSH_ARR(globs.resArena, NET_HASH_COUNT, net_Prop*);
-    globs.tracked = BUMP_PUSH_ARR(globs.resArena, NET_MAX_PROP_COUNT, net_Prop*);
+    bump_clear(&globs.resArena);
+    globs.hash = BUMP_PUSH_ARR(&globs.resArena, NET_HASH_COUNT, net_Prop*);
+    globs.tracked = BUMP_PUSH_ARR(&globs.resArena, NET_MAX_PROP_COUNT, net_Prop*);
     globs.trackedCount = 0;
 }
 
@@ -263,11 +263,11 @@ void _net_processMessage(U8* buffer, U32 size) {
     if(msgKind == net_msgKind_UPDATE) {
         net_Prop* prop = net_hashGet(name);
         if(!prop) {
-            prop = BUMP_PUSH_NEW(globs.resArena, net_Prop);
+            prop = BUMP_PUSH_NEW(&globs.resArena, net_Prop);
             _net_hashInsert(name, prop);
             ARR_APPEND(globs.tracked, globs.trackedCount, prop);
-            prop->name = str_copy(name, globs.resArena);
-            prop->data = BUMP_PUSH_NEW(globs.resArena, net_PropData);
+            prop->name = str_copy(name, &globs.resArena);
+            prop->data = BUMP_PUSH_NEW(&globs.resArena, net_PropData);
         }
 
         prop->type = (net_PropType)valType;

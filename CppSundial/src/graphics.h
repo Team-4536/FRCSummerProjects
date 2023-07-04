@@ -83,8 +83,9 @@ struct gfx_UniformBlock {
 
     gfx_UniformBlock* next;
 };
+// NOTE: consider making into a union
+// NOTE: figure out a way to make this work without editing gfx src.
 
-// TODO: unionize uniforms
 
 struct gfx_Pass {
 
@@ -109,13 +110,12 @@ struct gfx_Pass {
 
 struct gfx_Globs {
 
-    // TODO: move bump shit to use pointers instead of refs
     BumpAlloc resArena = BumpAlloc();
 
     BumpAlloc passArena = BumpAlloc();
     gfx_Pass* passes = nullptr;
     U32 passCount = 0;
-    // TODO: make a more clear way to construct passes/calls (not hidden in globs)
+    // TODO: move passes to arenas outside of gfx
 
     gfx_IndexBuffer ib2d = gfx_IndexBuffer();
     gfx_VertexArray va2d = gfx_VertexArray();
@@ -123,7 +123,7 @@ struct gfx_Globs {
 
 
 void gfx_init();
-gfx_Shader* gfx_registerShader(gfx_VType vertLayout, const char* vertPath, const char* fragPath, BumpAlloc& arena);
+gfx_Shader* gfx_registerShader(gfx_VType vertLayout, const char* vertPath, const char* fragPath, BumpAlloc* scratch);
 gfx_Texture* gfx_registerTexture(U8* data, int width, int height, gfx_TexPxType pixelLayout);
 void gfx_clear(V4f color);
 gfx_Pass* gfx_registerPass();
@@ -155,12 +155,12 @@ static gfx_Globs globs = gfx_Globs();
 // CLEANUP: figure out a way to share scratch arenas between modules
 void gfx_init() {
 
-    bump_allocate(globs.resArena, RES_SIZE);
-    bump_allocate(globs.passArena, MAX_PASS_COUNT * sizeof(gfx_Pass) + MAX_DRAW_CALL_COUNT * sizeof(gfx_UniformBlock));
+    bump_allocate(&globs.resArena, RES_SIZE);
+    bump_allocate(&globs.passArena, MAX_PASS_COUNT * sizeof(gfx_Pass) + MAX_DRAW_CALL_COUNT * sizeof(gfx_UniformBlock));
 
     // CLEANUP: consider begin_frame func
     // preps passes to start
-    globs.passes = BUMP_PUSH_ARR(globs.passArena, MAX_PASS_COUNT, gfx_Pass);
+    globs.passes = BUMP_PUSH_ARR(&globs.passArena, MAX_PASS_COUNT, gfx_Pass);
     globs.passCount = 0;
 
 
@@ -211,7 +211,8 @@ void gfx_init() {
 }
 
 
-U32 _gfx_loadTextFileToBuffer(const char* path, char** out, BumpAlloc& arena) {
+// TODO: move to utils
+U32 _gfx_loadTextFileToBuffer(const char* path, char** out, BumpAlloc* arena) {
 
     FILE* file = fopen(path, "r");
     if(file == NULL) { return -1; }
@@ -232,19 +233,19 @@ U32 _gfx_loadTextFileToBuffer(const char* path, char** out, BumpAlloc& arena) {
 
 
 // TODO: move to handles instead of pointers
-gfx_Shader* gfx_registerShader(gfx_VType vertLayout, const char* vertPath, const char* fragPath, BumpAlloc& arena) {
+gfx_Shader* gfx_registerShader(gfx_VType vertLayout, const char* vertPath, const char* fragPath, BumpAlloc* scratch) {
 
     int err = 0;
 
     char* vertSrc = nullptr;
-    err = _gfx_loadTextFileToBuffer(vertPath, &vertSrc, arena);
+    err = _gfx_loadTextFileToBuffer(vertPath, &vertSrc, scratch);
     if(err == -1) {
         printf("Shader source file at \"%s\" could not be found\n", vertPath);
         assert(false);
     }
 
     char* fragSrc = nullptr;
-    err = _gfx_loadTextFileToBuffer(fragPath, &fragSrc, arena);
+    err = _gfx_loadTextFileToBuffer(fragPath, &fragSrc, scratch);
     if(err == -1) {
         printf("Shader source file at \"%s\" could not be found\n", fragPath);
         assert(false);
@@ -262,7 +263,7 @@ gfx_Shader* gfx_registerShader(gfx_VType vertLayout, const char* vertPath, const
 
 
     bool compFailed = false;
-    char* logBuffer = BUMP_PUSH_ARR(arena, 512, char);
+    char* logBuffer = BUMP_PUSH_ARR(scratch, 512, char);
 
     glGetShaderiv(v, GL_COMPILE_STATUS, &err);
     if(!err) {
@@ -281,7 +282,7 @@ gfx_Shader* gfx_registerShader(gfx_VType vertLayout, const char* vertPath, const
 
     gfx_Shader* s = nullptr;
     if(!compFailed) {
-        s = BUMP_PUSH_NEW(globs.resArena, gfx_Shader);
+        s = BUMP_PUSH_NEW(&globs.resArena, gfx_Shader);
 
         s->id = glCreateProgram();
         glAttachShader(s->id, v);
@@ -302,7 +303,7 @@ gfx_Shader* gfx_registerShader(gfx_VType vertLayout, const char* vertPath, const
 gfx_Texture* gfx_registerTexture(U8* data, int width, int height, gfx_TexPxType pixelLayout) {
 
 
-    gfx_Texture* t = BUMP_PUSH_NEW(globs.resArena, gfx_Texture);
+    gfx_Texture* t = BUMP_PUSH_NEW(&globs.resArena, gfx_Texture);
     t->data = data;
     t->width = width;
     t->height = height;
@@ -354,7 +355,7 @@ gfx_Pass* gfx_registerPass() {
 gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass) {
     ASSERT(pass);
 
-    gfx_UniformBlock* block = BUMP_PUSH_NEW(globs.passArena, gfx_UniformBlock);
+    gfx_UniformBlock* block = BUMP_PUSH_NEW(&globs.passArena, gfx_UniformBlock);
     block->next = nullptr;
 
     if(!pass->startCall) {
@@ -405,8 +406,8 @@ void gfx_drawPasses() {
 
     // reset passes and calls for next frame
     globs.passCount = 0;
-    bump_clear(globs.passArena);
-    globs.passes = BUMP_PUSH_ARR(globs.passArena, MAX_PASS_COUNT, gfx_Pass);
+    bump_clear(&globs.passArena);
+    globs.passes = BUMP_PUSH_ARR(&globs.passArena, MAX_PASS_COUNT, gfx_Pass);
 }
 
 

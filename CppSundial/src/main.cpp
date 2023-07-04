@@ -42,8 +42,8 @@ int main() {
 
     BumpAlloc lifetimeArena;
     BumpAlloc frameArena;
-    bump_allocate(lifetimeArena, 1000000);
-    bump_allocate(frameArena, 1000000);
+    bump_allocate(&lifetimeArena, 1000000);
+    bump_allocate(&frameArena, 1000000);
 
 
 
@@ -110,7 +110,7 @@ int main() {
 
     gfx_Shader* blueShader;
     {
-        blueShader = gfx_registerShader(gfx_vtype_POS2F_UV, "res/shaders/blue.vert", "res/shaders/blue.frag", frameArena);
+        blueShader = gfx_registerShader(gfx_vtype_POS2F_UV, "res/shaders/blue.vert", "res/shaders/blue.frag", &frameArena);
 
         // TODO: remove lambdas
         blueShader->passUniformBindFunc = [](gfx_Shader* shader, gfx_UniformBlock* uniforms) {
@@ -212,9 +212,9 @@ int main() {
                         blu_style_add_backgroundColor(col_darkGray);
 
                             a = blu_areaMake(STR("FPS"), blu_areaFlags_DRAW_TEXT);
-                            char* buf = BUMP_PUSH_ARR(frameArena, 32, char);
+                            char* buf = BUMP_PUSH_ARR(&frameArena, 32, char);
                             gcvt(1/dt, 6, buf);
-                            blu_areaAddDisplayStr(a, str_join(STR("FPS: "), STR(buf), frameArena));
+                            blu_areaAddDisplayStr(a, str_join(STR("FPS: "), STR(buf), &frameArena));
 
 
                             a = blu_areaMake(STR("connectionPar"), blu_areaFlags_DRAW_BACKGROUND);
@@ -247,13 +247,13 @@ int main() {
                                 blu_parentScope(a) {
                                     blu_styleScope {
                                     blu_style_add_sizeX({ blu_sizeKind_PERCENT, 0.5 });
-                                        a = blu_areaMake(str_join(prop->name, STR("label"), frameArena), blu_areaFlags_DRAW_TEXT);
+                                        a = blu_areaMake(str_join(prop->name, STR("label"), &frameArena), blu_areaFlags_DRAW_TEXT);
                                         blu_areaAddDisplayStr(a, prop->name);
 
-                                        a = blu_areaMake(str_join(prop->name, STR("value"), frameArena), blu_areaFlags_DRAW_TEXT);
+                                        a = blu_areaMake(str_join(prop->name, STR("value"), &frameArena), blu_areaFlags_DRAW_TEXT);
                                         a->style.backgroundColor = col_darkGray;
                                         if(prop->type == net_propType_S32) {
-                                            blu_areaAddDisplayStr(a, str_format(frameArena, STR("%i"), (prop->data->s32))); }
+                                            blu_areaAddDisplayStr(a, str_format(&frameArena, STR("%i"), (prop->data->s32))); }
                                     }
                                 }
                             }
@@ -392,7 +392,7 @@ int main() {
         gfx_clear(V4f(0, 0, 0, 1));
         gfx_drawPasses();
 
-        bump_clear(frameArena);
+        bump_clear(&frameArena);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
