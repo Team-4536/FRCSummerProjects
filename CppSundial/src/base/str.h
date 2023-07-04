@@ -28,8 +28,6 @@ void str_printf(str fmt, ...);
 
 str str_format(BumpAlloc* arena, str fmt, ...);
 
-// TODO: float conversion magic
-
 
 #ifdef BASE_IMPL
 
@@ -86,6 +84,15 @@ str str_format(BumpAlloc* arena, str fmt, ...) {
                     out.length++;
                 }
             }
+            else if(*ptr == 'f') {
+                char buf[10] = { 0 };
+                if(gcvt(va_arg(argp, double), 6, buf) == NULL) { continue; };
+                for(int i = 0; i < 10; i++) {
+                    *BUMP_PUSH_NEW(arena, char) = buf[i];
+                    out.length++;
+                    if(buf[i] == '\0') { break; }
+                }
+            }
             else {
                 *BUMP_PUSH_NEW(arena, char) = *ptr;
                 out.length++;
@@ -135,8 +142,17 @@ void str_printf(str fmt, ...) {
                 }
                 while(U8 x = ARR_POP(mem, digit)) { putchar(x); }
             }
+            else if(*ptr == 'f') {
+                char buf[10];
+                if(gcvt(va_arg(argp, double), 6, buf) == NULL) { continue; };
+                for(int i = 0; i < 10; i++) {
+                    putchar(buf[i]);
+                    if(buf[i] == '\0') { break; }
+                }
+            }
             else {
-                putchar(*ptr); }
+                putchar(*ptr);
+            }
         }
         else {
             putchar(*ptr);

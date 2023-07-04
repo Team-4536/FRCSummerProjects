@@ -46,7 +46,6 @@ int main() {
     bump_allocate(&frameArena, 1000000);
 
 
-
     GLFWwindow* window = nullptr;
     GLFWcursor* hoverCursor = nullptr;
     // GLFW INIT AND WINDOW CREATION ===============================================================================
