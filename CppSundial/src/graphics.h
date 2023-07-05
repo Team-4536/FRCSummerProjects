@@ -34,7 +34,8 @@ enum gfx_VType {
     gfx_vtype_POS3F_UV
 };
 
-typedef void (*gfx_ShaderUniformBindFunc)(gfx_Shader* shader, gfx_UniformBlock* uniforms);
+struct gfx_Pass; // >:(
+typedef void (*gfx_ShaderUniformBindFunc)(gfx_Pass* pass, gfx_UniformBlock* uniforms);
 struct gfx_Shader {
     U32 id = 0;
     gfx_VType layout = gfx_vtype_NONE;
@@ -46,7 +47,7 @@ struct gfx_Shader {
 struct gfx_IndexBuffer {
     U32 id = 0;
     U32 count = 0;
-    // U32* data = nullptr;
+    U32* data = nullptr;
 };
 
 struct gfx_VertexArray {
@@ -55,7 +56,7 @@ struct gfx_VertexArray {
 
     gfx_VType layoutType = gfx_vtype_NONE;
     // U32 count = 0;
-    // F32* data = nullptr;
+    void* data = nullptr;
 };
 
 
@@ -73,6 +74,7 @@ struct gfx_Framebuffer {
 
 
 
+// CLEANUP: better name?
 struct gfx_UniformBlock {
 
     // CALL UNIS =========================
@@ -92,22 +94,31 @@ struct gfx_UniformBlock {
 
     Mat4f model = Mat4f();
 
+    gfx_VertexArray* va = nullptr;
+    gfx_IndexBuffer* ib = nullptr;
+
     // PASS UNIS ========================
 
     Mat4f vp = Mat4f(0.0f);
 
     //
 
-    gfx_UniformBlock* next;
+    gfx_UniformBlock* _next;
 };
 // NOTE: consider making into a union
 // NOTE: figure out a way to make this work without editing gfx src.
 
 
+// CLEANUP: make public members clearer
+// CLEANUP: all ctors or no?
 // target == nullptr indicates drawing to the screen
 struct gfx_Pass {
 
-    bool isClearPass = false;
+    gfx_VertexArray* curVa;
+    gfx_IndexBuffer* curIb;
+
+
+    bool isClearPass = false; // TODO: assert fail on adding calls to clear passes / refactor
 
     gfx_Framebuffer* target = nullptr;
     gfx_Shader* shader = nullptr;
@@ -122,32 +133,29 @@ struct gfx_Pass {
 
 
 
-
-
-
-
-
-struct gfx_Globs {
-
-    BumpAlloc resArena = BumpAlloc();
-
-    BumpAlloc passArena = BumpAlloc();
-    gfx_Pass* passes = nullptr;
-    U32 passCount = 0;
-    // TODO: move passes to arenas outside of gfx
-
-    gfx_IndexBuffer ib2d = gfx_IndexBuffer();
-    gfx_VertexArray va2d = gfx_VertexArray();
-};
-
-
 void gfx_init();
+// CLEANUP: this
+gfx_VertexArray* gfx_getQuadVA();
+gfx_IndexBuffer* gfx_getQuadIB();
+
 gfx_Shader* gfx_registerShader(gfx_VType vertLayout, const char* vertPath, const char* fragPath, BumpAlloc* scratch);
 gfx_Texture* gfx_registerTexture(U8* data, int width, int height, gfx_TexPxType pixelLayout);
 gfx_Framebuffer* gfx_registerFramebuffer();
+
+gfx_VertexArray* gfx_registerVertexArray(gfx_VType layout, void* data, U32 dataSize, bool dynamic);
+gfx_IndexBuffer* gfx_registerIndexBuffer(U32* data, U32 dataCount);
+
 void gfx_resizeFramebuffer(gfx_Framebuffer* fb, int nw, int nh);
-gfx_Pass* gfx_registerPass(bool isClearPass);
+
+// NOTE: use these for binding VAs/IBs otherwise it'll shit itself
+// NOTE: VERTEX ARRAY GOES FIRST DONT ASK
+void gfx_bindVertexArray(gfx_Pass* pass, gfx_VertexArray* va);
+void gfx_bindIndexBuffer(gfx_Pass* pass, gfx_IndexBuffer* ib);
+
+gfx_Pass* gfx_registerPass();
 gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass);
+
+// draws all passes, clears passes and calls after.
 void gfx_drawPasses();
 
 
@@ -162,11 +170,23 @@ void gfx_drawPasses();
 #define MAX_PASS_COUNT 16
 #define RES_SIZE 1000000
 
+
+struct gfx_Globs {
+
+    BumpAlloc resArena = BumpAlloc();
+
+    BumpAlloc passArena = BumpAlloc();
+    gfx_Pass* passes = nullptr;
+    U32 passCount = 0;
+    // TODO: move passes to arenas outside of gfx
+
+    gfx_IndexBuffer* quadIb = nullptr;
+    gfx_VertexArray* quadVa = nullptr;
+};
 static gfx_Globs globs = gfx_Globs();
 
 
 // NOTE: requires opengl already setup
-// NOTE: allocates 3 bumps
 void gfx_init() {
 
     bump_allocate(&globs.resArena, RES_SIZE);
@@ -178,52 +198,25 @@ void gfx_init() {
     globs.passCount = 0;
 
 
-    // INDEX BUFFER =============================================================
-    globs.ib2d = gfx_IndexBuffer();
+
     U32 ibData[] = {
         0, 1, 2,
-        2, 3, 0 };
-    glGenBuffers(1, &globs.ib2d.id);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, globs.ib2d.id);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(ibData), ibData, GL_STATIC_DRAW);
-    globs.ib2d.count = sizeof(ibData) / sizeof(U32);
+        2, 3, 0
+    };
+    globs.quadIb = gfx_registerIndexBuffer(ibData, sizeof(ibData) / sizeof(U32));
 
-    int err = glGetError();
-    if(err == GL_OUT_OF_MEMORY) { ASSERT(err != GL_OUT_OF_MEMORY); };
-
-
-
-    // VERTEX BUFFER AND ARR ====================================================
-    {
-        globs.va2d = gfx_VertexArray();
-        glGenVertexArrays(1, &globs.va2d.id);
-        glBindVertexArray(globs.va2d.id);
-
-        glGenBuffers(1, &globs.va2d.vbId);
-        glBindBuffer(GL_ARRAY_BUFFER, globs.va2d.vbId);
-        F32 vbData[] = {
-            -1, -1,    0, 0, // BL
-            -1,  1,    0, 1, // UL
-             1,  1,    1, 1, // UR
-             1, -1,    1, 0  // BR
-        };
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vbData), vbData, GL_STATIC_DRAW);
-
-        // CLEANUP: out of memory errs
-    }
-
-    // ATTRIBS ================================================================
-    {
-        U32 vertSize = 4 * sizeof(F32);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, vertSize, (void*)(0));
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, vertSize, (void*)(2 * sizeof(F32)));
-        glEnableVertexAttribArray(1);
-        globs.va2d.layoutType = gfx_vtype_POS2F_UV;
-    }
-    glBindVertexArray(0);
+    F32 vbData[] = {
+        -1, -1,    0, 0, // BL
+        -1,  1,    0, 1, // UL
+        1,  1,    1, 1, // UR
+        1, -1,    1, 0  // BR
+    };
+    globs.quadVa = gfx_registerVertexArray(gfx_vtype_POS2F_UV, vbData, sizeof(vbData), false);
 }
 
+
+gfx_VertexArray* gfx_getQuadVA() { return globs.quadVa; }
+gfx_IndexBuffer* gfx_getQuadIB() { return globs.quadIb; }
 
 
 gfx_Shader* gfx_registerShader(gfx_VType vertLayout, const char* vertPath, const char* fragPath, BumpAlloc* scratch) {
@@ -368,7 +361,78 @@ void gfx_resizeFramebuffer(gfx_Framebuffer* fb, int nw, int nh) {
 
 
 
+// TODO: gl out of memory errs
 
+gfx_VertexArray* gfx_registerVertexArray(gfx_VType layout, void* data, U32 dataSize, bool dynamic) {
+
+    gfx_VertexArray* va = BUMP_PUSH_NEW(&globs.resArena, gfx_VertexArray);
+    *va = gfx_VertexArray();
+
+    // VERTEX BUFFER AND ARR ====================================================
+    {
+        glGenVertexArrays(1, &va->id);
+        glBindVertexArray(va->id);
+
+        glGenBuffers(1, &va->vbId);
+        glBindBuffer(GL_ARRAY_BUFFER, va->vbId);
+
+        va->data = data;
+        glBufferData(GL_ARRAY_BUFFER, dataSize, data, dynamic? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
+
+    }
+
+    // ATTRIBS ================================================================
+    {
+        if(layout == gfx_vtype_POS2F_UV) {
+            va->layoutType = gfx_vtype_POS2F_UV;
+            U32 vertSize = 4 * sizeof(F32);
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, vertSize, (void*)(0));
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, vertSize, (void*)(2 * sizeof(F32)));
+            glEnableVertexAttribArray(1);
+        }
+        else if(layout == gfx_vtype_POS3F_UV) {
+            va->layoutType = gfx_vtype_POS3F_UV;
+            U32 vertSize = 5 * sizeof(F32);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertSize, (void*)(0));
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, vertSize, (void*)(3 * sizeof(F32)));
+            glEnableVertexAttribArray(1);
+        }
+        else { ASSERT(false); }
+
+    }
+    glBindVertexArray(0);
+
+    return va;
+}
+
+gfx_IndexBuffer* gfx_registerIndexBuffer(U32* data, U32 dataCount) {
+    gfx_IndexBuffer* ib = BUMP_PUSH_NEW(&globs.resArena, gfx_IndexBuffer);
+    *ib = gfx_IndexBuffer();
+
+
+    glGenBuffers(1, &ib->id);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->id);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, dataCount * sizeof(U32), data, GL_STATIC_DRAW);
+    ib->data = data;
+    ib->count = dataCount;
+
+    return ib;
+}
+
+// CLEANUP: make binding more consistent
+void gfx_bindVertexArray(gfx_Pass* pass, gfx_VertexArray* va) {
+    ASSERT(va);
+    ASSERT(va->layoutType == pass->shader->layout);
+    glBindVertexArray(va->id);
+    pass->curVa = va;
+}
+void gfx_bindIndexBuffer(gfx_Pass* pass, gfx_IndexBuffer* ib) {
+    ASSERT(ib);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->id);
+    pass->curIb = ib;
+}
 
 
 
@@ -376,11 +440,10 @@ void gfx_resizeFramebuffer(gfx_Framebuffer* fb, int nw, int nh) {
 
 
 // Begins new pass
-gfx_Pass* gfx_registerPass(bool isClearPass) {
+gfx_Pass* gfx_registerPass() {
     ASSERT(globs.passCount < MAX_PASS_COUNT - 1);
     gfx_Pass* p = ARR_APPEND(globs.passes, globs.passCount, gfx_Pass());
     *p = gfx_Pass();
-    p->isClearPass = isClearPass;
     return p;
 }
 // Adds and returns new call within the current pass
@@ -389,7 +452,7 @@ gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass) {
 
     gfx_UniformBlock* block = BUMP_PUSH_NEW(&globs.passArena, gfx_UniformBlock);
     *block = gfx_UniformBlock();
-    block->next = nullptr;
+    block->_next = nullptr;
 
     if(!pass->startCall) {
         pass->startCall = block;
@@ -398,7 +461,7 @@ gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass) {
     // TODO: sll macros
 
     else {
-        pass->endCall->next = block;
+        pass->endCall->_next = block;
         pass->endCall = block; }
 
     return block;
@@ -426,25 +489,23 @@ void gfx_drawPasses() {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         }
         else {
+            ASSERT(pass->shader);
             glUseProgram(pass->shader->id);
             ASSERT(pass->shader->passUniformBindFunc);
-            pass->shader->passUniformBindFunc(pass->shader, &pass->passUniforms);
-
-            // TODO: per call vb/ibs
-            glBindVertexArray(globs.va2d.id);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, globs.ib2d.id);
+            pass->shader->passUniformBindFunc(pass, &pass->passUniforms);
 
             gfx_UniformBlock* curBlock = pass->startCall;
             while(curBlock) {
 
-                // TODO: vertex array layout assert
-                // ASSERT(pass->shader == va)
-
                 ASSERT(pass->shader->uniformBindFunc);
-                pass->shader->uniformBindFunc(pass->shader, curBlock);
-                glDrawElements(GL_TRIANGLES, globs.ib2d.count, GL_UNSIGNED_INT, nullptr);
+                pass->shader->uniformBindFunc(pass, curBlock);
 
-                curBlock = curBlock->next;
+                ASSERT(pass->curIb);
+                ASSERT(pass->curVa);
+
+                glDrawElements(GL_TRIANGLES, pass->curIb->count, GL_UNSIGNED_INT, nullptr);
+
+                curBlock = curBlock->_next;
             }
         }
     }
@@ -453,6 +514,8 @@ void gfx_drawPasses() {
     globs.passCount = 0;
     bump_clear(&globs.passArena);
     globs.passes = BUMP_PUSH_ARR(&globs.passArena, MAX_PASS_COUNT, gfx_Pass);
+
+    glBindVertexArray(0);
 }
 
 

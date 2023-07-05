@@ -103,10 +103,52 @@ int main() {
     blu_init(solidTex);
     blu_loadFont("C:/windows/fonts/consola.ttf");
 
-    gfx_Framebuffer* f = gfx_registerFramebuffer();
+    gfx_Framebuffer* sceneFramebuffer = gfx_registerFramebuffer();
+
+
+    float vaData[] = {
+        0, 0, 0,        0, 0,
+        0, 1, 0,        0, 0,
+        1, 1, 0,        0, 0,
+        1, 0, 0,        0, 0
+    };
+    gfx_VertexArray* sceneVA = gfx_registerVertexArray(gfx_vtype_POS3F_UV, vaData, sizeof(vaData), false);
+
+    U32 ibData[] = {
+        0, 1, 2,
+        2, 3, 0 };
+    gfx_IndexBuffer* sceneIB = gfx_registerIndexBuffer(ibData, sizeof(ibData) / sizeof(U32));
+
 
 
     net_init();
+
+
+    gfx_Shader* sceneShader;
+    {
+        sceneShader = gfx_registerShader(gfx_vtype_POS3F_UV, "res/shaders/scene.vert", "res/shaders/scene.frag", &frameArena);
+
+        sceneShader->passUniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
+            int loc;
+
+            loc = glGetUniformLocation(pass->shader->id, "uVP");
+            glUniformMatrix4fv(loc, 1, false, &(uniforms->vp)[0]);
+
+        };
+
+        sceneShader->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
+            int loc;
+
+            loc = glGetUniformLocation(pass->shader->id, "uColor");
+            glUniform4f(loc, uniforms->color.x, uniforms->color.y, uniforms->color.z, uniforms->color.w);
+
+            loc = glGetUniformLocation(pass->shader->id, "uModel");
+            glUniformMatrix4fv(loc, 1, false, &(uniforms->model)[0]);
+
+            gfx_bindVertexArray(pass, uniforms->va);
+            gfx_bindIndexBuffer(pass, uniforms->ib);
+        };
+    }
 
 
     gfx_Shader* blueShader;
@@ -114,40 +156,43 @@ int main() {
         blueShader = gfx_registerShader(gfx_vtype_POS2F_UV, "res/shaders/blue.vert", "res/shaders/blue.frag", &frameArena);
 
         // TODO: remove lambdas
-        blueShader->passUniformBindFunc = [](gfx_Shader* shader, gfx_UniformBlock* uniforms) {
+        blueShader->passUniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
             int loc;
 
-            loc = glGetUniformLocation(shader->id, "uVP");
+            loc = glGetUniformLocation(pass->shader->id, "uVP");
             glUniformMatrix4fv(loc, 1, false, &(uniforms->vp)[0]);
+
+            gfx_bindVertexArray(pass, gfx_getQuadVA());
+            gfx_bindIndexBuffer(pass, gfx_getQuadIB());
         };
 
-        blueShader->uniformBindFunc = [](gfx_Shader* shader, gfx_UniformBlock* uniforms) {
+        blueShader->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
             int loc;
 
-            loc = glGetUniformLocation(shader->id, "uDstStart");
+            loc = glGetUniformLocation(pass->shader->id, "uDstStart");
             glUniform2f(loc, uniforms->dstStart.x, uniforms->dstStart.y);
-            loc = glGetUniformLocation(shader->id, "uDstEnd");
+            loc = glGetUniformLocation(pass->shader->id, "uDstEnd");
             glUniform2f(loc, uniforms->dstEnd.x, uniforms->dstEnd.y);
 
-            loc = glGetUniformLocation(shader->id, "uSrcStart");
+            loc = glGetUniformLocation(pass->shader->id, "uSrcStart");
             glUniform2f(loc, uniforms->srcStart.x, uniforms->srcStart.y);
-            loc = glGetUniformLocation(shader->id, "uSrcEnd");
+            loc = glGetUniformLocation(pass->shader->id, "uSrcEnd");
             glUniform2f(loc, uniforms->srcEnd.x, uniforms->srcEnd.y);
 
-            loc = glGetUniformLocation(shader->id, "uClipStart");
+            loc = glGetUniformLocation(pass->shader->id, "uClipStart");
             glUniform2f(loc, uniforms->clipStart.x, uniforms->clipStart.y);
-            loc = glGetUniformLocation(shader->id, "uClipEnd");
+            loc = glGetUniformLocation(pass->shader->id, "uClipEnd");
             glUniform2f(loc, uniforms->clipEnd.x, uniforms->clipEnd.y);
 
-            loc = glGetUniformLocation(shader->id, "uColor");
+            loc = glGetUniformLocation(pass->shader->id, "uColor");
             glUniform4f(loc, uniforms->color.x, uniforms->color.y, uniforms->color.z, uniforms->color.w);
 
-            loc = glGetUniformLocation(shader->id, "uTexture");
+            loc = glGetUniformLocation(pass->shader->id, "uTexture");
             glUniform1i(loc, 0);
             glActiveTexture(GL_TEXTURE0 + 0);
             glBindTexture(GL_TEXTURE_2D, uniforms->texture->id);
 
-            loc = glGetUniformLocation(shader->id, "uFontTexture");
+            loc = glGetUniformLocation(pass->shader->id, "uFontTexture");
             glUniform1i(loc, 1);
             glActiveTexture(GL_TEXTURE0 + 1);
             glBindTexture(GL_TEXTURE_2D, uniforms->fontTexture->id);
@@ -163,6 +208,10 @@ int main() {
     float clipPos = 0;
     float clipMax = 1400;
     float clipSize = 0;
+
+    float camX = 0;
+    float camY = 0;
+    float camZ = 0;
 
     F64 prevTime = glfwGetTime();
     while(!glfwWindowShouldClose(window)) {
@@ -307,19 +356,49 @@ int main() {
                 {
                     a = blu_areaMake(STR("fbdisplay"), blu_areaFlags_DRAW_TEXTURE);
                     a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
-                    a->texture = f->texture;
+                    a->texture = sceneFramebuffer->texture;
 
                     int w = (int)a->calculatedSizes[blu_axis_X];
                     int h = (int)a->calculatedSizes[blu_axis_Y];
 
-                    if(w != f->texture->width || h != f->texture->height) {
-                        gfx_resizeFramebuffer(f, w, h); }
+                    if(w != sceneFramebuffer->texture->width || h != sceneFramebuffer->texture->height) {
+                        gfx_resizeFramebuffer(sceneFramebuffer, w, h); }
 
 
 
-                    gfx_Pass* p = gfx_registerPass(true);
-                    p->target = f;
-                    p->passUniforms.color = V4f(0, 1, 1, 1);
+                    gfx_Pass* p = gfx_registerPass();
+                    p->isClearPass = true;
+                    p->target = sceneFramebuffer;
+                    p->passUniforms.color = V4f(0, 0, 0, 1);
+
+
+
+                    Mat4f proj = Mat4f(1.0f);
+                    if(h != 0) {
+                        matrixPerspective(90, w / h, 0.01, 1000000, proj); }
+
+                    Mat4f view;
+                    // TODO: 3d-ify utils
+                    camX += (glfwGetKey(window, GLFW_KEY_D) - glfwGetKey(window, GLFW_KEY_A)) * dt;
+                    camY += (glfwGetKey(window, GLFW_KEY_W) - glfwGetKey(window, GLFW_KEY_S)) * dt;
+                    camZ += (glfwGetKey(window, GLFW_KEY_Q) - glfwGetKey(window, GLFW_KEY_E)) * dt;
+
+                    matrixTranslation(V2f(camX, camY), camZ, view);
+                    matrixInverse(view, view);
+
+                    Mat4f vp;
+                    vp = view * proj;
+
+                    p = gfx_registerPass();
+                    p->target = sceneFramebuffer;
+                    p->passUniforms.vp = vp;
+                    p->shader = sceneShader;
+
+                    gfx_UniformBlock* b = gfx_registerCall(p);
+                    b->color = V4f(1, 1, 1, 1);
+                    b->model = Mat4f(1.0f);
+                    b->ib = sceneIB;
+                    b->va = sceneVA;
                 }
 
 
@@ -409,10 +488,11 @@ int main() {
             blu_layout(V2f(w, h));
 
 
-            gfx_Pass* clear = gfx_registerPass(true);
+            gfx_Pass* clear = gfx_registerPass();
+            clear->isClearPass = true;
             clear->passUniforms.color = V4f(0, 0, 0, 1);
 
-            gfx_Pass* p = gfx_registerPass(false);
+            gfx_Pass* p = gfx_registerPass();
             p->shader = blueShader;
             p->passUniforms = gfx_UniformBlock();
             p->passUniforms.vp = vp;
