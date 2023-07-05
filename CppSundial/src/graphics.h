@@ -58,10 +58,10 @@ struct gfx_VertexArray {
     // F32* data = nullptr;
 };
 
-// NOTE: consider different formats for framebuffers
-// RN rgba and depth are assumed
-// TODO: framebuffer & texture resize func
 
+// NOTE: consider different formats for framebuffers
+// TODO: framebuffer & texture resize func
+// RN rgba and depth attachments are assumed
 struct gfx_Framebuffer {
     gfx_Texture* texture;
 
@@ -104,15 +104,17 @@ struct gfx_UniformBlock {
 // NOTE: figure out a way to make this work without editing gfx src.
 
 
+// target == nullptr indicates drawing to the screen
 struct gfx_Pass {
 
+    bool isClearPass = false;
+
+    gfx_Framebuffer* target = nullptr;
     gfx_Shader* shader = nullptr;
     gfx_UniformBlock passUniforms = gfx_UniformBlock();
 
     gfx_UniformBlock* startCall = nullptr;
     gfx_UniformBlock* endCall = nullptr;
-
-    // TODO: render targets
 };
 
 
@@ -143,12 +145,10 @@ void gfx_init();
 gfx_Shader* gfx_registerShader(gfx_VType vertLayout, const char* vertPath, const char* fragPath, BumpAlloc* scratch);
 gfx_Texture* gfx_registerTexture(U8* data, int width, int height, gfx_TexPxType pixelLayout);
 gfx_Framebuffer* gfx_registerFramebuffer();
-void gfx_clear(V4f color);
-gfx_Pass* gfx_registerPass();
+void gfx_resizeFramebuffer(gfx_Framebuffer* fb, int nw, int nh);
+gfx_Pass* gfx_registerPass(bool isClearPass);
 gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass);
 void gfx_drawPasses();
-
-
 
 
 #ifdef GFX_IMPL
@@ -353,23 +353,34 @@ gfx_Framebuffer* gfx_registerFramebuffer() {
     return f;
 }
 
+// resizes texture and depth components GPU side
+void gfx_resizeFramebuffer(gfx_Framebuffer* fb, int nw, int nh) {
 
+    glBindTexture(GL_TEXTURE_2D, fb->texture->id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, nw, nh, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
-void gfx_clear(V4f color) {
-    glClearColor(color.x, color.y, color.z, color.w);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glBindRenderbuffer(GL_RENDERBUFFER, fb->depthId);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, nw, nh);
+
+    fb->texture->width = nw;
+    fb->texture->height = nh;
 }
 
 
 
 
 
+
+
+
+
+
 // Begins new pass
-gfx_Pass* gfx_registerPass() {
+gfx_Pass* gfx_registerPass(bool isClearPass) {
     ASSERT(globs.passCount < MAX_PASS_COUNT - 1);
     gfx_Pass* p = ARR_APPEND(globs.passes, globs.passCount, gfx_Pass());
-    p->startCall = nullptr;
-    p->endCall = nullptr;
+    *p = gfx_Pass();
+    p->isClearPass = isClearPass;
     return p;
 }
 // Adds and returns new call within the current pass
@@ -377,6 +388,7 @@ gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass) {
     ASSERT(pass);
 
     gfx_UniformBlock* block = BUMP_PUSH_NEW(&globs.passArena, gfx_UniformBlock);
+    *block = gfx_UniformBlock();
     block->next = nullptr;
 
     if(!pass->startCall) {
@@ -402,25 +414,38 @@ void gfx_drawPasses() {
     for(int i = 0; i < globs.passCount; i++) {
         gfx_Pass* pass = &globs.passes[i];
 
-        glUseProgram(pass->shader->id);
-        ASSERT(pass->shader->passUniformBindFunc);
-        pass->shader->passUniformBindFunc(pass->shader, &pass->passUniforms);
+        if(pass->target) { glBindFramebuffer(GL_FRAMEBUFFER, pass->target->fbId); }
+        else { glBindFramebuffer(GL_FRAMEBUFFER, 0); }
 
-        // TODO: per call vb/ibs
-        glBindVertexArray(globs.va2d.id);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, globs.ib2d.id);
+        if(pass->isClearPass) {
+            glClearColor(
+                pass->passUniforms.color.x,
+                pass->passUniforms.color.y,
+                pass->passUniforms.color.z,
+                pass->passUniforms.color.w);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        }
+        else {
+            glUseProgram(pass->shader->id);
+            ASSERT(pass->shader->passUniformBindFunc);
+            pass->shader->passUniformBindFunc(pass->shader, &pass->passUniforms);
 
-        gfx_UniformBlock* curBlock = pass->startCall;
-        while(curBlock) {
+            // TODO: per call vb/ibs
+            glBindVertexArray(globs.va2d.id);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, globs.ib2d.id);
 
-            // TODO: vertex array layout assert
-            // ASSERT(pass->shader == va)
+            gfx_UniformBlock* curBlock = pass->startCall;
+            while(curBlock) {
 
-            ASSERT(pass->shader->uniformBindFunc);
-            pass->shader->uniformBindFunc(pass->shader, curBlock);
-            glDrawElements(GL_TRIANGLES, globs.ib2d.count, GL_UNSIGNED_INT, nullptr);
+                // TODO: vertex array layout assert
+                // ASSERT(pass->shader == va)
 
-            curBlock = curBlock->next;
+                ASSERT(pass->shader->uniformBindFunc);
+                pass->shader->uniformBindFunc(pass->shader, curBlock);
+                glDrawElements(GL_TRIANGLES, globs.ib2d.count, GL_UNSIGNED_INT, nullptr);
+
+                curBlock = curBlock->next;
+            }
         }
     }
 

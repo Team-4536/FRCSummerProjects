@@ -103,7 +103,7 @@ int main() {
     blu_init(solidTex);
     blu_loadFont("C:/windows/fonts/consola.ttf");
 
-    // gfx_Framebuffer* f = gfx_registerFramebuffer();
+    gfx_Framebuffer* f = gfx_registerFramebuffer();
 
 
     net_init();
@@ -201,7 +201,6 @@ int main() {
                 clipSize = a->calculatedSizes[blu_axis_Y];
                 blu_areaAddDisplayStr(a, STR("left"));
                 a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 300 };
-                a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, 100 };
                 a->style.childLayoutAxis = blu_axis_X;
                 blu_parentScope(a) {
 
@@ -305,6 +304,27 @@ int main() {
 
 
 
+                {
+                    a = blu_areaMake(STR("fbdisplay"), blu_areaFlags_DRAW_TEXTURE);
+                    a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
+                    a->texture = f->texture;
+
+                    int w = (int)a->calculatedSizes[blu_axis_X];
+                    int h = (int)a->calculatedSizes[blu_axis_Y];
+
+                    if(w != f->texture->width || h != f->texture->height) {
+                        gfx_resizeFramebuffer(f, w, h); }
+
+
+
+                    gfx_Pass* p = gfx_registerPass(true);
+                    p->target = f;
+                    p->passUniforms.color = V4f(0, 1, 1, 1);
+                }
+
+
+
+
                 //*
                 a = blu_areaMake(STR("window"),
                         blu_areaFlags_DRAW_BACKGROUND |
@@ -388,7 +408,11 @@ int main() {
             glViewport(0, 0, w, h);
             blu_layout(V2f(w, h));
 
-            gfx_Pass* p = gfx_registerPass();
+
+            gfx_Pass* clear = gfx_registerPass(true);
+            clear->passUniforms.color = V4f(0, 0, 0, 1);
+
+            gfx_Pass* p = gfx_registerPass(false);
             p->shader = blueShader;
             p->passUniforms = gfx_UniformBlock();
             p->passUniforms.vp = vp;
@@ -396,7 +420,6 @@ int main() {
             blu_createPass(p);
         }
 
-        gfx_clear(V4f(0, 0, 0, 1));
         gfx_drawPasses();
 
         bump_clear(&frameArena);
