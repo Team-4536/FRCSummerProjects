@@ -103,6 +103,8 @@ int main() {
     blu_init(solidTex);
     blu_loadFont("C:/windows/fonts/consola.ttf");
 
+    // gfx_Framebuffer* f = gfx_registerFramebuffer();
+
 
     net_init();
 

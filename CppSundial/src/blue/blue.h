@@ -32,14 +32,14 @@ THE CHECKLIST:
     [X] custom textures
     [X] animations
     [X] scrolling
-    [ ] clipping
-    [ ] tooltips/dropdowns
-    [ ] text input
-    [ ] cursor changes
+    [X] clipping
     [ ] padding
+    [ ] cursor changes
     [ ] rounding
     [ ] borders
     [ ] drop shadows
+    [ ] tooltips/dropdowns
+    [ ] text input
 
     [ ] cleanup
     [ ] batching
@@ -130,8 +130,8 @@ struct blu_Area {
     blu_Area* nextFree = nullptr;
 
     // tree links, [2] means double buffered
-    // TODO: replace double buffer/ benchmark vs a copy version
-    // TODO: better way of iterating over all elements
+    // CLEANUP: replace double buffer/ benchmark vs a copy version
+    // CLEANUP: better way of iterating over all elements
     blu_Area* parent = nullptr;
     blu_Area* firstChild[2] = { 0 };
     blu_Area* lastChild = nullptr;

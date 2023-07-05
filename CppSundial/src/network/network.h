@@ -91,7 +91,7 @@ struct net_Sock {
 // windows is a terrible platform
 // return value indicates if socket has finished connecting to server
 // Errors: net_sockErr_failedConnection, failedAddrInfo, failedCreation
-bool _net_sockCreateConnect(const char* ip, const char* port, net_Sock* sock, net_SockErr* outError) {
+bool _net_sockCreateConnect(const char* hostname, const char* port, net_Sock* sock, net_SockErr* outError) {
     *outError = net_sockErr_none;
     int err;
 
@@ -105,7 +105,7 @@ bool _net_sockCreateConnect(const char* ip, const char* port, net_Sock* sock, ne
 
         addrinfo* resInfo;
         // CLEANUP: perma allocations here
-        err = getaddrinfo(ip, port, &hints, &resInfo);
+        err = getaddrinfo(hostname, port, &hints, &resInfo);
         if(err != 0) {
             *outError = net_sockErr_failedAddrInfo;
             return false;
@@ -289,7 +289,7 @@ void net_update() {
     net_SockErr err;
 
     if(!globs.connected) {
-        bool connected = _net_sockCreateConnect("127.0.0.1", "7000", &globs.simSocket, &err);
+        bool connected = _net_sockCreateConnect("localhost", "7000", &globs.simSocket, &err);
 
         if(err != net_sockErr_none) { // attempt reconnection forever on errors
             _net_sockCloseFree(&globs.simSocket); }

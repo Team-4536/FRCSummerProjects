@@ -58,6 +58,17 @@ struct gfx_VertexArray {
     // F32* data = nullptr;
 };
 
+// NOTE: consider different formats for framebuffers
+// RN rgba and depth are assumed
+// TODO: framebuffer & texture resize func
+
+struct gfx_Framebuffer {
+    gfx_Texture* texture;
+
+    U32 fbId = 0;
+    U32 depthId = 0;
+};
+
 
 
 
@@ -131,13 +142,11 @@ struct gfx_Globs {
 void gfx_init();
 gfx_Shader* gfx_registerShader(gfx_VType vertLayout, const char* vertPath, const char* fragPath, BumpAlloc* scratch);
 gfx_Texture* gfx_registerTexture(U8* data, int width, int height, gfx_TexPxType pixelLayout);
+gfx_Framebuffer* gfx_registerFramebuffer();
 void gfx_clear(V4f color);
 gfx_Pass* gfx_registerPass();
 gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass);
 void gfx_drawPasses();
-
-
-
 
 
 
@@ -318,6 +327,32 @@ gfx_Texture* gfx_registerTexture(U8* data, int width, int height, gfx_TexPxType 
 
     return t;
 }
+
+gfx_Framebuffer* gfx_registerFramebuffer() {
+
+    gfx_Framebuffer* f = BUMP_PUSH_NEW(&globs.resArena, gfx_Framebuffer);
+
+    glGenFramebuffers(1, &f->fbId);
+    glBindFramebuffer(GL_FRAMEBUFFER, f->fbId);
+
+    f->texture = gfx_registerTexture(nullptr, 1, 1, gfx_texPxType_RGBA8);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, f->texture->id);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, f->texture->id, 0);
+
+    glGenRenderbuffers(1, &f->depthId);
+    glBindRenderbuffer(GL_RENDERBUFFER, f->depthId);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, 1, 1);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, f->depthId);
+
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        printf("Framebuffer creation failed.");
+        ASSERT(false);
+    }
+
+    return f;
+}
+
 
 
 void gfx_clear(V4f color) {
