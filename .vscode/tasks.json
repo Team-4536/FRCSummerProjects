@@ -9,23 +9,5 @@
             "command": "py -3 sundial/src/main.py",
             "problemMatcher": []
         },
-        {
-            "label": "Run robot sim",
-            "type": "shell",
-            "command": "py -3 imperative/robot.py sim",
-            "problemMatcher": []
-        },
-        {
-            "label": "Deploy robot code",
-            "type": "shell",
-            "command": "py -3 imperative/robot.py deploy",
-            "problemMatcher": []
-        },
-        {
-            "label": "Debug deploy robot code",
-            "type": "shell",
-            "command": "py -3 imperative/robot.py deploy --nc",
-            "problemMatcher": []
-        }
     ]
 }

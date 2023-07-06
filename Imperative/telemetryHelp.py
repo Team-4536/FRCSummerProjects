@@ -3,7 +3,7 @@ import wpilib
 
 
 
-def publishExpression(exp: str, root: object, table: ntcore.NetworkTable) -> None:
+def publishExpression(exp: str, pubName: str, root: object, table: ntcore.NetworkTable) -> None:
 
     isFunc = exp.endswith("()")
     exp = exp.removesuffix("()")
@@ -17,8 +17,8 @@ def publishExpression(exp: str, root: object, table: ntcore.NetworkTable) -> Non
 
 
     try:
-        if isFunc: table.putValue("expr", val())
-        else: table.putValue("expr", val)
+        if isFunc: table.putValue(pubName, val())
+        else: table.putValue(pubName, val)
     except Exception as e:
         print(f"{type(val)}")
         print(f"Exception while publishing value of expression \'{exp}\': {repr(e)}")

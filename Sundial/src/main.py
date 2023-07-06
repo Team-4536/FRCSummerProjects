@@ -6,6 +6,7 @@ from utils.tables import telemTable
 import dearpygui.dearpygui as dpg
 from widgets.visuals import swerveWidget
 from widgets.visuals import mechWidget
+from widgets.visuals import fieldWidget
 from widgets import ntPlot
 from widgets import client
 import widgets.demoControlWidget
@@ -53,10 +54,10 @@ class sundial:
 
         self.widgets: list[widget] = [
 
-            mechWidget.mechWidget(),
+            fieldWidget.fieldWidget(),
+            swerveWidget.swerveWidget(),
             client.clientWidget(),
             ntPlot.ntPlot(),
-            widgets.demoControlWidget.DemoControlWidget()
         ]
 
         dpg.show_viewport()
