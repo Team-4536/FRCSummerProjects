@@ -18,7 +18,7 @@ static struct DemoGlobs {
     gfx_IndexBuffer* sceneIB = nullptr;
 
     // TODO: v3s
-    V4f camPos = { 0, 0, 1, 0 };
+    V4f camPos = { 0.5, 0.5, 2, 0 };
     V2i viewPortSize = { 0, 0 };
 
     V2f windowPos = V2f(350, 100);
@@ -30,6 +30,7 @@ static struct DemoGlobs {
 } demoGlobs;
 
 
+// TODO: make deps clearer
 
 void demo_init(BumpAlloc* frameArena) {
     demoGlobs = DemoGlobs();
@@ -58,7 +59,6 @@ void demo_init(BumpAlloc* frameArena) {
 
             loc = glGetUniformLocation(pass->shader->id, "uVP");
             glUniformMatrix4fv(loc, 1, false, &(uniforms->vp)[0]);
-
         };
 
         demoGlobs.sceneShader->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
@@ -76,6 +76,24 @@ void demo_init(BumpAlloc* frameArena) {
     }
 
 }
+
+
+blu_Area* demo_makeFancyButton(str name, int stdWidth, int hoverWidth, V4f hoverBack, V4f hoverText) {
+
+    blu_Area* a = blu_areaMake(name,
+        blu_areaFlags_DRAW_BACKGROUND |
+        blu_areaFlags_DRAW_TEXT |
+        blu_areaFlags_HOVER_ANIM |
+        blu_areaFlags_CLICKABLE);
+
+    blu_areaAddDisplayStr(a, name);
+    a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, hoverBack, a->target_hoverAnim);
+    a->style.textColor = v4f_lerp(a->style.textColor, hoverText, a->target_hoverAnim);
+    a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, lerp(stdWidth, hoverWidth, a->target_hoverAnim) };
+
+    return a;
+}
+
 
 void demo_makeUI(BumpAlloc& frameArena, float dt, GLFWwindow* window) {
 
@@ -213,7 +231,6 @@ void demo_makeUI(BumpAlloc& frameArena, float dt, GLFWwindow* window) {
                 gfx_resizeFramebuffer(demoGlobs.sceneFB, w, h); }
 
 
-
             gfx_Pass* p = gfx_registerPass();
             p->isClearPass = true;
             p->target = demoGlobs.sceneFB;
@@ -223,24 +240,21 @@ void demo_makeUI(BumpAlloc& frameArena, float dt, GLFWwindow* window) {
 
             Mat4f proj = Mat4f(1.0f);
             if(h != 0) {
-                matrixPerspective(90, w / h, 0.01, 1000000, proj); }
+                matrixPerspective(90, (float)w / h, 0.01, 1000000, proj); }
 
-            Mat4f view;
             // TODO: 3d-ify utils
             demoGlobs.camPos.x += (glfwGetKey(window, GLFW_KEY_D) - glfwGetKey(window, GLFW_KEY_A)) * dt;
             demoGlobs.camPos.y += (glfwGetKey(window, GLFW_KEY_W) - glfwGetKey(window, GLFW_KEY_S)) * dt;
             demoGlobs.camPos.z += (glfwGetKey(window, GLFW_KEY_Q) - glfwGetKey(window, GLFW_KEY_E)) * dt;
 
+            Mat4f view;
             matrixTranslation(V2f(demoGlobs.camPos.x, demoGlobs.camPos.y), demoGlobs.camPos.z, view);
             matrixInverse(view, view);
 
-            Mat4f vp;
-            vp = view * proj;
-
             p = gfx_registerPass();
             p->target = demoGlobs.sceneFB;
-            p->passUniforms.vp = vp;
             p->shader = demoGlobs.sceneShader;
+            p->passUniforms.vp = view * proj;
 
             gfx_UniformBlock* b = gfx_registerCall(p);
             b->color = V4f(1, 1, 1, 1);
@@ -261,7 +275,7 @@ void demo_makeUI(BumpAlloc& frameArena, float dt, GLFWwindow* window) {
 
         blu_Area* win = a;
         blu_areaAddDisplayStr(a, STR("window"));
-        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 350 };
+        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 250 };
         a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, 250 };
         a->style.childLayoutAxis = blu_axis_Y;
 
@@ -280,28 +294,15 @@ void demo_makeUI(BumpAlloc& frameArena, float dt, GLFWwindow* window) {
                     a = blu_areaMake(STR("space"), 0);
                     a->style.sizes[blu_axis_X].kind = blu_sizeKind_REMAINDER;
 
-
                     blu_styleScope {
+                    blu_style_add_backgroundColor(col_darkGray);
+                    blu_style_add_textColor(col_white);
                         U32 stdSize = 30;
                         U32 wideSize = 40;
 
-                        a = blu_areaMake(STR("b1"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
-                        blu_areaAddDisplayStr(a, STR("AAAAA"));
-                        a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, col_white, a->target_hoverAnim);
-                        a->style.textColor = v4f_lerp(a->style.textColor, col_darkBlue, a->target_hoverAnim);
-                        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, lerp(stdSize, wideSize, a->target_hoverAnim) };
-
-                        a = blu_areaMake(STR("b2"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
-                        blu_areaAddDisplayStr(a, STR("O"));
-                        a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, col_white, a->target_hoverAnim);
-                        a->style.textColor = v4f_lerp(a->style.textColor, col_darkBlue, a->target_hoverAnim);
-                        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, lerp(stdSize, wideSize, a->target_hoverAnim) };
-
-                        a = blu_areaMake(STR("b3"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
-                        blu_areaAddDisplayStr(a, STR("X"));
-                        a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, col_red, a->target_hoverAnim);
-                        a->style.textColor = v4f_lerp(a->style.textColor, col_darkBlue, a->target_hoverAnim);
-                        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, lerp(stdSize, wideSize, a->target_hoverAnim) };
+                        demo_makeFancyButton(STR("-"), stdSize, wideSize, col_white, col_darkBlue);
+                        demo_makeFancyButton(STR("O"), stdSize, wideSize, col_white, col_darkBlue);
+                        demo_makeFancyButton(STR("X"), stdSize, wideSize, col_red, col_darkBlue);
                     }
                 } // end title bar
 

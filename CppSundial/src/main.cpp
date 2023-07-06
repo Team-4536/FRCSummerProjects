@@ -168,10 +168,13 @@ int main() {
         F64 dt = time - prevTime;
         prevTime = time;
 
+        int w, h;
+        glfwGetFramebufferSize(window, &w, &h);
+
+
         net_update();
 
         blu_beginFrame();
-
 
         demo_makeUI(frameArena, dt, window);
         demo_updateScene(dt);
@@ -188,8 +191,6 @@ int main() {
 
 
         { // BLU RENDERING
-            int w, h;
-            glfwGetFramebufferSize(window, &w, &h);
             Mat4f vp;
             matrixOrtho(0, w, h, 0, 0.0001, 10000, vp);
 
@@ -209,7 +210,7 @@ int main() {
         }
 
 
-        gfx_drawPasses();
+        gfx_drawPasses(w, h);
 
         bump_clear(&frameArena);
         glfwSwapBuffers(window);

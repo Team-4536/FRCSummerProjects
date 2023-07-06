@@ -140,6 +140,8 @@ gfx_IndexBuffer* gfx_getQuadIB();
 
 gfx_Shader* gfx_registerShader(gfx_VType vertLayout, const char* vertPath, const char* fragPath, BumpAlloc* scratch);
 gfx_Texture* gfx_registerTexture(U8* data, int width, int height, gfx_TexPxType pixelLayout);
+
+// TODO: multisample/antialias framebuffers
 gfx_Framebuffer* gfx_registerFramebuffer();
 
 gfx_VertexArray* gfx_registerVertexArray(gfx_VType layout, void* data, U32 dataSize, bool dynamic);
@@ -156,7 +158,7 @@ gfx_Pass* gfx_registerPass();
 gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass);
 
 // draws all passes, clears passes and calls after.
-void gfx_drawPasses();
+void gfx_drawPasses(U32 scWidth, U32 scHeight);
 
 
 #ifdef GFX_IMPL
@@ -472,13 +474,23 @@ gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass) {
 
 // Draws all passes,
 // Clears after
-void gfx_drawPasses() {
+void gfx_drawPasses(U32 scWidth, U32 scHeight) {
 
     for(int i = 0; i < globs.passCount; i++) {
         gfx_Pass* pass = &globs.passes[i];
 
-        if(pass->target) { glBindFramebuffer(GL_FRAMEBUFFER, pass->target->fbId); }
-        else { glBindFramebuffer(GL_FRAMEBUFFER, 0); }
+
+        if(pass->target) {
+            glBindFramebuffer(GL_FRAMEBUFFER, pass->target->fbId);
+
+            glViewport(0, 0,
+            pass->target->texture->width,
+            pass->target->texture->height);
+        }
+        else {
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glViewport(0, 0, scWidth, scHeight);
+        }
 
         if(pass->isClearPass) {
             glClearColor(
