@@ -6,11 +6,11 @@ class dualLimitSwitchMoterController:
         self.encoderDistance = encoderDistance
         self.PID = PIDController.PIDController(kp, ki, kd)
 
-    def tick(self, target: float, position: float, dt: float, limitSwitch1, limitSwitch2) -> float:
+    def tick(self, target: float, position: float, dt: float) -> float:
         out = None
-        if position > self.encoderBase + self.encoderDistance:
+        if target > self.encoderBase + self.encoderDistance:
             out = self.PID.tick(target, self.encoderBase + self.encoderDistance, dt)
-        elif position < self.encoderBase:
+        elif target < self.encoderBase:
             out = self.PID.tick(target, self.encoderBase, dt)
         else:
             out = self.PID.tick(target, position, dt)
