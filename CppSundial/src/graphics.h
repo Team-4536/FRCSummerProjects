@@ -41,7 +41,6 @@ struct gfx_Shader {
     gfx_VType layout = gfx_vtype_NONE;
     gfx_ShaderUniformBindFunc uniformBindFunc = nullptr;
     gfx_ShaderUniformBindFunc passUniformBindFunc = nullptr;
-    // TODO: target layout
 };
 
 struct gfx_IndexBuffer {

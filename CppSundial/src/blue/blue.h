@@ -636,7 +636,7 @@ void _blu_solveRemainders(blu_Area* parent, int axis) {
 }
 
 
-// TODO: make recursive functions consistent
+// CLEANUP: make recursive functions consistent
 void _blu_calculateOffsetsAndRect(blu_Area* parent) {
 
     bool x = parent->style.childLayoutAxis == blu_axis_X;
@@ -707,7 +707,6 @@ void blu_layout(V2f scSize) {
                 if(axis == blu_axis_Y) {
                     elem->calculatedSizes[axis] = globs.fontHeight + 2*elem->style.textPadding.y;
                     // CLEANUP: what about no text
-                    // TODO: (?) vertical text layout?
                     // TODO: text wrapping/cutoff
                 }
                 else if(axis == blu_axis_X) {
