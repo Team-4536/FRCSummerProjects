@@ -4,6 +4,8 @@ import numpy
 from enum import Enum
 import select
 
+# in seconds
+SEND_INTERVAL = 0.1
 
 
 
@@ -60,11 +62,12 @@ class Server():
         self.sock.setblocking(False)
         print("Server loaded")
 
-        self.msgList = []
+        self.msgMap: dict[str, Message] = { }
         self.cliSock = None
+        self.lastSendTime = 0
 
 
-    def update(self):
+    def update(self, curTime: float):
 
         if self.cliSock == None:
 
@@ -78,15 +81,22 @@ class Server():
 
 
 
-        if len(self.msgList) != 0:
-            m = self.msgList.pop(0)
+        if(curTime - self.lastSendTime > SEND_INTERVAL):
 
-            try:
-                status = self.cliSock.send(m.content)
-            except Exception as e:
-                self.cliSock.close()
-                self.cliSock = None
-                print(f"[SOCKETS] Client ended with exception {repr(e)}")
+            for p in self.msgMap.items():
+                self.lastSendTime = curTime
+                assert(self.cliSock != None) # ?????????
+
+                try:
+                    self.cliSock.send(p[1].content)
+                except Exception as e:
+                    self.cliSock.close()
+                    self.cliSock = None
+                    print(f"[SOCKETS] Client ended with exception {repr(e)}")
+
+    def putUpdateMessage(self, name: str, value: float|int):
+        m = Message(MessageKind.UPDATE, name, value)
+        self.msgMap.update({ name : m })
 
 
 

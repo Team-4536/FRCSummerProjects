@@ -323,6 +323,8 @@ void _net_processMessage(U8* msgBuf, U32 msgSize, BumpAlloc* scratch) {
         prop->type = (net_PropType)valType;
         if(prop->type == net_propType_F64) {
             prop->data->f64 = *((F64*)val);
+            // TEMP
+            str_listAppend(&log, str_format(scratch, STR("%f\t"), prop->data->f64), scratch);
         }
         else if (prop->type == net_propType_S32) {
             prop->data->s32 = *((S32*)val);

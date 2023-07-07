@@ -78,8 +78,7 @@ class SwerveBot(wpilib.TimedRobot):
         self.telemTable.putNumber("PosY", self.sim.position.y)
         self.telemTable.putNumber("Yaw", self.gyro.getYaw())
 
-        self.server.msgList.append(
-            socketing.Message(socketing.MessageKind.UPDATE, "PosX", self.sim.position.x))
+        self.server.putUpdateMessage("PosX", self.sim.position.x)
         """
         self.server.msgQueue.push(
             socketing.Message(socketing.MessageKind.UPDATE, "PosY", self.sim.position.y))
@@ -87,7 +86,7 @@ class SwerveBot(wpilib.TimedRobot):
             socketing.Message(socketing.MessageKind.UPDATE, "Yaw", self.gyro.getYaw()))
         """
 
-        self.server.update()
+        self.server.update(self.time.timeSinceInit)
 
 
 
