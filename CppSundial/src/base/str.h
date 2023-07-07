@@ -11,6 +11,15 @@ struct str {
     const U8* chars;
     U64 length;
 };
+struct StrNode {
+    str s = { nullptr, 0 };
+    StrNode* next = nullptr;
+};
+struct StrList {
+    StrNode* start = nullptr;
+    StrNode* end = nullptr;
+};
+
 
 #define STR(x) str_make(x)
 
@@ -28,6 +37,14 @@ void str_printf(str fmt, ...);
 
 str str_format(BumpAlloc* arena, str fmt, ...);
 
+
+
+// copies string into arena, and appends a new node (in arena) to list.
+void str_listAppend(StrList* list, str string, BumpAlloc* arena);
+
+// copies all strings in s into arena, returns one str that goes over all
+str str_listCollect(StrList s, BumpAlloc* arena);
+// str str_listCollect(StrList s, str sep, BumpAlloc* arena);
 
 #ifdef BASE_IMPL
 
@@ -227,5 +244,53 @@ void str_println(str s) {
     putchar('\n');
 }
 
+
+
+
+
+void str_listAppend(StrList* list, str string, BumpAlloc* arena) {
+
+    StrNode* node = BUMP_PUSH_NEW(arena, StrNode);
+    node->s = str_copy(string, arena);
+
+    if(!list->start) {
+        list->start = node;
+        list->end = node;
+    }
+    else {
+        list->end->next = node;
+        list->end = node;
+    }
+}
+
+str str_listCollect(StrList s, BumpAlloc* arena) {
+    str out = { (U8*)arena->end, 0 };
+
+    StrNode* n = s.start;
+    while(n) {
+        str copy = str_copy(n->s, arena);
+        out.length += n->s.length;
+        n = n->next;
+    }
+
+    return out;
+}
+
+
+/*
+str str_listCollect(StrList s, str sep, BumpAlloc* arena) {
+    str out = { (U8*)arena->end, 0 };
+
+    StrNode* n = s.start;
+    while(n) {
+        str copy = str_copy(n->s, arena);
+        str_copy(sep, arena);
+        out.length += n->s.length + sep.length;
+        n = n->next;
+    }
+
+    return out;
+}
+*/
 
 #endif

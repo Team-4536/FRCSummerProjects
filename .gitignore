@@ -5,7 +5,7 @@ simgui.json
 
 __pycache__/
 Sundial/res/log.txt
-
+CppSundial/sunLog.log
 
 *.o
 *.exe

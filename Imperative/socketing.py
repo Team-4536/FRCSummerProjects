@@ -21,33 +21,33 @@ class Message():
     def __init__(self, kind: MessageKind, name: str, value: float|int|str) -> None:
 
         self.content = b""
-        self.content += int(kind.value).to_bytes(1)
-
-        encoded = name.encode()
-        l = len(encoded)
-        assert(l < 255)
-        self.content += int(l).to_bytes(1)
-        self.content += encoded
 
 
         valType = 0
-        encoded = b""
+        valEncoded = b""
 
         if(type(value) == int):
             valType = MessageUpdateType.S32
-            encoded += value.to_bytes(4, 'little', signed=True)
+            valEncoded += value.to_bytes(4, 'little', signed=True)
 
         elif(type(value) == float or type(value) == numpy.float64):
             valType = MessageUpdateType.F64
-            encoded += bytearray(struct.pack("d", float(value)))
+            valEncoded += bytearray(struct.pack("d", float(value)))
 
         elif(type(value) == str): assert(False) # TODO: this
         else:
             print(f"Invalid type in message: {type(value)}")
             assert(False)
 
+
+
+        self.content += int(kind.value).to_bytes(1)
+        self.content += len(name).to_bytes(1)
         self.content += int(valType.value).to_bytes(1)
-        self.content += encoded
+        self.content += len(valEncoded).to_bytes(1)
+
+        self.content += name.encode()
+        self.content += valEncoded
 
 
 

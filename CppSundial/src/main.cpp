@@ -176,7 +176,7 @@ int main() {
 
 
 
-        net_update();
+        net_update(&frameArena);
 
         blu_beginFrame();
 

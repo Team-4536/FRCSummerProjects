@@ -774,6 +774,7 @@ void _blu_renderString(str string, V2f start, Rect2f clip, V4f color, gfx_Pass* 
 
         U8 c = string.chars[i] - BLU_FONT_FIRST;
 
+        // TODO: INVALID CHAR RENDERING
         // if(c < 0 || c > BLU_FONT_CHARCOUNT) {
             // c = 'I'; }
         ASSERT(c >= 0 && c < BLU_FONT_CHARCOUNT);

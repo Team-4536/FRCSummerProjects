@@ -7,6 +7,7 @@
 
 
 
+// CLEANUP: demo stuff is a mess
 #ifdef DEMO_IMPL
 
 static struct DemoGlobs {
@@ -17,7 +18,6 @@ static struct DemoGlobs {
     gfx_VertexArray* sceneVA = nullptr;
     gfx_IndexBuffer* sceneIB = nullptr;
 
-    // TODO: v3s
     V4f camPos = { 0.5, 0.5, 2, 0 };
     V2i viewPortSize = { 0, 0 };
 
@@ -224,10 +224,7 @@ void demo_makeUI(BumpAlloc& frameArena, float dt, GLFWwindow* window) {
                                 if(prop->type == net_propType_S32) {
                                     blu_areaAddDisplayStr(a, str_format(&frameArena, STR("%i"), (prop->data->s32))); }
                                 else if(prop->type == net_propType_F64) {
-                                    // blu_areaAddDisplayStr(a, STR("Hello i am a float"));
-                                    // printf("%f\n", prop->data->f64);
-                                    blu_areaAddDisplayStr(a, str_format(&frameArena, STR("%f"), (prop->data->f64)));
-                                }
+                                    blu_areaAddDisplayStr(a, str_format(&frameArena, STR("%f"), (prop->data->f64))); }
                             }
                         }
                     }

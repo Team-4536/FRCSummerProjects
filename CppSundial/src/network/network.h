@@ -48,7 +48,7 @@ struct net_Prop {
 
 
 void net_init();
-void net_update();
+void net_update(BumpAlloc* scratch);
 void net_cleanup();
 
 void net_resetTracked();
@@ -89,6 +89,7 @@ struct net_Sock {
 };
 
 // windows is a terrible platform
+// hostname can also be an IP adress
 // return value indicates if socket has finished connecting to server
 // Errors: net_sockErr_failedConnection, failedAddrInfo, failedCreation
 bool _net_sockCreateConnect(const char* hostname, const char* port, net_Sock* sock, net_SockErr* outError) {
@@ -166,6 +167,8 @@ struct net_Globs {
     net_Prop** hash = nullptr; // array of ptrs for hash access
     net_Prop** tracked = nullptr; // array of ptrs for list based access
     U32 trackedCount = 0;
+
+    FILE* logFile;
 };
 
 static net_Globs globs = net_Globs();
@@ -188,6 +191,9 @@ void net_init() {
         printf("WSAStartup failed: %d\n", err);
         ASSERT(false);
     }
+
+
+    globs.logFile = fopen("sunLog.log", "w");
 }
 
 // clears and reallocs resArena
@@ -245,26 +251,71 @@ net_Prop* net_hashGet(str string) {
 
 
 
-void _net_processMessage(U8* buffer, U32 size) {
+void _net_log(str s) {
+    fwrite(s.chars, 1, s.length, globs.logFile);
+}
 
-    if(size < 2) { return; }
 
-    U8 msgKind = buffer[0];
-    U8 nameLen = buffer[1];
-    str name = { &buffer[2], nameLen };
-    str_printf(STR("[MESSAGE] %s\n"), name);
+// TODO: batching
+// TODO: str
+// TODO: document everything
+void _net_processMessage(U8* msgBuf, U32 msgSize, BumpAlloc* scratch) {
 
-    if(size < 2 + nameLen) { return; }
-    U8 valType = buffer[2 + nameLen];
-    if(valType != net_propType_S32 && valType != net_propType_F64) { return; } // TODO: str
-    void* val = &(buffer[2+nameLen+1]);
+    StrList log = StrList();
+
+
+    // CLEANUP: remove goto
+    U8 msgKind;
+    U8 nameLen;
+    U8 valType;
+    U8 valLen;
+    str name;
+    void* val;
+
+    // VALIDATION ================================
+
+    msgKind = msgBuf[0];
+    str_listAppend(&log, str_format(scratch, STR("%i\t"), (int)msgKind), scratch);
+    if(msgKind != net_msgKind_UPDATE) { // TODO: events
+        str_listAppend(&log, STR("\nInvalid msg type\n"), scratch);
+        goto writeLog;
+    }
+
+    nameLen = msgBuf[1];
+    str_listAppend(&log, str_format(scratch, STR("%i\t"), (int)nameLen), scratch);
+
+    valType = msgBuf[2];
+    str_listAppend(&log, str_format(scratch, STR("%i\t"), (int)valType), scratch);
+    if(valType != net_propType_S32 &&
+       valType != net_propType_F64) {
+        str_listAppend(&log, str_format(scratch, STR("Invalid data type\t"), valType), scratch);
+        goto writeLog;
+    }
+
+    valLen = msgBuf[3];
+    str_listAppend(&log, str_format(scratch, STR("%i\t"), (int)valLen), scratch);
+
+
+
+    name = { &msgBuf[4], nameLen };
+    str_listAppend(&log, str_format(scratch, STR("%s\t"), name), scratch);
+
+    val = &(msgBuf[4 + nameLen]);
+
+    // VALIDATION ================================
+
+
+
+
 
     if(msgKind == net_msgKind_UPDATE) {
         net_Prop* prop = net_hashGet(name);
+
         if(!prop) {
             prop = BUMP_PUSH_NEW(&globs.resArena, net_Prop);
             _net_hashInsert(name, prop);
             ARR_APPEND(globs.tracked, globs.trackedCount, prop);
+
             prop->name = str_copy(name, &globs.resArena);
             prop->data = BUMP_PUSH_NEW(&globs.resArena, net_PropData);
         }
@@ -279,13 +330,15 @@ void _net_processMessage(U8* buffer, U32 size) {
         }
     }
     // TODO: events
-    else {
-        return;
-    }
 
+
+
+writeLog:
+    _net_log(str_listCollect(log, scratch));
+    _net_log(STR("\n"));
 }
 
-void net_update() {
+void net_update(BumpAlloc* scratch) {
 
     net_SockErr err;
 
@@ -297,6 +350,7 @@ void net_update() {
         else if(connected) {
             globs.connected = true;
             net_resetTracked();
+            _net_log(str_format(scratch, STR("[CONNECTED]\n")));
         }
         return;
     }
@@ -308,22 +362,27 @@ void net_update() {
 
     if (recvSize == SOCKET_ERROR) {
         if(WSAGetLastError() != WSAEWOULDBLOCK) {
-            printf("Error recieving message! WSA code: %i\n", WSAGetLastError());
+            _net_log(str_format(scratch, STR("[ERR]\t%i\n"), WSAGetLastError()));
             globs.connected = false;
             _net_sockCloseFree(&globs.simSocket);
         }
     }
     // buffer received
     else if (recvSize > 0) {
-        _net_processMessage(recvBuffer, recvSize); }
+        _net_processMessage(recvBuffer, recvSize, scratch); }
     // size is 0, indicating shutdown
     else {
         globs.connected = false;
         _net_sockCloseFree(&globs.simSocket);
     }
+
+    if(!globs.connected) {
+        _net_log(str_format(scratch, STR("[DISCONNECTED]\n")));
+    }
 }
 
 void net_cleanup() {
+    fclose(globs.logFile);
     _net_sockCloseFree(&globs.simSocket);
     WSACleanup();
 }
