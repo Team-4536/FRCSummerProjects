@@ -162,12 +162,18 @@ int main() {
 
     F64 prevTime = glfwGetTime();
     while(!glfwWindowShouldClose(window)) {
+
         F64 time = glfwGetTime();
         F64 dt = time - prevTime;
         prevTime = time;
 
         int w, h;
         glfwGetFramebufferSize(window, &w, &h);
+
+        F64 mx, my;
+        glfwGetCursorPos(window, &mx, &my);
+        bool leftPressed = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)? true : false;
+
 
 
         net_update();
@@ -177,23 +183,12 @@ int main() {
         demo_makeUI(frameArena, dt, window);
         demo_updateScene(dt);
 
-
-        { // BLU INPUT
-            F64 mx, my;
-            glfwGetCursorPos(window, &mx, &my);
-            bool leftPressed = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)? true : false;
-            blu_input(V2f((F32)mx, (F32)my), leftPressed, windowScrollDelta);
-
-            windowScrollDelta = 0;
-        }
-
+        blu_input(V2f((F32)mx, (F32)my), leftPressed, windowScrollDelta);
+        blu_layout(V2f(w, h));
 
         { // BLU RENDERING
             Mat4f vp;
             matrixOrtho(0, w, h, 0, 0.0001, 10000, vp);
-
-            glViewport(0, 0, w, h);
-            blu_layout(V2f(w, h));
 
             gfx_Pass* clear = gfx_registerPass();
             clear->isClearPass = true;
@@ -207,10 +202,12 @@ int main() {
             blu_createPass(p);
         }
 
-
         gfx_drawPasses(w, h);
 
         bump_clear(&frameArena);
+
+        windowScrollDelta = 0;
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
