@@ -1,9 +1,8 @@
-from threading import Thread, Lock
 import struct
 import socket
-from typing import Any
 import numpy
 from enum import Enum
+import select
 
 
 
@@ -51,68 +50,50 @@ class Message():
 
 
 
-class SyncQueue:
-
-    def __init__(self) -> None:
-        self.elemList: list[Message] = []
-        self.lock = Lock()
-
-    def push(self, elem: Message) -> None:
-        with self.lock:
-            self.elemList.append(elem)
-
-    def consume(self) -> Message|None:
-        with self.lock:
-            if len(self.elemList) == 0: e = None
-            else: e = self.elemList.pop(0)
-        return e
-
-
-
-
-
-
-
-
-
 class Server():
 
     def __init__(self) -> None:
+
         self.sock = socket.socket(socket.AddressFamily.AF_INET, socket.SOCK_STREAM)
         self.sock.bind(("localhost", 7000))
         self.sock.listen(1) # client backlog
+        self.sock.setblocking(False)
         print("Server loaded")
 
-        self.idSrc = 1
-        self.msgQueue = SyncQueue()
+        self.msgList = []
+        self.cliSock = None
 
 
-    def handleClient(self, id: int, sock: socket.socket):
+    def update(self):
 
-        while True:
-            try:
-                m = self.msgQueue.consume()
-                if m is None: continue
-                sock.send(m.content)
-            except Exception as e:
-                print(f"[SOCKETS] Client ended with exception {repr(e)}")
-                break
+        if self.cliSock == None:
 
-        sock.close()
+            rlist, wlist, elist = select.select([self.sock], [], [], 0)
+            if(len(rlist) == 0): return
 
-    def _startRecieving(self):
-        while True:
-            c, addr = self.sock.accept() # start client
+            sock, addr = self.sock.accept() # start client
+            sock.setblocking(False)
+            self.cliSock = sock
             print("[SOCKETS] client connected")
 
-            cliThread = Thread(target=self.handleClient, args=[self.idSrc, c])
-            self.idSrc += 1
-            cliThread.daemon = True
-            cliThread.start()
 
-    def start(self):
-        thread = Thread(target=self._startRecieving)
-        thread.daemon = True
-        thread.start()
+
+        if len(self.msgList) != 0:
+            m = self.msgList.pop(0)
+
+            try:
+                status = self.cliSock.send(m.content)
+            except Exception as e:
+                self.cliSock.close()
+                self.cliSock = None
+                print(f"[SOCKETS] Client ended with exception {repr(e)}")
+
+
+
+    def close(self):
+        if self.cliSock != None:
+            self.cliSock.close()
+
+        self.sock.close()
 
 

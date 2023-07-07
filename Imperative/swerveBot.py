@@ -20,7 +20,6 @@ class SwerveBot(wpilib.TimedRobot):
     def robotInit(self) -> None:
 
         self.server = socketing.Server()
-        self.server.start()
 
         self.telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
         self.driveCtrlr = wpilib.XboxController(0)
@@ -79,7 +78,7 @@ class SwerveBot(wpilib.TimedRobot):
         self.telemTable.putNumber("PosY", self.sim.position.y)
         self.telemTable.putNumber("Yaw", self.gyro.getYaw())
 
-        self.server.msgQueue.push(
+        self.server.msgList.append(
             socketing.Message(socketing.MessageKind.UPDATE, "PosX", self.sim.position.x))
         """
         self.server.msgQueue.push(
@@ -87,6 +86,8 @@ class SwerveBot(wpilib.TimedRobot):
         self.server.msgQueue.push(
             socketing.Message(socketing.MessageKind.UPDATE, "Yaw", self.gyro.getYaw()))
         """
+
+        self.server.update()
 
 
 

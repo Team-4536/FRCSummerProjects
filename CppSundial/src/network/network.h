@@ -258,7 +258,7 @@ void _net_log(str s) {
 
 // TODO: batching
 // TODO: str
-// TODO: document everything
+// TODO: document message spec and log spec
 void _net_processMessage(U8* msgBuf, U32 msgSize, BumpAlloc* scratch) {
 
     StrList log = StrList();
@@ -382,6 +382,7 @@ void net_update(BumpAlloc* scratch) {
 }
 
 void net_cleanup() {
+    _net_log(STR("[QUIT]"));
     fclose(globs.logFile);
     _net_sockCloseFree(&globs.simSocket);
     WSACleanup();
