@@ -11,6 +11,7 @@ import timing
 from swerveController import SwerveController
 from telemetryHelp import publishExpression
 from virtualGyro import VirtualGyro
+from swerveEstimation import SwerveEstimator
 
 class SwerveBot(wpilib.TimedRobot):
 
