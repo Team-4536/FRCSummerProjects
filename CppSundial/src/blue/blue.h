@@ -773,7 +773,11 @@ void _blu_renderString(str string, V2f start, Rect2f clip, V4f color, gfx_Pass* 
     for(int i = 0; i < string.length; i++) {
 
         U8 c = string.chars[i] - BLU_FONT_FIRST;
-        assert(c >= 0 && c < BLU_FONT_CHARCOUNT);
+
+        // if(c < 0 || c > BLU_FONT_CHARCOUNT) {
+            // c = 'I'; }
+        ASSERT(c >= 0 && c < BLU_FONT_CHARCOUNT);
+
         blu_Glyph data = globs.fontGlyphs[c];
 
         gfx_UniformBlock* block = gfx_registerCall(pass);

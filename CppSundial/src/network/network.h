@@ -247,17 +247,16 @@ net_Prop* net_hashGet(str string) {
 
 void _net_processMessage(U8* buffer, U32 size) {
 
-    ASSERT(size >= 2);
-
+    if(size < 2) { return; }
 
     U8 msgKind = buffer[0];
     U8 nameLen = buffer[1];
     str name = { &buffer[2], nameLen };
-    str_printf(STR("%s\n"), name);
+    str_printf(STR("[MESSAGE] %s\n"), name);
 
-    ASSERT(size >= 2 + nameLen);
+    if(size < 2 + nameLen) { return; }
     U8 valType = buffer[2 + nameLen];
-    ASSERT(valType == net_propType_S32 || valType == net_propType_F64); // TODO: str
+    if(valType != net_propType_S32 && valType != net_propType_F64) { return; } // TODO: str
     void* val = &(buffer[2+nameLen+1]);
 
     if(msgKind == net_msgKind_UPDATE) {
@@ -280,7 +279,9 @@ void _net_processMessage(U8* buffer, U32 size) {
         }
     }
     // TODO: events
-    else { ASSERT(false); }
+    else {
+        return;
+    }
 
 }
 

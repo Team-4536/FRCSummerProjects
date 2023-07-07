@@ -88,9 +88,9 @@ str str_format(BumpAlloc* arena, str fmt, ...) {
                 char buf[10] = { 0 };
                 if(gcvt(va_arg(argp, double), 6, buf) == NULL) { continue; };
                 for(int i = 0; i < 10; i++) {
+                    if(buf[i] == '\0') { break; }
                     *BUMP_PUSH_NEW(arena, char) = buf[i];
                     out.length++;
-                    if(buf[i] == '\0') { break; }
                 }
             }
             else {
