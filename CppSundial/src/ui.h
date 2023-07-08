@@ -3,8 +3,8 @@
 #include "graphics.h"
 #include "base/utils.h"
 #include "blue/blue.h"
-#include "External/GLAD/gl.h"
-#include "External/GLFW/glfw3.h"
+#include "GLAD/gl.h"
+#include "GLFW/glfw3.h"
 #include "network/network.h"
 #include "colors.h"
 
