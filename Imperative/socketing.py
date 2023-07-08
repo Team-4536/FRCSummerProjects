@@ -52,6 +52,7 @@ class Message():
 
 
 
+
 class Server():
 
     def __init__(self) -> None:
@@ -83,16 +84,18 @@ class Server():
 
         if(curTime - self.lastSendTime > SEND_INTERVAL):
 
+            content = b""
             for p in self.msgMap.items():
                 self.lastSendTime = curTime
-                assert(self.cliSock != None) # ?????????
 
-                try:
-                    self.cliSock.send(p[1].content)
-                except Exception as e:
-                    self.cliSock.close()
-                    self.cliSock = None
-                    print(f"[SOCKETS] Client ended with exception {repr(e)}")
+                content += p[1].content
+
+            try:
+                self.cliSock.send(content)
+            except Exception as e:
+                self.cliSock.close()
+                self.cliSock = None
+                print(f"[SOCKETS] Client ended with exception {repr(e)}")
 
     def putUpdateMessage(self, name: str, value: float|int):
         m = Message(MessageKind.UPDATE, name, value)

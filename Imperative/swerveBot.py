@@ -74,17 +74,21 @@ class SwerveBot(wpilib.TimedRobot):
             self.telemTable.putNumber(prefs[i] + "SteerSpeed", self.steerMotors[i].get())
             self.telemTable.putNumber(prefs[i] + "SteerPos", self.steerEncoders[i].getPosition())
 
+            self.server.putUpdateMessage(prefs[i] + "DriveSpeed", self.driveMotors[i].get())
+            self.server.putUpdateMessage(prefs[i] + "DrivePos", self.driveEncoders[i].getPosition())
+            self.server.putUpdateMessage(prefs[i] + "SteerSpeed", self.steerMotors[i].get())
+            self.server.putUpdateMessage(prefs[i] + "SteerPos", self.steerEncoders[i].getPosition())
+
+
         self.telemTable.putNumber("PosX", self.sim.position.x)
         self.telemTable.putNumber("PosY", self.sim.position.y)
         self.telemTable.putNumber("Yaw", self.gyro.getYaw())
 
         self.server.putUpdateMessage("PosX", self.sim.position.x)
-        """
-        self.server.msgQueue.push(
-            socketing.Message(socketing.MessageKind.UPDATE, "PosY", self.sim.position.y))
-        self.server.msgQueue.push(
-            socketing.Message(socketing.MessageKind.UPDATE, "Yaw", self.gyro.getYaw()))
-        """
+        self.server.putUpdateMessage("PosY", self.sim.position.y)
+        self.server.putUpdateMessage("Yaw", self.gyro.getYaw())
+
+
 
         self.server.update(self.time.timeSinceInit)
 
