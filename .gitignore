@@ -9,6 +9,5 @@ CppSundial/sunLog.log
 
 *.o
 *.exe
-!gl.o
-!stb_image.o
-!stb_truetype.o
+
+

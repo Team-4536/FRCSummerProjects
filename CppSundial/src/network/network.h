@@ -347,8 +347,9 @@ StrList _net_processMessage(U8 kind, str name, void* data, U8 dataType, U32 data
             str_listAppend(&log, str_format(scratch, STR("%f\t"), prop->data->f64), scratch);
         }
         else if (prop->type == net_propType_S32) {
-            prop->data->s32 = *((S32*)data);
             // TODO: endianness
+            prop->data->s32 = *((S32*)data);
+            str_listAppend(&log, str_format(scratch, STR("%i\t"), prop->data->s32), scratch);
         }
     }
     else if(kind == net_msgKind_EVENT) {

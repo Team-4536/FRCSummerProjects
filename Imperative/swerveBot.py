@@ -88,6 +88,8 @@ class SwerveBot(wpilib.TimedRobot):
         self.server.putUpdate("PosY", self.sim.position.y)
         self.server.putUpdate("Yaw", self.gyro.getYaw())
 
+        self.server.putUpdate("Test", int(420))
+
 
 
         self.server.update(self.time.timeSinceInit)

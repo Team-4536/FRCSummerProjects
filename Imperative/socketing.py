@@ -29,7 +29,7 @@ class Message():
 
         if(type(value) == int):
             valType = MessageUpdateType.S32
-            valEncoded += value.to_bytes(4, 'little', signed=True)
+            valEncoded += int(value).to_bytes(4, 'little', signed=True)
 
         elif(type(value) == float or type(value) == numpy.float64):
             valType = MessageUpdateType.F64
@@ -42,10 +42,10 @@ class Message():
 
 
 
-        self.content += int(kind.value).to_bytes(1)
-        self.content += len(name).to_bytes(1)
-        self.content += int(valType.value).to_bytes(1)
-        self.content += len(valEncoded).to_bytes(1)
+        self.content += int(kind.value).to_bytes(1, 'little')
+        self.content += len(name).to_bytes(1, 'little')
+        self.content += int(valType.value).to_bytes(1, 'little')
+        self.content += len(valEncoded).to_bytes(1, 'little')
 
         self.content += name.encode()
         self.content += valEncoded
