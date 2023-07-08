@@ -11,13 +11,15 @@ import timing
 from swerveController import SwerveController
 from telemetryHelp import publishExpression
 from virtualGyro import VirtualGyro
+from swerveEstimation import SwerveEstimator
+import socketing
 
 class SwerveBot(wpilib.TimedRobot):
 
 
     def robotInit(self) -> None:
 
-        self.telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
+        self.server = socketing.Server()
         self.driveCtrlr = wpilib.XboxController(0)
         self.armCtrlr = wpilib.XboxController(1)
         self.time = timing.TimeData(None)
@@ -65,18 +67,28 @@ class SwerveBot(wpilib.TimedRobot):
 
         prefs = ["FL", "FR", "BL", "BR"]
         for i in range(0, 4):
-            self.telemTable.putNumber(prefs[i] + "DriveSpeed", self.driveMotors[i].get())
-            self.telemTable.putNumber(prefs[i] + "DrivePos", self.driveEncoders[i].getPosition())
-            self.telemTable.putNumber(prefs[i] + "SteerSpeed", self.steerMotors[i].get())
-            self.telemTable.putNumber(prefs[i] + "SteerPos", self.steerEncoders[i].getPosition())
+            self.server.putUpdate(prefs[i] + "DriveSpeed", self.driveMotors[i].get())
+            self.server.putUpdate(prefs[i] + "DrivePos", self.driveEncoders[i].getPosition())
+            self.server.putUpdate(prefs[i] + "SteerSpeed", self.steerMotors[i].get())
+            self.server.putUpdate(prefs[i] + "SteerPos", self.steerEncoders[i].getPosition())
 
-        self.telemTable.putNumber("PosX", self.sim.position.x)
-        self.telemTable.putNumber("PosY", self.sim.position.y)
-        self.telemTable.putNumber("Yaw", self.gyro.getYaw())
+        self.server.putUpdate("PosX", self.sim.position.x)
+        self.server.putUpdate("PosY", self.sim.position.y)
+        self.server.putUpdate("Yaw", self.gyro.getYaw())
+
+        self.server.putUpdate("Test", int(420))
+
+
+        #TODO: debug expression in cpp sundial
+
+
+        self.server.update(self.time.timeSinceInit)
+
 
 
 
     def teleopInit(self) -> None:
+
         self.swerveController = SwerveController(
             self.steerMotors,
             self.driveMotors,
@@ -88,7 +100,7 @@ class SwerveBot(wpilib.TimedRobot):
         self.input = FlymerInputs(self.driveCtrlr, self.armCtrlr)
 
         self.swerveController.tick(
-            -self.gyro.getYaw(),
+            self.gyro.getYaw(),
             self.input.driveX,
             self.input.driveY,
             self.input.turning,
@@ -99,8 +111,11 @@ class SwerveBot(wpilib.TimedRobot):
         # publishExpression("swerveController.leftStick.y", "y", self, self.telemTable)
 
 
+
     def disabledPeriodic(self) -> None:
-        return super().disabledPeriodic()
+        for i in range(0, 4):
+            self.driveMotors[i].stopMotor()
+            self.steerMotors[i].stopMotor()
 
 
 if __name__ == "__main__":

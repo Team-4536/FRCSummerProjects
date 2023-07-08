@@ -100,7 +100,7 @@ class fieldWidget(widget):
 
         angle: float = telemTable.getNumber("Yaw", 0.0) # type: ignore
         angle *= math.pi / 180
-        dpg.apply_transform(self.botRotateTag, dpg.create_rotation_matrix(angle, [0, 0, 1]))
+        dpg.apply_transform(self.botRotateTag, dpg.create_rotation_matrix(angle, [0, 0, -1]))
 
 
 
