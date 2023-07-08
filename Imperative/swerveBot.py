@@ -79,6 +79,7 @@ class SwerveBot(wpilib.TimedRobot):
         self.server.putUpdate("Test", int(420))
 
 
+        #TODO: debug expression in cpp sundial
 
 
         self.server.update(self.time.timeSinceInit)

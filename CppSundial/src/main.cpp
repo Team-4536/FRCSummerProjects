@@ -14,10 +14,8 @@
 #include "blue/blue.h"
 #include "network/network.h"
 
-#include "colors.h"
+#include "ui.h"
 
-#define DEMO_IMPL
-#include "demoStuff.h"
 
 
 // NOTE: I didn't want to put it in gfx because of the stb dependency
@@ -100,12 +98,10 @@ int main() {
 
 
     gfx_Texture* solidTex = loadTextureFromFile("res/textures/solid.png");
-    gfx_Texture* testTex = loadTextureFromFile("res/textures/helloTex.png");
     blu_init(solidTex);
     blu_loadFont("C:/windows/fonts/consola.ttf");
 
-
-
+    ui_init(&frameArena);
     net_init();
 
 
@@ -157,7 +153,6 @@ int main() {
         };
     }
 
-    demo_init(&frameArena);
 
 
     // TODO: framerate caps
@@ -176,14 +171,19 @@ int main() {
         glfwGetCursorPos(window, &mx, &my);
         bool leftPressed = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)? true : false;
 
-
-
         net_update(&frameArena);
 
         blu_beginFrame();
 
-        demo_updateScene(dt, window);
-        demo_makeUI(frameArena, dt);
+
+
+
+
+        ui_update(&frameArena, window, dt);
+
+
+
+
 
         blu_input(V2f((F32)mx, (F32)my), leftPressed, windowScrollDelta);
         blu_layout(V2f(w, h));

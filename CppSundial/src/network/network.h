@@ -276,7 +276,14 @@ void _net_log(str s) {
 }
 
 
-// TODO: expand data types
+/*
+TODO: expand data types
+    [ ] strings
+    [ ] v2s?
+    [ ] matricies
+    [ ] arrays
+*/
+
 // TODO: document/improve log spec
 // TODO: msg begin markers
 
