@@ -19,6 +19,7 @@ static struct DemoGlobs {
     gfx_IndexBuffer* sceneIB = nullptr;
 
     V4f camPos = { 0.5, 0.5, 2, 0 };
+    Mat4f robotTransform = Mat4f(1);
     V2i viewPortSize = { 0, 0 };
 
     V2f windowPos = V2f(350, 100);
@@ -78,6 +79,32 @@ void demo_init(BumpAlloc* frameArena) {
 }
 
 
+
+
+void demo_updateScene(float dt, GLFWwindow* window) {
+
+    // TODO: 3d-ify utils
+    demoGlobs.camPos.x += (glfwGetKey(window, GLFW_KEY_D) - glfwGetKey(window, GLFW_KEY_A)) * dt;
+    demoGlobs.camPos.y += (glfwGetKey(window, GLFW_KEY_W) - glfwGetKey(window, GLFW_KEY_S)) * dt;
+    demoGlobs.camPos.z += (glfwGetKey(window, GLFW_KEY_Q) - glfwGetKey(window, GLFW_KEY_E)) * dt;
+
+
+    // TODO: make str literal macro instead of strlen call
+    net_Prop* posX = net_hashGet(STR("PosX"));
+    net_Prop* posY = net_hashGet(STR("PosY"));
+    net_Prop* yaw = net_hashGet(STR("Yaw"));
+
+    if(posX && posY && yaw) {
+        matrixTransform(
+            (F32)posX->data->f64,
+            (F32)posY->data->f64,
+            0,
+            (F32)yaw->data->f64,
+            demoGlobs.robotTransform);
+    }
+}
+
+
 blu_Area* demo_makeFancyButton(str name, int stdWidth, int hoverWidth, V4f hoverBack, V4f hoverText) {
 
     blu_Area* a = blu_areaMake(name,
@@ -95,7 +122,8 @@ blu_Area* demo_makeFancyButton(str name, int stdWidth, int hoverWidth, V4f hover
 }
 
 
-void demo_makeUI(BumpAlloc& frameArena, float dt, GLFWwindow* window) {
+
+void demo_makeUI(BumpAlloc& frameArena, float dt) {
 
     blu_Area* a;
 
@@ -134,13 +162,8 @@ void demo_makeUI(BumpAlloc& frameArena, float dt, GLFWwindow* window) {
             if(h != 0) {
                 matrixPerspective(90, (float)w / h, 0.01, 1000000, proj); }
 
-            // TODO: 3d-ify utils
-            demoGlobs.camPos.x += (glfwGetKey(window, GLFW_KEY_D) - glfwGetKey(window, GLFW_KEY_A)) * dt;
-            demoGlobs.camPos.y += (glfwGetKey(window, GLFW_KEY_W) - glfwGetKey(window, GLFW_KEY_S)) * dt;
-            demoGlobs.camPos.z += (glfwGetKey(window, GLFW_KEY_Q) - glfwGetKey(window, GLFW_KEY_E)) * dt;
-
             Mat4f view;
-            matrixTranslation(V2f(demoGlobs.camPos.x, demoGlobs.camPos.y), demoGlobs.camPos.z, view);
+            matrixTranslation(demoGlobs.camPos.x, demoGlobs.camPos.y, demoGlobs.camPos.z, view);
             matrixInverse(view, view);
 
             p = gfx_registerPass();
@@ -152,27 +175,7 @@ void demo_makeUI(BumpAlloc& frameArena, float dt, GLFWwindow* window) {
             b->color = V4f(1, 1, 1, 1);
             b->ib = demoGlobs.sceneIB;
             b->va = demoGlobs.sceneVA;
-            b->model = Mat4f(1);
-
-            // TODO: make str literal macro instead of strlen call
-            net_Prop* posX = net_hashGet(STR("PosX"));
-            net_Prop* posY = net_hashGet(STR("PosY"));
-            net_Prop* yaw = net_hashGet(STR("Yaw"));
-
-            if(posX && posY && yaw) {
-                matrixTransform(
-                    V2f((F32)posX->data->f64,
-                    (F32)posY->data->f64),
-                    0,
-                    (F32)yaw->data->f64, V2f(1, 1), b->model);
-            }
-
-            net_Prop* event = net_getEvents();
-            while(event) {
-                str_printf(STR("%s\n"), event->name);
-                event = event->eventNext;
-            }
-
+            b->model = demoGlobs.robotTransform;
         }
 
 
@@ -293,9 +296,6 @@ void demo_makeUI(BumpAlloc& frameArena, float dt, GLFWwindow* window) {
     } // end main style
 }
 
-void demo_updateScene(float dt) {
-
-}
 
 
 #endif

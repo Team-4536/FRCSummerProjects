@@ -182,8 +182,8 @@ int main() {
 
         blu_beginFrame();
 
-        demo_makeUI(frameArena, dt, window);
-        demo_updateScene(dt);
+        demo_updateScene(dt, window);
+        demo_makeUI(frameArena, dt);
 
         blu_input(V2f((F32)mx, (F32)my), leftPressed, windowScrollDelta);
         blu_layout(V2f(w, h));

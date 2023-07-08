@@ -237,12 +237,11 @@ Mat4f operator*(const Mat4f& lhs, const Mat4f& rhs);
 bool matrixInverse(Mat4f m, Mat4f& invOut);
 void matrixOrtho(float l, float r, float b, float t, float n, float f, Mat4f& out);
 void matrixPerspective(float fovY, float aspect, float near, float far, Mat4f& out);
+
 void matrixZRotation(F32 deg, Mat4f& out);
-void matrixTranslation(V2f t, Mat4f& out);
-void matrixTranslation(V2f t, F32 z, Mat4f& out);
-void matrixScale(V2f scale, Mat4f& out);
-void matrixScale(V2f scale, F32 z, Mat4f& out);
-void matrixTransform(V2f translation, F32 z, F32 deg, V2f scale, Mat4f& out);
+void matrixTranslation(F32 x, F32 y, F32 z, Mat4f& out);
+void matrixScale(F32 x, F32 y, F32 z, Mat4f& out);
+void matrixTransform(F32 x, F32 y, F32 z, F32 deg, Mat4f& out);
 
 
 
@@ -519,38 +518,26 @@ void matrixZRotation(F32 deg, Mat4f& out) {
     out = Mat4f(e);
 }
 
-void matrixTranslation(V2f t, Mat4f& out) {
-    out = Mat4f(1.0f);
-    out.at(3, 0) = t.x;
-    out.at(3, 1) = t.y;
-}
 
-void matrixTranslation(V2f t, F32 z, Mat4f& out) {
+void matrixTranslation(F32 x, F32 y, F32 z, Mat4f& out) {
     out = Mat4f(1.0f);
-    out.at(3, 0) = t.x;
-    out.at(3, 1) = t.y;
+    out.at(3, 0) = x;
+    out.at(3, 1) = y;
     out.at(3, 2) = z;
 }
 
-void matrixScale(V2f scale, Mat4f& out) {
+void matrixScale(F32 x, F32 y, F32 z, Mat4f& out) {
     out = Mat4f(1.0f);
-    out.at(0, 0) = scale.x;
-    out.at(1, 1) = scale.y;
-}
-
-void matrixScale(V2f scale, F32 z, Mat4f& out) {
-    out = Mat4f(1.0f);
-    out.at(0, 0) = scale.x;
-    out.at(1, 1) = scale.y;
+    out.at(0, 0) = x;
+    out.at(1, 1) = y;
     out.at(2, 2) = z;
 }
 
-void matrixTransform(V2f translation, F32 z, F32 deg, V2f scale, Mat4f& out) {
+void matrixTransform(F32 x, F32 y, F32 z, F32 deg, Mat4f& out) {
     out = Mat4f(1.0f);
     Mat4f temp;
 
-    matrixTranslation(translation, z, out);
-    matrixScale(scale, temp);
+    matrixTranslation(x, y, z, temp);
     out = temp * out;
     matrixZRotation(deg, temp);
     out = temp * out;
