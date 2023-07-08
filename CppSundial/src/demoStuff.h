@@ -150,9 +150,21 @@ void demo_makeUI(BumpAlloc& frameArena, float dt, GLFWwindow* window) {
 
             gfx_UniformBlock* b = gfx_registerCall(p);
             b->color = V4f(1, 1, 1, 1);
-            b->model = Mat4f(1.0f);
             b->ib = demoGlobs.sceneIB;
             b->va = demoGlobs.sceneVA;
+            b->model = Mat4f(1);
+
+            net_Prop* posX = net_hashGet(STR("PosX"));
+            net_Prop* posY = net_hashGet(STR("PosY"));
+            net_Prop* yaw = net_hashGet(STR("Yaw"));
+
+            if(posX && posY && yaw) {
+                matrixTransform(
+                    V2f((F32)posX->data->f64,
+                    (F32)posY->data->f64),
+                    0,
+                    (F32)yaw->data->f64, V2f(1, 1), b->model);
+            }
         }
 
 

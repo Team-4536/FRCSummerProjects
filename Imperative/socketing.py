@@ -5,7 +5,7 @@ from enum import Enum
 import select
 
 # in seconds
-SEND_INTERVAL = 0.1
+SEND_INTERVAL = 1/60
 
 
 

@@ -6,7 +6,6 @@
 
 
 
-
 enum net_SockErr {
     net_sockErr_none,
     net_sockErr_failedAddrInfo,
@@ -262,10 +261,10 @@ void _net_log(str s) {
 }
 
 
-// TODO: str update messages
+// TODO: expand data types
 // TODO: document/improve log spec
 // TODO: events
-// TODO: msg begin markers (?)
+// TODO: msg begin markers
 
 // returns nullptr if failed, else ptr to data
 U8* _net_getBytes(U8* buf, U32 bufSize, U8** current, U32 count) {
@@ -329,7 +328,7 @@ StrList _net_processMessage(U8 kind, str name, void* data, U8 dataType, U32 data
         prop->type = (net_PropType)dataType;
         if(prop->type == net_propType_F64) {
             prop->data->f64 = *((F64*)data);
-            // TEMP
+
             str_listAppend(&log, str_format(scratch, STR("%f\t"), prop->data->f64), scratch);
         }
         else if (prop->type == net_propType_S32) {
