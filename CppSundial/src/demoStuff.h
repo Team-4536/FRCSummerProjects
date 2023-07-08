@@ -25,7 +25,7 @@ static struct DemoGlobs {
 
     float clipSize = 0;
     float clipPos = 0;
-    float clipMax = 1400;
+    float clipMax = 1000;
 
 } demoGlobs;
 
@@ -273,16 +273,17 @@ void demo_makeUI(BumpAlloc& frameArena, float dt, GLFWwindow* window) {
                     demoGlobs.clipPos += blu_interactionFromWidget(a).dragDelta.y / demoGlobs.clipSize * demoGlobs.clipMax;
 
                 }
-            } else { demoGlobs.clipPos = 0; }
 
+                demoGlobs.clipPos = max(demoGlobs.clipPos, 0);
+                demoGlobs.clipPos = min(demoGlobs.clipPos, demoGlobs.clipMax - (demoGlobs.clipSize));
+                spacer->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, (demoGlobs.clipPos / demoGlobs.clipMax) * demoGlobs.clipSize };
+            } else {
+                demoGlobs.clipPos = 0;
+            }
 
-            demoGlobs.clipPos = max(demoGlobs.clipPos, 0);
-            demoGlobs.clipPos = min(demoGlobs.clipPos, demoGlobs.clipMax - (demoGlobs.clipSize));
             clip->viewOffset = { 0, demoGlobs.clipPos };
 
-            if(spacer) {
-                spacer->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, (demoGlobs.clipPos / demoGlobs.clipMax) * demoGlobs.clipSize };
-            }
+
 
         } // end left
 
