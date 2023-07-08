@@ -74,19 +74,19 @@ class SwerveBot(wpilib.TimedRobot):
             self.telemTable.putNumber(prefs[i] + "SteerSpeed", self.steerMotors[i].get())
             self.telemTable.putNumber(prefs[i] + "SteerPos", self.steerEncoders[i].getPosition())
 
-            self.server.putUpdateMessage(prefs[i] + "DriveSpeed", self.driveMotors[i].get())
-            self.server.putUpdateMessage(prefs[i] + "DrivePos", self.driveEncoders[i].getPosition())
-            self.server.putUpdateMessage(prefs[i] + "SteerSpeed", self.steerMotors[i].get())
-            self.server.putUpdateMessage(prefs[i] + "SteerPos", self.steerEncoders[i].getPosition())
+            self.server.putUpdate(prefs[i] + "DriveSpeed", self.driveMotors[i].get())
+            self.server.putUpdate(prefs[i] + "DrivePos", self.driveEncoders[i].getPosition())
+            self.server.putUpdate(prefs[i] + "SteerSpeed", self.steerMotors[i].get())
+            self.server.putUpdate(prefs[i] + "SteerPos", self.steerEncoders[i].getPosition())
 
 
         self.telemTable.putNumber("PosX", self.sim.position.x)
         self.telemTable.putNumber("PosY", self.sim.position.y)
         self.telemTable.putNumber("Yaw", self.gyro.getYaw())
 
-        self.server.putUpdateMessage("PosX", self.sim.position.x)
-        self.server.putUpdateMessage("PosY", self.sim.position.y)
-        self.server.putUpdateMessage("Yaw", self.gyro.getYaw())
+        self.server.putUpdate("PosX", self.sim.position.x)
+        self.server.putUpdate("PosY", self.sim.position.y)
+        self.server.putUpdate("Yaw", self.gyro.getYaw())
 
 
 
@@ -94,7 +94,9 @@ class SwerveBot(wpilib.TimedRobot):
 
 
 
+
     def teleopInit(self) -> None:
+
         self.swerveController = SwerveController(
             self.steerMotors,
             self.driveMotors,
@@ -117,8 +119,9 @@ class SwerveBot(wpilib.TimedRobot):
         # publishExpression("swerveController.leftStick.y", "y", self, self.telemTable)
 
 
+
     def disabledPeriodic(self) -> None:
-        return super().disabledPeriodic()
+        pass
 
 
 if __name__ == "__main__":

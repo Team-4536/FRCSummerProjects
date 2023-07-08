@@ -40,6 +40,8 @@ struct net_Prop {
 
     U64 hashKey;
     net_Prop* hashNext;
+
+    net_Prop* eventNext;
 };
 
 
@@ -55,6 +57,7 @@ void net_resetTracked();
 // is net connected to anything?
 bool net_getConnected();
 void net_getTracked(net_Prop*** outArr, U32* outCount);
+net_Prop* net_getEvents();
 
 net_Prop* net_hashGet(str string);
 
@@ -168,6 +171,9 @@ struct net_Globs {
     net_Prop** tracked = nullptr; // array of ptrs for list based access
     U32 trackedCount = 0;
 
+    net_Prop* eventStart = nullptr;
+    net_Prop* eventEnd = nullptr;
+
     FILE* logFile;
 
     U32 recvBufStartOffset = 0;
@@ -218,6 +224,11 @@ void net_getTracked(net_Prop*** outArr, U32* outCount) {
     *outCount = globs.trackedCount; }
 
 
+// NOTE: Event props are put in the scratch arena passed when calling net_update()
+net_Prop* net_getEvents() {
+    return globs.eventStart;
+}
+
 void _net_hashInsert(str string, net_Prop* p) {
 
     U64 key = hash_hashStr(string);
@@ -256,6 +267,10 @@ net_Prop* net_hashGet(str string) {
 
 
 
+
+
+
+
 void _net_log(str s) {
     fwrite(s.chars, 1, s.length, globs.logFile);
 }
@@ -263,7 +278,6 @@ void _net_log(str s) {
 
 // TODO: expand data types
 // TODO: document/improve log spec
-// TODO: events
 // TODO: msg begin markers
 
 // returns nullptr if failed, else ptr to data
@@ -292,7 +306,8 @@ StrList _net_processMessage(U8 kind, str name, void* data, U8 dataType, U32 data
     StrList log = StrList();
 
     str_listAppend(&log, str_format(scratch, STR("%i\t"), (int)kind), scratch);
-    if(kind != net_msgKind_UPDATE) { // TODO: events
+    if(kind != net_msgKind_UPDATE &&
+       kind != net_msgKind_EVENT) {
         str_listAppend(&log, STR("Invalid msg type\t"), scratch);
         return log;
     }
@@ -336,6 +351,20 @@ StrList _net_processMessage(U8 kind, str name, void* data, U8 dataType, U32 data
             // TODO: endianness
         }
     }
+    else if(kind == net_msgKind_EVENT) {
+        net_Prop* p = BUMP_PUSH_NEW(scratch, net_Prop);
+
+        p->name = str_copy(name, scratch);
+
+        if(!globs.eventStart) {
+            globs.eventStart = p;
+            globs.eventEnd = p;
+        }
+        else {
+            globs.eventEnd->eventNext = p;
+            globs.eventEnd = p;
+        }
+    }
 
     return log;
 }
@@ -349,7 +378,8 @@ U32 _net_processPackets(U8* buf, U32 bufSize, BumpAlloc* scratch) {
     U8* cur = buf;
     while(true) {
 
-        U8* messageHeader = _net_getBytes(buf, bufSize, &cur, 4);
+        U8* cCopy = cur;
+        U8* messageHeader = _net_getBytes(buf, bufSize, &cCopy, 4);
         if(!messageHeader) { break; }
 
         U8 msgKind = messageHeader[0];
@@ -358,14 +388,16 @@ U32 _net_processPackets(U8* buf, U32 bufSize, BumpAlloc* scratch) {
         U8 valLen = messageHeader[3];
 
         // CLEANUP: giving messages a lil too much control
-        U8* nameBuf = _net_getBytes(buf, bufSize, &cur, nameLen);
+        U8* nameBuf = _net_getBytes(buf, bufSize, &cCopy, nameLen);
         if(!nameBuf) { break; }
-        U8* dataBuf = _net_getBytes(buf, bufSize, &cur, valLen);
-        if(!nameBuf) { break; }
+        U8* dataBuf = _net_getBytes(buf, bufSize, &cCopy, valLen);
+        if(!dataBuf) { break; }
 
         StrList log = _net_processMessage(msgKind, {nameBuf, nameLen}, dataBuf, valType, valLen, scratch);
         _net_log(str_listCollect(log, scratch));
         _net_log(STR("\n"));
+
+        cur = cCopy;
     }
 
     // _net_log(str_format(scratch, STR("[PACKET END] rem: %i\n"), cur - buf));
@@ -376,7 +408,12 @@ U32 _net_processPackets(U8* buf, U32 bufSize, BumpAlloc* scratch) {
 
 
 
+// Event props are put in scratch, as well as misc things
+// Tracked props are stored in a resArena global.
 void net_update(BumpAlloc* scratch) {
+
+    globs.eventStart = nullptr;
+    globs.eventEnd = nullptr;
 
     net_SockErr err;
 

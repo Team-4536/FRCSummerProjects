@@ -11,6 +11,7 @@ SEND_INTERVAL = 1/60
 
 class MessageKind(Enum):
     UPDATE = 0
+    EVENT = 1
 
 class MessageUpdateType(Enum):
     S32 = 0
@@ -22,7 +23,6 @@ class Message():
     def __init__(self, kind: MessageKind, name: str, value: float|int|str) -> None:
 
         self.content = b""
-
 
         valType = 0
         valEncoded = b""
@@ -64,6 +64,7 @@ class Server():
         print("Server loaded")
 
         self.msgMap: dict[str, Message] = { }
+        self.eventList: list[Message] = [ ]
         self.cliSock = None
         self.lastSendTime = 0
 
@@ -81,7 +82,6 @@ class Server():
             print("[SOCKETS] client connected")
 
 
-
         if(curTime - self.lastSendTime > SEND_INTERVAL):
 
             content = b""
@@ -90,6 +90,9 @@ class Server():
 
                 content += p[1].content
 
+            while len(self.eventList) > 0:
+                content += self.eventList.pop(0).content
+
             try:
                 self.cliSock.send(content)
             except Exception as e:
@@ -97,9 +100,12 @@ class Server():
                 self.cliSock = None
                 print(f"[SOCKETS] Client ended with exception {repr(e)}")
 
-    def putUpdateMessage(self, name: str, value: float|int):
+    def putUpdate(self, name: str, value: float|int):
         m = Message(MessageKind.UPDATE, name, value)
         self.msgMap.update({ name : m })
+
+    def putEvent(self, name: str):
+        self.eventList.append(Message(MessageKind.EVENT, name, int(0)))
 
 
 

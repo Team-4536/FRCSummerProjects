@@ -160,6 +160,8 @@ int main() {
     demo_init(&frameArena);
 
 
+    // TODO: framerate caps
+
     F64 prevTime = glfwGetTime();
     while(!glfwWindowShouldClose(window)) {
 

@@ -154,6 +154,7 @@ void demo_makeUI(BumpAlloc& frameArena, float dt, GLFWwindow* window) {
             b->va = demoGlobs.sceneVA;
             b->model = Mat4f(1);
 
+            // TODO: make str literal macro instead of strlen call
             net_Prop* posX = net_hashGet(STR("PosX"));
             net_Prop* posY = net_hashGet(STR("PosY"));
             net_Prop* yaw = net_hashGet(STR("Yaw"));
@@ -165,6 +166,13 @@ void demo_makeUI(BumpAlloc& frameArena, float dt, GLFWwindow* window) {
                     0,
                     (F32)yaw->data->f64, V2f(1, 1), b->model);
             }
+
+            net_Prop* event = net_getEvents();
+            while(event) {
+                str_printf(STR("%s\n"), event->name);
+                event = event->eventNext;
+            }
+
         }
 
 
