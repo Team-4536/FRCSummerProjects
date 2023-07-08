@@ -47,8 +47,8 @@ class SwerveController:
         leftStick = V2f(inputX, inputY)
 
         FLTurningVector = V2f(math.cos(45) * inputZ, math.cos(45) * inputZ)
-        FRTurningVector = V2f(-math.cos(45) * inputZ, math.cos(45) * inputZ)
-        BLTurningVector = V2f(math.cos(45) * inputZ, -math.cos(45) * inputZ)
+        FRTurningVector = V2f(math.cos(45) * inputZ, -math.cos(45) * inputZ)
+        BLTurningVector = V2f(-math.cos(45) * inputZ, math.cos(45) * inputZ)
         BRTurningVector = V2f(-math.cos(45) * inputZ, -math.cos(45) * inputZ)
 
         #field oriented offset

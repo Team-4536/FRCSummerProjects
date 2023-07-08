@@ -20,8 +20,6 @@ class SwerveBot(wpilib.TimedRobot):
     def robotInit(self) -> None:
 
         self.server = socketing.Server()
-
-        self.telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
         self.driveCtrlr = wpilib.XboxController(0)
         self.armCtrlr = wpilib.XboxController(1)
         self.time = timing.TimeData(None)
@@ -69,26 +67,17 @@ class SwerveBot(wpilib.TimedRobot):
 
         prefs = ["FL", "FR", "BL", "BR"]
         for i in range(0, 4):
-            self.telemTable.putNumber(prefs[i] + "DriveSpeed", self.driveMotors[i].get())
-            self.telemTable.putNumber(prefs[i] + "DrivePos", self.driveEncoders[i].getPosition())
-            self.telemTable.putNumber(prefs[i] + "SteerSpeed", self.steerMotors[i].get())
-            self.telemTable.putNumber(prefs[i] + "SteerPos", self.steerEncoders[i].getPosition())
-
             self.server.putUpdate(prefs[i] + "DriveSpeed", self.driveMotors[i].get())
             self.server.putUpdate(prefs[i] + "DrivePos", self.driveEncoders[i].getPosition())
             self.server.putUpdate(prefs[i] + "SteerSpeed", self.steerMotors[i].get())
             self.server.putUpdate(prefs[i] + "SteerPos", self.steerEncoders[i].getPosition())
-
-
-        self.telemTable.putNumber("PosX", self.sim.position.x)
-        self.telemTable.putNumber("PosY", self.sim.position.y)
-        self.telemTable.putNumber("Yaw", self.gyro.getYaw())
 
         self.server.putUpdate("PosX", self.sim.position.x)
         self.server.putUpdate("PosY", self.sim.position.y)
         self.server.putUpdate("Yaw", self.gyro.getYaw())
 
         self.server.putUpdate("Test", int(420))
+
 
 
 
@@ -110,7 +99,7 @@ class SwerveBot(wpilib.TimedRobot):
         self.input = FlymerInputs(self.driveCtrlr, self.armCtrlr)
 
         self.swerveController.tick(
-            -self.gyro.getYaw(),
+            self.gyro.getYaw(),
             self.input.driveX,
             self.input.driveY,
             self.input.turning,
@@ -123,7 +112,9 @@ class SwerveBot(wpilib.TimedRobot):
 
 
     def disabledPeriodic(self) -> None:
-        pass
+        for i in range(0, 4):
+            self.driveMotors[i].stopMotor()
+            self.steerMotors[i].stopMotor()
 
 
 if __name__ == "__main__":

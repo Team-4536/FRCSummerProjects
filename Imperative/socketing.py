@@ -1,4 +1,5 @@
 import struct
+import ntcore
 import socket
 import numpy
 from enum import Enum
@@ -55,7 +56,11 @@ class Message():
 
 class Server():
 
+    inst = None
+
     def __init__(self) -> None:
+
+        self.telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
 
         self.sock = socket.socket(socket.AddressFamily.AF_INET, socket.SOCK_STREAM)
         self.sock.bind(("localhost", 7000))
@@ -67,6 +72,8 @@ class Server():
         self.eventList: list[Message] = [ ]
         self.cliSock = None
         self.lastSendTime = 0
+
+        Server.inst = self
 
 
     def update(self, curTime: float):
@@ -101,6 +108,9 @@ class Server():
                 print(f"[SOCKETS] Client ended with exception {repr(e)}")
 
     def putUpdate(self, name: str, value: float|int):
+
+        self.telemTable.putValue(name, value)
+
         m = Message(MessageKind.UPDATE, name, value)
         self.msgMap.update({ name : m })
 

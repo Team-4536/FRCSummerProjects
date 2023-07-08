@@ -84,9 +84,10 @@ void demo_init(BumpAlloc* frameArena) {
 void demo_updateScene(float dt, GLFWwindow* window) {
 
     // TODO: 3d-ify utils
-    demoGlobs.camPos.x += (glfwGetKey(window, GLFW_KEY_D) - glfwGetKey(window, GLFW_KEY_A)) * dt;
-    demoGlobs.camPos.y += (glfwGetKey(window, GLFW_KEY_W) - glfwGetKey(window, GLFW_KEY_S)) * dt;
-    demoGlobs.camPos.z += (glfwGetKey(window, GLFW_KEY_Q) - glfwGetKey(window, GLFW_KEY_E)) * dt;
+    F32 moveSpeed = 3;
+    demoGlobs.camPos.x += (glfwGetKey(window, GLFW_KEY_D) - glfwGetKey(window, GLFW_KEY_A)) * moveSpeed * dt;
+    demoGlobs.camPos.y += (glfwGetKey(window, GLFW_KEY_W) - glfwGetKey(window, GLFW_KEY_S)) * moveSpeed * dt;
+    demoGlobs.camPos.z += (glfwGetKey(window, GLFW_KEY_Q) - glfwGetKey(window, GLFW_KEY_E)) * moveSpeed * dt;
 
 
     // TODO: make str literal macro instead of strlen call
@@ -103,24 +104,6 @@ void demo_updateScene(float dt, GLFWwindow* window) {
             demoGlobs.robotTransform);
     }
 }
-
-
-blu_Area* demo_makeFancyButton(str name, int stdWidth, int hoverWidth, V4f hoverBack, V4f hoverText) {
-
-    blu_Area* a = blu_areaMake(name,
-        blu_areaFlags_DRAW_BACKGROUND |
-        blu_areaFlags_DRAW_TEXT |
-        blu_areaFlags_HOVER_ANIM |
-        blu_areaFlags_CLICKABLE);
-
-    blu_areaAddDisplayStr(a, name);
-    a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, hoverBack, a->target_hoverAnim);
-    a->style.textColor = v4f_lerp(a->style.textColor, hoverText, a->target_hoverAnim);
-    a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, lerp(stdWidth, hoverWidth, a->target_hoverAnim) };
-
-    return a;
-}
-
 
 
 void demo_makeUI(BumpAlloc& frameArena, float dt) {
