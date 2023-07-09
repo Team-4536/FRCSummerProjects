@@ -60,7 +60,6 @@ struct gfx_VertexArray {
 
 
 // NOTE: consider different formats for framebuffers
-// TODO: framebuffer & texture resize func
 // RN rgba and depth attachments are assumed
 struct gfx_Framebuffer {
     gfx_Texture* texture;

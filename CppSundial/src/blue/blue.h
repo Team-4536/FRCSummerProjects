@@ -436,7 +436,9 @@ blu_Area* blu_areaMake(str string, U32 flags) {
 
 
     if(area) { // assert to check a component hasn't been created twice per frame
-        ASSERT(area->lastTouchedIdx != globs.frameIndex); }
+        if(area->lastTouchedIdx == globs.frameIndex) {
+            ASSERT(false); }
+    }
 
 
     // CONSTRUCTION //////////////////
@@ -513,6 +515,8 @@ blu_Area* blu_areaMake(str string, U32 flags) {
     // SET TREE LINKS ///////////////////////////////////////////////////////////
 
     _blu_areaUpdate(area);
+
+    // blu_areaAddDisplayStr(area, string);
 
     return area;
 }

@@ -118,7 +118,8 @@ class SwerveController:
         #calculate error
 
         def getSteeringError(Target, PosAngle, Power):
-            FakeError = Target - PosAngle
+            # ???????????????????????????????????
+            FakeError = -Target - PosAngle
             Pos = -(FakeError)
             while Pos > 90:
                 Pos = Pos - 180
@@ -131,7 +132,7 @@ class SwerveController:
                 SteeringError = SteeringError - 360
 
             return SteeringError, Power
-        
+
         FLSteeringError, FLPower = getSteeringError(FLTarget, FLPosAngle, FLPower)
         FRSteeringError, FRPower = getSteeringError(FRTarget, FRPosAngle, FRPower)
         BLSteeringError, BLPower = getSteeringError(BLTarget, BLPosAngle, BLPower)

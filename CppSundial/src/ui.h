@@ -97,13 +97,13 @@ enum Component {
 void draw_field(float dt, GLFWwindow* window) {
 
 
+    // TODO: real camera controller
     F32 moveSpeed = 3;
     globs.camPos.x += (glfwGetKey(window, GLFW_KEY_D) - glfwGetKey(window, GLFW_KEY_A)) * moveSpeed * dt;
     globs.camPos.y += (glfwGetKey(window, GLFW_KEY_W) - glfwGetKey(window, GLFW_KEY_S)) * moveSpeed * dt;
     globs.camPos.z += (glfwGetKey(window, GLFW_KEY_Q) - glfwGetKey(window, GLFW_KEY_E)) * moveSpeed * dt;
 
 
-    // TODO: make str literal macro instead of strlen call
     net_Prop* posX = net_hashGet(STR("PosX"));
     net_Prop* posY = net_hashGet(STR("PosY"));
     net_Prop* yaw = net_hashGet(STR("Yaw"));
@@ -117,7 +117,7 @@ void draw_field(float dt, GLFWwindow* window) {
             (F32)posX->data->f64,
             (F32)posY->data->f64,
             0,
-            (F32)yaw->data->f64,
+            -(F32)yaw->data->f64,
             robotTransform);
     }
 
@@ -127,7 +127,7 @@ void draw_field(float dt, GLFWwindow* window) {
             (F32)estX->data->f64,
             (F32)estY->data->f64,
             0,
-            (F32)yaw->data->f64,
+            -(F32)yaw->data->f64,
             estimateTransform);
     }
 
@@ -190,13 +190,11 @@ void draw_network(float dt, BumpAlloc* scratch) {
 
     a = blu_areaMake(STR("left"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
     globs.clipSize = a->calculatedSizes[blu_axis_Y];
-    blu_areaAddDisplayStr(a, STR("left"));
     a->style.childLayoutAxis = blu_axis_X;
     blu_parentScope(a) {
 
         a = blu_areaMake(STR("clip"), blu_areaFlags_VIEW_OFFSET | blu_areaFlags_CLICKABLE);
         blu_Area* clip = a;
-        blu_areaAddDisplayStr(a, STR("blip"));
         a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
         a->style.childLayoutAxis = blu_axis_Y;
         globs.clipPos += blu_interactionFromWidget(a).scrollDelta * 40;
@@ -207,18 +205,17 @@ void draw_network(float dt, BumpAlloc* scratch) {
             blu_style_add_childLayoutAxis(blu_axis_X);
             blu_style_add_backgroundColor(col_darkGray);
 
+                a = blu_areaMake(STR("FPS"), blu_areaFlags_DRAW_TEXT);
                 str n = str_format(scratch, STR("FPS: %f"), 1/dt);
                 blu_areaAddDisplayStr(a, n);
 
                 a = blu_areaMake(STR("connectionPar"), blu_areaFlags_DRAW_BACKGROUND);
-                blu_areaAddDisplayStr(a, STR("conPar"));
                 blu_parentScope(a) {
                     a = blu_areaMake(STR("networkConnLabel"), blu_areaFlags_DRAW_TEXT);
                     blu_areaAddDisplayStr(a, STR("Network status: "));
                     a->style.sizes[blu_axis_X] = { blu_sizeKind_TEXT, 0 };
 
                     a = blu_areaMake(STR("connSpacer"), 0);
-                    blu_areaAddDisplayStr(a, STR("conspace"));
                     a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
 
                     a = blu_areaMake(STR("connection"), blu_areaFlags_DRAW_BACKGROUND);

@@ -22,6 +22,7 @@ WHEEL_CIRC = WHEEL_DIA * math.pi
 
 class SwerveBot(wpilib.TimedRobot):
 
+    # TODO: assert saftey on startup and run
 
     def robotInit(self) -> None:
 

@@ -36,7 +36,7 @@ class Message():
             valType = MessageUpdateType.F64
             valEncoded += bytearray(struct.pack("d", float(value)))
 
-        elif(type(value) == str): assert(False) # TODO: this
+        elif(type(value) == str): assert(False)
         else:
             print(f"Invalid type in message: {type(value)}")
             assert(False)

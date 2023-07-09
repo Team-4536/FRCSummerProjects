@@ -21,10 +21,11 @@ struct StrList {
 };
 
 
-#define STR(x) str_make(x)
+#define STR(x) str{ (const U8*)x, sizeof(x)-1 } // -1 for null term
+// #define STR(x) str_make(x)
 
 str str_make(const char* c); // use given memory
-str str_make(const char* c, BumpAlloc* arena); // copy given cstr to the heap
+str str_make(const char* c, BumpAlloc* arena); // copy c into arena
 str str_copy(str a, BumpAlloc* arena);
 str str_join(str l, str r, BumpAlloc* arena);
 str str_substr(str s, U64 start, U64 length);
