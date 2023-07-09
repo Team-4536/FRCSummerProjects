@@ -141,7 +141,7 @@ struct blu_Area {
 
     // hashing
     blu_Area* hashNext;
-    U64 hashKey; // TODO: parent based hashing/salting/whatever
+    U64 hashKey;
 
     U64 lastTouchedIdx = 0;
 
@@ -157,6 +157,7 @@ struct blu_Area {
     V2f offset = { 0, 0 };
     V2f viewOffset = { 0, 0 };
 
+
     // layout pass data
     F32 calculatedSizes[blu_axis_COUNT];
     F32 calculatedPosition[blu_axis_COUNT];
@@ -166,8 +167,6 @@ struct blu_Area {
     // persistant shit for input / anim
     F32 target_hoverAnim = 1;
 
-
-    // input
     bool prevHovered = false;
     bool prevPressed = false;
 };
@@ -432,6 +431,10 @@ void _blu_areaUpdate(blu_Area* a) {
 blu_Area* blu_areaMake(str string, U32 flags) {
 
     U64 hashKey = hash_hashStr(string);
+    if(globs.currentParent) {
+        hashKey += globs.currentParent->hashKey; }
+
+
     blu_Area* area = blu_hashGet(hashKey);
 
 

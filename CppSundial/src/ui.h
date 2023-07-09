@@ -209,16 +209,16 @@ void draw_network(float dt, BumpAlloc* scratch) {
                 str n = str_format(scratch, STR("FPS: %f"), 1/dt);
                 blu_areaAddDisplayStr(a, n);
 
-                a = blu_areaMake(STR("connectionPar"), blu_areaFlags_DRAW_BACKGROUND);
+                a = blu_areaMake(STR("connectionStatus"), blu_areaFlags_DRAW_BACKGROUND);
                 blu_parentScope(a) {
-                    a = blu_areaMake(STR("networkConnLabel"), blu_areaFlags_DRAW_TEXT);
+                    a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
                     blu_areaAddDisplayStr(a, STR("Network status: "));
                     a->style.sizes[blu_axis_X] = { blu_sizeKind_TEXT, 0 };
 
-                    a = blu_areaMake(STR("connSpacer"), 0);
+                    a = blu_areaMake(STR("spacer"), 0);
                     a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
 
-                    a = blu_areaMake(STR("connection"), blu_areaFlags_DRAW_BACKGROUND);
+                    a = blu_areaMake(STR("box"), blu_areaFlags_DRAW_BACKGROUND);
                     a->style.backgroundColor = col_red;
                     a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 100 };
                     if(net_getConnected()) {
@@ -237,12 +237,12 @@ void draw_network(float dt, BumpAlloc* scratch) {
                     blu_parentScope(a) {
                         blu_styleScope {
                         blu_style_add_sizeX({ blu_sizeKind_PERCENT, 0.5 });
-                            a = blu_areaMake(str_join(prop->name, STR("label"), scratch), blu_areaFlags_DRAW_TEXT);
+                            a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
 
                             str n = str_format(scratch, STR("\"%s\""), prop->name);
                             blu_areaAddDisplayStr(a, n);
 
-                            a = blu_areaMake(str_join(prop->name, STR("value"), scratch), blu_areaFlags_DRAW_TEXT);
+                            a = blu_areaMake(STR("value"), blu_areaFlags_DRAW_TEXT);
                             a->style.backgroundColor = col_darkGray;
                             if(prop->type == net_propType_S32) {
                                 blu_areaAddDisplayStr(a, str_format(scratch, STR("%i"), (prop->data->s32))); }
@@ -258,17 +258,17 @@ void draw_network(float dt, BumpAlloc* scratch) {
 
         blu_Area* spacer = nullptr;
         if(globs.clipMax > globs.clipSize) {
-            a = blu_areaMake(STR("scrollpar"), blu_areaFlags_DRAW_BACKGROUND);
+            a = blu_areaMake(STR("scrollArea"), blu_areaFlags_DRAW_BACKGROUND);
             a->style.backgroundColor = col_darkGray;
             a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 10 };
             a->style.childLayoutAxis = blu_axis_Y;
 
             blu_parentScope(a) {
 
-                a = blu_areaMake(STR("scspace"), 0);
+                a = blu_areaMake(STR("spacer"), 0);
                 spacer = a;
 
-                a = blu_areaMake(STR("scroll"),
+                a = blu_areaMake(STR("bar"),
                     blu_areaFlags_DRAW_BACKGROUND |
                     blu_areaFlags_CLICKABLE);
                 a->style.backgroundColor = col_lightGray;
