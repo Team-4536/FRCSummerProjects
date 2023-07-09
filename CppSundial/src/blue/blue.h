@@ -33,8 +33,8 @@ THE CHECKLIST:
     [X] animations
     [X] scrolling
     [X] clipping
+    [X] cursor changes
     [ ] padding
-    [ ] cursor changes
     [ ] rounding
     [ ] borders
     [ ] drop shadows
@@ -80,6 +80,13 @@ enum blu_AreaFlags {
 struct blu_Size {
     blu_SizeKind kind = blu_sizeKind_NONE;
     F32 value = 0;
+};
+
+enum blu_Cursor {
+    blu_cursor_norm,
+    blu_cursor_hand,
+    blu_cursor_resizeH,
+    blu_cursor_type,
 };
 
 
@@ -157,6 +164,8 @@ struct blu_Area {
     V2f offset = { 0, 0 };
     V2f viewOffset = { 0, 0 };
 
+    blu_Cursor cursor = blu_cursor_norm;
+
 
     // layout pass data
     F32 calculatedSizes[blu_axis_COUNT];
@@ -213,6 +222,8 @@ void blu_pushStyle();
 void blu_popStyle();
 
 blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area);
+
+blu_Cursor blu_getCursor();
 
 
 
@@ -288,6 +299,8 @@ struct blu_Globs {
     blu_Glyph fontGlyphs[BLU_FONT_CHARCOUNT];
 
 
+
+    blu_Cursor reqCursor = blu_cursor_norm;
 
     V2f inputMousePos = V2f();
     bool inputCurLButton = false;
@@ -415,6 +428,7 @@ void _blu_areaReset(blu_Area* a) {
     a->displayString = { nullptr, 0 };
     a->texture = nullptr;
     a->offset = { 0, 0 };
+    a->cursor = blu_cursor_norm;
 }
 
 void _blu_areaUpdate(blu_Area* a) {
@@ -975,6 +989,9 @@ bool _blu_genInteractionsRecurse(blu_Area* area, bool covered) {
 
         if(area->prevPressed) {
             globs.dragged = area; }
+
+        if(containsMouse) {
+            globs.reqCursor = area->cursor; }
     }
     else {
         area->prevHovered = false;
@@ -998,8 +1015,14 @@ void blu_input(V2f npos, bool lmbState, float mouseDelta) {
 
     globs.mouseDelta = mouseDelta;
 
-    bool x;
+    globs.reqCursor = blu_cursor_norm;
+    if(globs.dragged) {
+        globs.reqCursor = globs.dragged->cursor; }
     _blu_genInteractionsRecurse(globs.ogParent, globs.dragged != nullptr);
+}
+
+blu_Cursor blu_getCursor() {
+    return globs.reqCursor;
 }
 
 

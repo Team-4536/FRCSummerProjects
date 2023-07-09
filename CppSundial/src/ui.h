@@ -328,6 +328,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
         float t = inter.held? 1 : a->target_hoverAnim;
         a->style.backgroundColor = v4f_lerp(col_darkBlue, col_white, t);
         globs.rightSize += -inter.dragDelta.x;
+        a->cursor = blu_cursor_resizeH;
 
 
         blu_styleScope
