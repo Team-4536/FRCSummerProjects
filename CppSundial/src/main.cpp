@@ -52,7 +52,7 @@ int main() {
     // GLFW INIT AND WINDOW CREATION ===============================================================================
     {
         assert(glfwInit());
-        glfwSetErrorCallback([](int error, const char* description) { printf("%s\n", description); });
+        glfwSetErrorCallback([](int error, const char* description) { printf("[GLFW] %s\n", description); });
 
         glfwWindowHint(GLFW_MAXIMIZED, true);
         glfwWindowHint(GLFW_RESIZABLE, true);
@@ -93,7 +93,7 @@ int main() {
         glEnable(GL_DEBUG_OUTPUT);
         glDebugMessageCallback(
         [](GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char* message, const void* userParam) {
-            printf("%s\n", message);
+            printf("[GL] %s\n", message);
         }, 0);
     }
 
@@ -105,7 +105,7 @@ int main() {
     blu_init(solidTex);
     blu_loadFont("C:/windows/fonts/consola.ttf");
 
-    ui_init(&frameArena);
+    ui_init(&frameArena, solidTex);
     net_init();
 
 

@@ -7,6 +7,7 @@
 #include "GLFW/glfw3.h"
 #include "network/network.h"
 #include "colors.h"
+#include "stb_image/stb_image.h"
 
 
 
@@ -18,6 +19,8 @@ struct FieldInfo {
 
     gfx_VertexArray* va = nullptr;
     gfx_IndexBuffer* ib = nullptr;
+
+    gfx_Texture* fieldTex = nullptr;
 
     Transform camTransform;
 };
@@ -42,6 +45,7 @@ static struct UIGlobs {
 
     gfx_Shader* sceneShader3d = nullptr;
     gfx_Shader* sceneShader2d = nullptr;
+    gfx_Texture* solidTex;
 
     float rightSize = 400;
 
@@ -58,16 +62,24 @@ static struct UIGlobs {
 
 // TODO: make deps clearer
 
-void ui_init(BumpAlloc* frameArena) {
+void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
     globs = UIGlobs();
+
+    globs.solidTex = solidTex;
+
+    int w, h, bpp;
+    stbi_set_flip_vertically_on_load(1);
+    U8* data;
+
+
 
     globs.fieldInfo.fb = gfx_registerFramebuffer();
 
     float vaData[] = {
         -.5, -.5, 0,        0, 0,
-        -.5, 0.5, 0,        0, 0,
-        0.5, 0.5, 0,        0, 0,
-        0.5, -.5, 0,        0, 0
+        -.5, 0.5, 0,        0, 1,
+        0.5, 0.5, 0,        1, 1,
+        0.5, -.5, 0,        1, 0
     };
     globs.fieldInfo.va = gfx_registerVertexArray(gfx_vtype_POS3F_UV, vaData, sizeof(vaData), false);
 
@@ -76,13 +88,16 @@ void ui_init(BumpAlloc* frameArena) {
         2, 3, 0 };
     globs.fieldInfo.ib = gfx_registerIndexBuffer(ibData, sizeof(ibData) / sizeof(U32));
 
+    data = stbi_load("res/textures/field.png", &w, &h, &bpp, 4);
+    ASSERT(data);
+    globs.fieldInfo.fieldTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
+
 
 
 
     globs.swerveInfo.target = gfx_registerFramebuffer();
-    int w, h, bpp;
 
-    U8* data = stbi_load("res/textures/swerveWheel.png", &w, &h, &bpp, 4);
+    data = stbi_load("res/textures/swerveWheel.png", &w, &h, &bpp, 4);
     ASSERT(data);
     globs.swerveInfo.wheelTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
 
@@ -141,6 +156,11 @@ void ui_init(BumpAlloc* frameArena) {
 
         loc = glGetUniformLocation(pass->shader->id, "uModel");
         glUniformMatrix4fv(loc, 1, false, &(uniforms->model)[0]);
+
+        loc = glGetUniformLocation(pass->shader->id, "uTexture");
+        glUniform1i(loc, 0);
+        glActiveTexture(GL_TEXTURE0 + 0);
+        glBindTexture(GL_TEXTURE_2D, uniforms->texture->id);
 
         gfx_bindVertexArray(pass, uniforms->va);
         gfx_bindIndexBuffer(pass, uniforms->ib);
@@ -231,6 +251,7 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
     b->model = temp * b->model;
 }
 
+// TODO: for some resaon there is an invalid framebuffer op error at runtime
 
 
 
@@ -246,10 +267,23 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
 
     // TODO: real camera controller
+    V4f mVec = { 0, 0, 0, 0 };
+
     F32 moveSpeed = 3;
-    info->camTransform.x += (glfwGetKey(window, GLFW_KEY_D) - glfwGetKey(window, GLFW_KEY_A)) * moveSpeed * dt;
-    info->camTransform.y += (glfwGetKey(window, GLFW_KEY_W) - glfwGetKey(window, GLFW_KEY_S)) * moveSpeed * dt;
-    info->camTransform.z += (glfwGetKey(window, GLFW_KEY_Q) - glfwGetKey(window, GLFW_KEY_E)) * moveSpeed * dt;
+    mVec.x += (glfwGetKey(window, GLFW_KEY_D) - glfwGetKey(window, GLFW_KEY_A)) * moveSpeed * dt;
+    mVec.z -= (glfwGetKey(window, GLFW_KEY_W) - glfwGetKey(window, GLFW_KEY_S)) * moveSpeed * dt;
+    mVec.y += (glfwGetKey(window, GLFW_KEY_E) - glfwGetKey(window, GLFW_KEY_Q)) * moveSpeed * dt;
+
+    Mat4f ry;
+    Mat4f rx;
+    matrixYRotation(info->camTransform.ry, ry);
+    matrixXRotation(info->camTransform.rx, rx);
+    mVec = mVec * (rx * ry);
+
+    info->camTransform.x += mVec.x;
+    info->camTransform.y += mVec.y;
+    info->camTransform.z += mVec.z;
+
 
 
     net_Prop* posX = net_hashGet(STR("PosX"));
@@ -259,28 +293,26 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
     net_Prop* estX = net_hashGet(STR("EstX"));
     net_Prop* estY = net_hashGet(STR("EstY"));
 
-    Mat4f robotTransform = Mat4f(1);
+    Transform robotTransform = Transform();
+    robotTransform.rx = -90; // CLEANUP/TODO: temp constants, until a model is made
+    robotTransform.sx = 0.711f;
+    robotTransform.sy = 0.711f;
     if(posX && posY && yaw) {
-
-        Transform t = Transform();
-        t.x = (F32)posX->data->f64;
-        t.y = 0;
-        t.z = -(F32)posY->data->f64;
-        t.ry = -(F32)yaw->data->f64;
-
-        robotTransform = matrixTransform(t);
+        robotTransform.x = (F32)posX->data->f64;
+        robotTransform.z = -(F32)posY->data->f64;
+        robotTransform.ry = -(F32)yaw->data->f64;
     }
 
-    Mat4f estimateTransform = Mat4f(1);
+    Transform estimateTransform = Transform();
+    estimateTransform.rx = -90;
+    estimateTransform.sx = 0.711f;
+    estimateTransform.sy = 0.711f;
     if(estX && estY && yaw) {
 
         Transform t = Transform();
-        t.x = (F32)estX->data->f64;
-        t.y = 0;
-        t.z = -(F32)estY->data->f64;
-        t.ry = -(F32)yaw->data->f64;
-
-        estimateTransform = matrixTransform(t);
+        estimateTransform.x = (F32)estX->data->f64;
+        estimateTransform.z = -(F32)estY->data->f64;
+        estimateTransform.ry = -(F32)yaw->data->f64;
     }
 
 
@@ -322,18 +354,36 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
     p->passUniforms.vp = view * proj;
 
 
+    gfx_UniformBlock* b;
 
-    gfx_UniformBlock* b = gfx_registerCall(p);
+
+    b = gfx_registerCall(p);
     b->color = V4f(1, 1, 1, 1);
     b->ib = info->ib;
     b->va = info->va;
-    b->model = robotTransform;
+    b->texture = info->fieldTex;
+
+    Transform field = Transform(); // TODO/CLEANUP: get a field model
+    field.rx = -90;
+    field.y = -0.2f;
+    field.sx = 16.4846;
+    field.sy = 8.1026;
+    b->model = matrixTransform(field);
+
 
     b = gfx_registerCall(p);
-    b->color = V4f(1, 1, 1, 0.5);
+    b->color = V4f(1, 0, 0, 1);
     b->ib = info->ib;
     b->va = info->va;
-    b->model = estimateTransform;
+    b->model = matrixTransform(robotTransform);
+    b->texture = globs.solidTex;
+
+    b = gfx_registerCall(p);
+    b->color = V4f(1, 0, 0, 0.5);
+    b->ib = info->ib;
+    b->va = info->va;
+    b->model = matrixTransform(estimateTransform);
+    b->texture = globs.solidTex;
 }
 
 
@@ -486,7 +536,8 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
         blu_styleScope
         {
         blu_style_add_sizeX({blu_sizeKind_PX, globs.rightSize });
-            draw_swerveDrive(&globs.swerveInfo, dt);
+            // draw_swerveDrive(&globs.swerveInfo, dt);
+            draw_network(&globs.netInfo, dt, scratch);
         }
     }
 }

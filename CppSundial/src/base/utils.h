@@ -249,6 +249,7 @@ void matrixTranslation(F32 x, F32 y, F32 z, Mat4f& out);
 void matrixScale(F32 x, F32 y, F32 z, Mat4f& out);
 
 
+// S for scale, R for rotation (in degrees), others are translation
 struct Transform {
     float x = 0;
     float y = 0;
@@ -257,6 +258,10 @@ struct Transform {
     float rx = 0;
     float ry = 0;
     float rz = 0;
+
+    float sx = 1;
+    float sy = 1;
+    float sz = 1;
 };
 Mat4f matrixTransform(Transform t);
 
@@ -586,6 +591,8 @@ Mat4f matrixTransform(Transform t) {
     matrixXRotation(t.rx, temp);
     out = temp * out;
     matrixZRotation(t.rz, temp);
+    out = temp * out;
+    matrixScale(t.sx, t.sy, t.sz, temp);
     out = temp * out;
 
     return out;

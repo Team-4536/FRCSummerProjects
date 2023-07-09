@@ -7,8 +7,9 @@ in vec2 vUv;
 
 
 uniform vec4 uColor;
+uniform sampler2D uTexture;
 
 void main()
 {
-    color = uColor;
+    color = uColor * texture(uTexture, vUv);
 };
