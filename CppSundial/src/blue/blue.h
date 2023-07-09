@@ -172,13 +172,11 @@ struct blu_Area {
 };
 
 
-// CLEANUP: name?
-struct blu_WidgetInputs {
+struct blu_WidgetInteraction {
     bool hovered = false;
     bool held = false;
     bool clicked = false;
 
-    bool dragged = false;
     V2f dragDelta = V2f();
 
     float scrollDelta = 0;
@@ -214,7 +212,7 @@ void blu_style_add_animationStrength(F32 s);
 void blu_pushStyle();
 void blu_popStyle();
 
-blu_WidgetInputs blu_interactionFromWidget(blu_Area* area);
+blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area);
 
 
 
@@ -271,7 +269,7 @@ struct blu_Globs {
 
     BumpAlloc frameArena = { };
 
-    blu_StyleStackNode* currentStyle = nullptr; // TODO: (?) make it so current style doesn't have to be rebuilt per area
+    blu_StyleStackNode* currentStyle = nullptr;
     blu_StyleStackNode* ogStyle = nullptr;
 
     U64 frameIndex = 0;
@@ -1005,10 +1003,10 @@ void blu_input(V2f npos, bool lmbState, float mouseDelta) {
 }
 
 
-blu_WidgetInputs blu_interactionFromWidget(blu_Area* area) {
+blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
     ASSERT(area->flags & blu_areaFlags_CLICKABLE);
 
-    blu_WidgetInputs out;
+    blu_WidgetInteraction out;
 
     if(globs.dragged && globs.dragged != area) {
         return out; }

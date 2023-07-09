@@ -27,6 +27,9 @@ static struct UIGlobs {
     float clipMax = 1000;
     // TODO: adaptive max size
 
+
+    float rightSize = 400;
+
 } globs;
 
 
@@ -317,9 +320,19 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
             draw_field(dt, window);
         }
 
+
+        blu_Area* a = blu_areaMake(STR("resizeBar"), blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
+        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 3 };
+
+        blu_WidgetInteraction inter = blu_interactionFromWidget(a);
+        float t = inter.held? 1 : a->target_hoverAnim;
+        a->style.backgroundColor = v4f_lerp(col_darkBlue, col_white, t);
+        globs.rightSize += -inter.dragDelta.x;
+
+
         blu_styleScope
         {
-        blu_style_add_sizeX({blu_sizeKind_PX, 400 });
+        blu_style_add_sizeX({blu_sizeKind_PX, globs.rightSize });
             draw_network(dt, scratch);
         }
     }
