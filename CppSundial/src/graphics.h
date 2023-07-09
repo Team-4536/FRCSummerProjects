@@ -90,14 +90,14 @@ struct gfx_UniformBlock {
     gfx_Texture* fontTexture = nullptr;
     V4f color = V4f(0, 0, 0, 1);
 
-    Mat4f model = Mat4f();
+    Mat4f model = Mat4f(1);
 
     gfx_VertexArray* va = nullptr;
     gfx_IndexBuffer* ib = nullptr;
 
     // PASS UNIS ========================
 
-    Mat4f vp = Mat4f(0.0f);
+    Mat4f vp = Mat4f(1);
 
     //
 
