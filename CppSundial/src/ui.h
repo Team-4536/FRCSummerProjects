@@ -48,6 +48,7 @@ static struct UIGlobs {
     gfx_Texture* solidTex;
 
     float rightSize = 400;
+    float botSize = 200;
 
 
     FieldInfo fieldInfo = FieldInfo();
@@ -177,6 +178,7 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
 
 
 
+// TODO: scale when to small horizontally
 void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
 
     blu_Area* a = blu_areaMake(STR("swerveDisplay"), blu_areaFlags_DRAW_TEXTURE);
@@ -186,14 +188,16 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
     int h = (int)a->calculatedSizes[blu_axis_Y];
 
     if(w != info->target->texture->width || h != info->target->texture->height) {
-        gfx_resizeFramebuffer(info->target, w, h);
+        if(w > 0 && h > 0) {
+            gfx_resizeFramebuffer(info->target, w, h);
+        }
     }
 
 
     gfx_Pass* p = gfx_registerPass();
     p->isClearPass = true;
     p->target = info->target;
-    p->passUniforms.color = V4f(0, 0, 0, 1);
+    p->passUniforms.color = col_darkBlue;
 
     p = gfx_registerPass();
     p->target = info->target;
@@ -250,10 +254,6 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
     matrixScale((F32)info->arrowTex->width / info->arrowTex->height, 1, 1, temp);
     b->model = temp * b->model;
 }
-
-// TODO: for some resaon there is an invalid framebuffer op error at runtime
-
-
 
 
 
@@ -329,7 +329,10 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
     int h = (int)a->calculatedSizes[blu_axis_Y];
 
     if(w != info->fb->texture->width || h != info->fb->texture->height) {
-        gfx_resizeFramebuffer(info->fb, w, h); }
+        if(w > 0 && h > 0) {
+            gfx_resizeFramebuffer(info->fb, w, h);
+        }
+    }
 
 
 
@@ -337,7 +340,7 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
     gfx_Pass* p = gfx_registerPass();
     p->isClearPass = true;
     p->target = info->fb;
-    p->passUniforms.color = V4f(0, 0, 0, 1);
+    p->passUniforms.color = col_darkBlue;
 
 
 
@@ -506,6 +509,7 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
 
 void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
 
+    blu_Area* a;
 
     blu_styleScope
     {
@@ -517,6 +521,15 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
     blu_style_add_animationStrength(0.1f);
 
 
+        a = blu_areaMake(STR("leftBarParent"), blu_areaFlags_DRAW_BACKGROUND);
+        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 100 };
+        a->style.childLayoutAxis = blu_axis_Y;
+
+        a = blu_areaMake(STR("leftBarSep"), blu_areaFlags_DRAW_BACKGROUND);
+        a->style.backgroundColor = col_black;
+        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 3 };
+
+
         blu_styleScope
         {
         blu_style_add_sizeX({blu_sizeKind_REMAINDER, 0 });
@@ -524,20 +537,43 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
         }
 
 
-        blu_Area* a = blu_areaMake(STR("resizeBar"), blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
+        a = blu_areaMake(STR("XresizeBar"), blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
         a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 3 };
 
         blu_WidgetInteraction inter = blu_interactionFromWidget(a);
         float t = inter.held? 1 : a->target_hoverAnim;
-        a->style.backgroundColor = v4f_lerp(col_darkBlue, col_white, t);
+        a->style.backgroundColor = v4f_lerp(col_black, col_white, t);
         globs.rightSize += -inter.dragDelta.x;
         a->cursor = blu_cursor_resizeH;
 
-        blu_styleScope
-        {
-        blu_style_add_sizeX({blu_sizeKind_PX, globs.rightSize });
-            // draw_swerveDrive(&globs.swerveInfo, dt);
-            draw_network(&globs.netInfo, dt, scratch);
+
+
+        a = blu_areaMake(STR("rightParent"), 0);
+        a->style.sizes[blu_axis_X] = {blu_sizeKind_PX, globs.rightSize };
+        a->style.childLayoutAxis = blu_axis_Y;
+
+
+        blu_parentScope(a) {
+
+            blu_styleScope {
+            blu_style_add_sizeY({ blu_sizeKind_REMAINDER, 0 });
+                draw_swerveDrive(&globs.swerveInfo, dt);
+            }
+
+
+            a = blu_areaMake(STR("YresizeBar"), blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
+            a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, 3 };
+
+            blu_WidgetInteraction inter = blu_interactionFromWidget(a);
+            float t = inter.held? 1 : a->target_hoverAnim;
+            a->style.backgroundColor = v4f_lerp(col_black, col_white, t);
+            globs.botSize += -inter.dragDelta.y;
+            a->cursor = blu_cursor_resizeH;
+
+            blu_styleScope {
+            blu_style_add_sizeY({blu_sizeKind_PX, globs.botSize });
+                draw_network(&globs.netInfo, dt, scratch);
+            }
         }
     }
 }
