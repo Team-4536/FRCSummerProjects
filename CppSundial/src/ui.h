@@ -19,7 +19,7 @@ struct FieldInfo {
     gfx_VertexArray* va = nullptr;
     gfx_IndexBuffer* ib = nullptr;
 
-    V4f camPos = { 0, 0, 2, 0 };
+    Transform camTransform;
 };
 
 struct NetInfo {
@@ -247,9 +247,9 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
     // TODO: real camera controller
     F32 moveSpeed = 3;
-    info->camPos.x += (glfwGetKey(window, GLFW_KEY_D) - glfwGetKey(window, GLFW_KEY_A)) * moveSpeed * dt;
-    info->camPos.y += (glfwGetKey(window, GLFW_KEY_W) - glfwGetKey(window, GLFW_KEY_S)) * moveSpeed * dt;
-    info->camPos.z += (glfwGetKey(window, GLFW_KEY_Q) - glfwGetKey(window, GLFW_KEY_E)) * moveSpeed * dt;
+    info->camTransform.x += (glfwGetKey(window, GLFW_KEY_D) - glfwGetKey(window, GLFW_KEY_A)) * moveSpeed * dt;
+    info->camTransform.y += (glfwGetKey(window, GLFW_KEY_W) - glfwGetKey(window, GLFW_KEY_S)) * moveSpeed * dt;
+    info->camTransform.z += (glfwGetKey(window, GLFW_KEY_Q) - glfwGetKey(window, GLFW_KEY_E)) * moveSpeed * dt;
 
 
     net_Prop* posX = net_hashGet(STR("PosX"));
@@ -261,29 +261,37 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
     Mat4f robotTransform = Mat4f(1);
     if(posX && posY && yaw) {
-        matrixTransform(
-            (F32)posX->data->f64,
-            (F32)posY->data->f64,
-            0,
-            -(F32)yaw->data->f64,
-            robotTransform);
+
+        Transform t = Transform();
+        t.x = (F32)posX->data->f64;
+        t.y = 0;
+        t.z = -(F32)posY->data->f64;
+        t.ry = -(F32)yaw->data->f64;
+
+        robotTransform = matrixTransform(t);
     }
 
     Mat4f estimateTransform = Mat4f(1);
     if(estX && estY && yaw) {
-        matrixTransform(
-            (F32)estX->data->f64,
-            (F32)estY->data->f64,
-            0,
-            -(F32)yaw->data->f64,
-            estimateTransform);
+
+        Transform t = Transform();
+        t.x = (F32)estX->data->f64;
+        t.y = 0;
+        t.z = -(F32)estY->data->f64;
+        t.ry = -(F32)yaw->data->f64;
+
+        estimateTransform = matrixTransform(t);
     }
 
 
 
 
-    blu_Area* a = blu_areaMake(STR("fieldDisplay"), blu_areaFlags_DRAW_TEXTURE);
+    blu_Area* a = blu_areaMake(STR("fieldDisplay"), blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE);
     a->texture = info->fb->texture;
+
+    V2f delta = blu_interactionFromWidget(a).dragDelta;
+    info->camTransform.ry -= delta.x * 0.5f;
+    info->camTransform.rx -= delta.y * 0.5f;
 
     int w = (int)a->calculatedSizes[blu_axis_X];
     int h = (int)a->calculatedSizes[blu_axis_Y];
@@ -305,8 +313,7 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
     if(h != 0) {
         matrixPerspective(90, (float)w / h, 0.01, 1000000, proj); }
 
-    Mat4f view;
-    matrixTranslation(info->camPos.x, info->camPos.y, info->camPos.z, view);
+    Mat4f view = matrixTransform(info->camTransform);
     matrixInverse(view, view);
 
     p = gfx_registerPass();
@@ -463,7 +470,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
         blu_styleScope
         {
         blu_style_add_sizeX({blu_sizeKind_REMAINDER, 0 });
-            draw_swerveDrive(&globs.swerveInfo, dt);
+            draw_field(&globs.fieldInfo, dt, window);
         }
 
 
@@ -479,7 +486,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
         blu_styleScope
         {
         blu_style_add_sizeX({blu_sizeKind_PX, globs.rightSize });
-            draw_network(&globs.netInfo, dt, scratch);
+            draw_swerveDrive(&globs.swerveInfo, dt);
         }
     }
 }

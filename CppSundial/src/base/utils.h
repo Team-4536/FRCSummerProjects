@@ -243,10 +243,22 @@ void matrixOrtho(float l, float r, float b, float t, float n, float f, Mat4f& ou
 void matrixPerspective(float fovY, float aspect, float near, float far, Mat4f& out);
 
 void matrixZRotation(F32 deg, Mat4f& out);
+void matrixXRotation(F32 deg, Mat4f& out);
+void matrixYRotation(F32 deg, Mat4f& out);
 void matrixTranslation(F32 x, F32 y, F32 z, Mat4f& out);
 void matrixScale(F32 x, F32 y, F32 z, Mat4f& out);
-void matrixTransform(F32 x, F32 y, F32 z, F32 deg, Mat4f& out);
 
+
+struct Transform {
+    float x = 0;
+    float y = 0;
+    float z = 0;
+
+    float rx = 0;
+    float ry = 0;
+    float rz = 0;
+};
+Mat4f matrixTransform(Transform t);
 
 
 #ifdef BASE_IMPL
@@ -522,6 +534,32 @@ void matrixZRotation(F32 deg, Mat4f& out) {
     out = Mat4f(e);
 }
 
+void matrixXRotation(F32 deg, Mat4f& out) {
+    F32 c = cosf(deg * (M_PI / 180));
+    F32 s = sinf(deg * (M_PI / 180));
+
+    F32 e[16] = {
+        1, 0, 0, 0,
+        0, c, s, 0,
+        0, -s, c, 0,
+        0, 0, 0, 1
+    };
+    out = Mat4f(e);
+}
+
+void matrixYRotation(F32 deg, Mat4f& out) {
+    F32 c = cosf(deg * (M_PI / 180));
+    F32 s = sinf(deg * (M_PI / 180));
+
+    F32 e[16] = {
+        c, 0, -s, 0,
+        0, 1, 0, 0,
+        s, 0, c, 0,
+        0, 0, 0, 1
+    };
+    out = Mat4f(e);
+}
+
 
 void matrixTranslation(F32 x, F32 y, F32 z, Mat4f& out) {
     out = Mat4f(1.0f);
@@ -537,15 +575,20 @@ void matrixScale(F32 x, F32 y, F32 z, Mat4f& out) {
     out.at(2, 2) = z;
 }
 
-void matrixTransform(F32 x, F32 y, F32 z, F32 deg, Mat4f& out) {
-    out = Mat4f(1.0f);
-    Mat4f temp;
 
-    matrixTranslation(x, y, z, temp);
+Mat4f matrixTransform(Transform t) {
+    Mat4f temp = Mat4f();
+    Mat4f out = Mat4f();
+
+    matrixTranslation(t.x, t.y, t.z, out);
+    matrixYRotation(t.ry, temp);
     out = temp * out;
-    matrixZRotation(deg, temp);
+    matrixXRotation(t.rx, temp);
     out = temp * out;
+    matrixZRotation(t.rz, temp);
+    out = temp * out;
+
+    return out;
 }
-
 
 #endif
