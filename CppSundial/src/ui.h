@@ -83,16 +83,6 @@ void ui_init(BumpAlloc* frameArena) {
 
 
 
-enum Component {
-    comp_field,
-    comp_network,
-    comp_status,
-
-    comp_driveSwerve,
-    comp_driveMech,
-    comp_driveTank,
-};
-
 
 
 

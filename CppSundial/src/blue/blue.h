@@ -44,6 +44,8 @@ THE CHECKLIST:
     [ ] cleanup
     [ ] batching
 
+    [ ] documentation and examples
+
 TESTING CHECKLIST:
 [ ] test hashmap collsions
 [ ] test out of memory things
@@ -205,7 +207,7 @@ void blu_pushParent(blu_Area* parent);
 void blu_popParent();
 
 void blu_beginFrame(); // cull
-void blu_input(V2f npos, bool lmbState, float mouseDelta); // set current and update prev input // CLEANUP: merge with begin?
+void blu_input(V2f npos, bool lmbState, float scrollDelta, blu_Cursor* outCursor);  // set current and update prev input // CLEANUP: merge with begin?
 void blu_layout(V2f scSize); // calculate layout shit
 void blu_createPass(gfx_Pass* normalPass);
 
@@ -222,8 +224,6 @@ void blu_pushStyle();
 void blu_popStyle();
 
 blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area);
-
-blu_Cursor blu_getCursor();
 
 
 
@@ -300,14 +300,12 @@ struct blu_Globs {
 
 
 
-    blu_Cursor reqCursor = blu_cursor_norm;
-
     V2f inputMousePos = V2f();
     bool inputCurLButton = false;
     bool inputPrevLButton = false;
     blu_Area* dragged = nullptr;
     V2f dragDelta = V2f();
-    float mouseDelta = 0;
+    float scrollDelta = 0;
 };
 
 static blu_Globs globs = blu_Globs();
@@ -956,13 +954,13 @@ void blu_popStyle() {
 
 // return indicates if parent has been blocked
 // never touch this code again
-bool _blu_genInteractionsRecurse(blu_Area* area, bool covered) {
+bool _blu_genInteractionsRecurse(blu_Area* area, bool covered, blu_Cursor* outCursor) {
 
 
     blu_Area* elem = area->lastChild;
     while(elem) {
 
-        if(_blu_genInteractionsRecurse(elem, covered)) {
+        if(_blu_genInteractionsRecurse(elem, covered, outCursor)) {
             covered = true; }
 
         elem = elem->prevSibling;
@@ -991,7 +989,7 @@ bool _blu_genInteractionsRecurse(blu_Area* area, bool covered) {
             globs.dragged = area; }
 
         if(containsMouse) {
-            globs.reqCursor = area->cursor; }
+            *outCursor = area->cursor; }
     }
     else {
         area->prevHovered = false;
@@ -1001,7 +999,7 @@ bool _blu_genInteractionsRecurse(blu_Area* area, bool covered) {
     return (clickable && containsMouse) || covered;
 }
 
-void blu_input(V2f npos, bool lmbState, float mouseDelta) {
+void blu_input(V2f npos, bool lmbState, float scrollDelta, blu_Cursor* outCursor) {
 
     if(!globs.inputCurLButton && globs.inputPrevLButton) {
         globs.dragged = nullptr;
@@ -1013,17 +1011,14 @@ void blu_input(V2f npos, bool lmbState, float mouseDelta) {
     globs.inputPrevLButton = globs.inputCurLButton;
     globs.inputCurLButton = lmbState;
 
-    globs.mouseDelta = mouseDelta;
+    globs.scrollDelta = scrollDelta;
 
-    globs.reqCursor = blu_cursor_norm;
-    if(globs.dragged) {
-        globs.reqCursor = globs.dragged->cursor; }
-    _blu_genInteractionsRecurse(globs.ogParent, globs.dragged != nullptr);
+    *outCursor = blu_cursor_norm;
+    if(globs.dragged) { *outCursor = globs.dragged->cursor; }
+
+    _blu_genInteractionsRecurse(globs.ogParent, globs.dragged != nullptr, outCursor);
 }
 
-blu_Cursor blu_getCursor() {
-    return globs.reqCursor;
-}
 
 
 blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
@@ -1037,7 +1032,7 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
 
     out.hovered = area->prevHovered;
     if(out.hovered) {
-        out.scrollDelta = globs.mouseDelta; }
+        out.scrollDelta = globs.scrollDelta; }
 
     if(globs.dragged == area) {
         out.held = true;

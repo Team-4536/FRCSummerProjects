@@ -189,8 +189,8 @@ int main() {
 
 
 
-        blu_input(V2f((F32)mx, (F32)my), leftPressed, windowScrollDelta);
-        blu_Cursor c = blu_getCursor();
+        blu_Cursor c;
+        blu_input(V2f((F32)mx, (F32)my), leftPressed, windowScrollDelta, &c);
         if(c == blu_cursor_norm) { glfwSetCursor(window, nullptr); }
         else if(c == blu_cursor_hand) { glfwSetCursor(window, handCursor); }
         else if(c == blu_cursor_resizeH) { glfwSetCursor(window, resizeHCursor); }
