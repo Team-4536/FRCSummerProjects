@@ -5,14 +5,14 @@ import wpimath.estimator
 import wpimath.kinematics
 from wpimath.kinematics import SwerveModulePosition;
 from wpimath.geometry import Translation2d, Pose2d, Rotation2d
-
+import numpy
 import math
+from real import V2f
 
 
 class SwerveEstimator:
 
     def __init__(self) -> None:
-        wheelDist = math.sqrt(1**2 + 1**2)
 
         wheelTranslations = (
             Translation2d(-1, 1),
@@ -21,8 +21,8 @@ class SwerveEstimator:
             Translation2d(1, -1)
         )
 
-        self.wheelPositions = (
-            # initial wheel states
+        # initial wheel states
+        self.wheelStates = (
             SwerveModulePosition(0, Rotation2d(0)),
             SwerveModulePosition(0, Rotation2d(0)),
             SwerveModulePosition(0, Rotation2d(0)),
@@ -34,19 +34,39 @@ class SwerveEstimator:
         self.est = wpimath.estimator.SwerveDrive4PoseEstimator(
             kine,
             Rotation2d(0),
-            self.wheelPositions,
+            self.wheelStates,
             Pose2d()
             )
 
     def update(self, curTime: float, gyroAngleCWDeg: float, positionsM: list[float], anglesDEGCW: list[float]):
-        r = Rotation2d(math.radians(-gyroAngleCWDeg))
+        r = Rotation2d(math.radians(-gyroAngleCWDeg)) # wpi uses CCW angles
 
         for i in range(0, 4):
-            self.wheelPositions[i].angle = Rotation2d(-math.radians(anglesDEGCW[i]))
-            self.wheelPositions[i].distance = positionsM[i]
+            self.wheelStates[i].angle = Rotation2d(-math.radians(anglesDEGCW[i]))
+            self.wheelStates[i].distance = positionsM[i]
 
-        nPose = self.est.updateWithTime(curTime, r, self.wheelPositions)
-        return nPose
+
+        nPose = self.est.updateWithTime(curTime, r, self.wheelStates)
+
+        posePos = [
+            [ 1, 0, 0, 0 ],
+            [ 0, 1, 0, 0 ],
+            [ 0, 0, 1, 0 ],
+            [ nPose.X(), nPose.Y(), 0, 1 ],
+        ]
+
+        # matrix to move from WPI coords to normal ppl coords
+        # CW+, X right, y up/forward
+        transform = [
+            [ 0, 1, 0, 0 ],
+            [-1, 0, 0, 0 ],
+            [ 0, 0, 1, 0 ],
+            [ 0, 0, 0, 1 ]
+        ]
+
+        transformed = numpy.matmul(posePos, transform)
+
+        return V2f(transformed[3][0], transformed[3][1])
 
 
 

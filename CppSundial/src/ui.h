@@ -18,7 +18,6 @@ static struct UIGlobs {
     gfx_IndexBuffer* sceneIB = nullptr;
 
     V4f camPos = { 0, 0, 2, 0 };
-    Mat4f robotTransform = Mat4f(1);
     V2i viewPortSize = { 0, 0 };
 
     V2f windowPos = V2f(350, 100);
@@ -97,6 +96,7 @@ enum Component {
 
 void draw_field(float dt, GLFWwindow* window) {
 
+
     F32 moveSpeed = 3;
     globs.camPos.x += (glfwGetKey(window, GLFW_KEY_D) - glfwGetKey(window, GLFW_KEY_A)) * moveSpeed * dt;
     globs.camPos.y += (glfwGetKey(window, GLFW_KEY_W) - glfwGetKey(window, GLFW_KEY_S)) * moveSpeed * dt;
@@ -108,13 +108,27 @@ void draw_field(float dt, GLFWwindow* window) {
     net_Prop* posY = net_hashGet(STR("PosY"));
     net_Prop* yaw = net_hashGet(STR("Yaw"));
 
+    net_Prop* estX = net_hashGet(STR("EstX"));
+    net_Prop* estY = net_hashGet(STR("EstY"));
+
+    Mat4f robotTransform = Mat4f(1);
     if(posX && posY && yaw) {
         matrixTransform(
             (F32)posX->data->f64,
             (F32)posY->data->f64,
             0,
             (F32)yaw->data->f64,
-            globs.robotTransform);
+            robotTransform);
+    }
+
+    Mat4f estimateTransform = Mat4f(1);
+    if(estX && estY && yaw) {
+        matrixTransform(
+            (F32)estX->data->f64,
+            (F32)estY->data->f64,
+            0,
+            (F32)yaw->data->f64,
+            estimateTransform);
     }
 
 
@@ -157,7 +171,13 @@ void draw_field(float dt, GLFWwindow* window) {
     b->color = V4f(1, 1, 1, 1);
     b->ib = globs.sceneIB;
     b->va = globs.sceneVA;
-    b->model = globs.robotTransform;
+    b->model = robotTransform;
+
+    b = gfx_registerCall(p);
+    b->color = V4f(1, 1, 1, 0.5);
+    b->ib = globs.sceneIB;
+    b->va = globs.sceneVA;
+    b->model = estimateTransform;
 }
 
 
@@ -302,7 +322,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
 
         blu_styleScope
         {
-        blu_style_add_sizeX({blu_sizeKind_PX, 300 });
+        blu_style_add_sizeX({blu_sizeKind_PX, 400 });
             draw_network(dt, scratch);
         }
     }

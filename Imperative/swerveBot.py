@@ -14,6 +14,12 @@ from virtualGyro import VirtualGyro
 from swerveEstimation import SwerveEstimator
 import socketing
 
+
+WHEEL_DIA = 0.1016 # 4 in. in meters
+WHEEL_RADIUS = WHEEL_DIA / 2
+WHEEL_CIRC = WHEEL_DIA * math.pi
+
+
 class SwerveBot(wpilib.TimedRobot):
 
 
@@ -45,21 +51,7 @@ class SwerveBot(wpilib.TimedRobot):
         ]
         self.steerEncoders: list[rev.RelativeEncoder] = [x.getEncoder() for x in self.steerMotors]
 
-
-    def _simulationInit(self) -> None:
-        self.sim = sim.SwerveSim(
-            self.driveMotors,
-            self.driveEncoders,
-            self.steerMotors,
-            self.steerEncoders,
-            self.gyro,
-            [ V2f(-1, 1), V2f(1, 1), V2f(-1, -1), V2f(1, -1) ],
-            0.1016 * math.pi #this 4in in meters, it's the wheel circ
-        )
-
-    def _simulationPeriodic(self) -> None:
-        self.sim.update(self.time.dt)
-
+        self.estimator = SwerveEstimator()
 
 
     def robotPeriodic(self) -> None:
@@ -78,11 +70,40 @@ class SwerveBot(wpilib.TimedRobot):
 
         self.server.putUpdate("Test", int(420))
 
+        estimatedPose = self.estimator.update(self.time.timeSinceInit, self.gyro.getYaw(),
+            [self.driveEncoders[i].getPosition() * WHEEL_CIRC for i in range(0, 4)],
+            [self.steerEncoders[i].getPosition() * 360 for i in range(0, 4)]
+            )
+
+        self.server.putUpdate("EstX", estimatedPose.x)
+        self.server.putUpdate("EstY", estimatedPose.y)
+
 
         #TODO: debug expression in cpp sundial
 
 
         self.server.update(self.time.timeSinceInit)
+
+
+
+
+
+    def _simulationInit(self) -> None:
+        self.sim = sim.SwerveSim(
+            self.driveMotors,
+            self.driveEncoders,
+            self.steerMotors,
+            self.steerEncoders,
+            self.gyro,
+            [ V2f(-1, 1), V2f(1, 1), V2f(-1, -1), V2f(1, -1) ],
+            WHEEL_CIRC
+        )
+
+    def _simulationPeriodic(self) -> None:
+        self.sim.update(self.time.dt)
+
+
+
 
 
 
@@ -107,10 +128,15 @@ class SwerveBot(wpilib.TimedRobot):
             self.time.dt,
             self.input.brakeToggle)
 
-        # publishExpression("swerveController.leftStick.x", "x", self, self.telemTable)
-        # publishExpression("swerveController.leftStick.y", "y", self, self.telemTable)
 
 
+
+
+
+
+
+    def disabledInit(self) -> None:
+        self.disabledPeriodic()
 
     def disabledPeriodic(self) -> None:
         for i in range(0, 4):
