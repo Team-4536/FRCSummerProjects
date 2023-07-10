@@ -88,6 +88,7 @@ enum blu_Cursor {
     blu_cursor_norm,
     blu_cursor_hand,
     blu_cursor_resizeH,
+    blu_cursor_resizeV,
     blu_cursor_type,
 };
 

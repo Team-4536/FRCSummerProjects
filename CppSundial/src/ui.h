@@ -263,10 +263,13 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
 
 
 
+// TODO: make controls not apply unless field is "selected"
+// TODO: robot follow mode
+// TODO: center over field button
+// CLEANUP: dragging seems low res
+
 void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
-
-    // TODO: real camera controller
     V4f mVec = { 0, 0, 0, 0 };
 
     F32 moveSpeed = 3;
@@ -568,7 +571,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
             float t = inter.held? 1 : a->target_hoverAnim;
             a->style.backgroundColor = v4f_lerp(col_black, col_white, t);
             globs.botSize += -inter.dragDelta.y;
-            a->cursor = blu_cursor_resizeH;
+            a->cursor = blu_cursor_resizeV;
 
             blu_styleScope {
             blu_style_add_sizeY({blu_sizeKind_PX, globs.botSize });

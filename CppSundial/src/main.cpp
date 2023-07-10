@@ -49,6 +49,7 @@ int main() {
     GLFWcursor* typeCursor = nullptr;
     GLFWcursor* handCursor = nullptr;
     GLFWcursor* resizeHCursor = nullptr;
+    GLFWcursor* resizeVCursor = nullptr;
     // GLFW INIT AND WINDOW CREATION ===============================================================================
     {
         assert(glfwInit());
@@ -70,6 +71,7 @@ int main() {
         handCursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
         typeCursor = glfwCreateStandardCursor(GLFW_IBEAM_CURSOR);
         resizeHCursor = glfwCreateStandardCursor(GLFW_HRESIZE_CURSOR);
+        resizeVCursor = glfwCreateStandardCursor(GLFW_VRESIZE_CURSOR);
         glfwSetScrollCallback(window, scroll_callback);
         // glfwSetKeyCallback(window, updateInput);
         // glfwSetCursorPosCallback(window, updateMousePos);
@@ -194,6 +196,7 @@ int main() {
         if(c == blu_cursor_norm) { glfwSetCursor(window, nullptr); }
         else if(c == blu_cursor_hand) { glfwSetCursor(window, handCursor); }
         else if(c == blu_cursor_resizeH) { glfwSetCursor(window, resizeHCursor); }
+        else if(c == blu_cursor_resizeV) { glfwSetCursor(window, resizeVCursor); }
         else if(c == blu_cursor_type) { glfwSetCursor(window, typeCursor); }
         else { ASSERT(false); }
 
