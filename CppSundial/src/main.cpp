@@ -160,9 +160,6 @@ int main() {
     }
 
 
-
-    // TODO: framerate caps
-
     F64 prevTime = glfwGetTime();
     while(!glfwWindowShouldClose(window)) {
 

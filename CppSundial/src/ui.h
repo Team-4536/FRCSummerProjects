@@ -23,6 +23,7 @@ struct FieldInfo {
     gfx_Texture* fieldTex = nullptr;
 
     Transform camTransform;
+    Transform camTarget;
 };
 
 struct NetInfo {
@@ -265,7 +266,6 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
 
 // TODO: make controls not apply unless field is "selected"
 // TODO: robot follow mode
-// TODO: center over field button
 // CLEANUP: dragging seems low res
 
 void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
@@ -283,9 +283,9 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
     matrixXRotation(info->camTransform.rx, rx);
     mVec = mVec * (rx * ry);
 
-    info->camTransform.x += mVec.x;
-    info->camTransform.y += mVec.y;
-    info->camTransform.z += mVec.z;
+    info->camTarget.x += mVec.x;
+    info->camTarget.y += mVec.y;
+    info->camTarget.z += mVec.z;
 
 
 
@@ -325,8 +325,8 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
     a->texture = info->fb->texture;
 
     V2f delta = blu_interactionFromWidget(a).dragDelta;
-    info->camTransform.ry -= delta.x * 0.5f;
-    info->camTransform.rx -= delta.y * 0.5f;
+    info->camTarget.ry -= delta.x * 0.5f;
+    info->camTarget.rx -= delta.y * 0.5f;
 
     int w = (int)a->calculatedSizes[blu_axis_X];
     int h = (int)a->calculatedSizes[blu_axis_Y];
@@ -334,6 +334,32 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
     if(w != info->fb->texture->width || h != info->fb->texture->height) {
         if(w > 0 && h > 0) {
             gfx_resizeFramebuffer(info->fb, w, h);
+        }
+    }
+
+
+
+    blu_parentScope(a) {
+        blu_styleScope {
+        blu_style_add_sizeX({ blu_sizeKind_PX, 50 });
+        blu_style_add_sizeY({ blu_sizeKind_PX, 50 });
+
+            // TODO: button textures
+            a = blu_areaMake(STR("homeButton"), blu_areaFlags_CLICKABLE | blu_areaFlags_CENTER_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_FLOATING | blu_areaFlags_HOVER_ANIM);
+            a->offset = V2f(0, 0);
+            a->cursor = blu_cursor_hand;
+            V4f tra = V4f(1, 1, 1, 0.5f);
+            a->style.backgroundColor = v4f_lerp(col_darkGray * tra, col_white * tra, a->target_hoverAnim);
+            blu_areaAddDisplayStr(a, STR("H"));
+
+            if(blu_interactionFromWidget(a).clicked) {
+                // HOME TARGET (above the field)
+                info->camTarget = {
+                    0, 10, 0,
+                    -90, 0, 0,
+                    1, 1, 1
+                    };
+            }
         }
     }
 
@@ -350,6 +376,16 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
     Mat4f proj = Mat4f(1.0f);
     if(h != 0) {
         matrixPerspective(90, (float)w / h, 0.01, 1000000, proj); }
+
+    // CLEANUP: transform lerp func, also quaternions would be cool
+    float followStrength = 0.1f;
+    info->camTransform.x = lerp(info->camTransform.x, info->camTarget.x, followStrength);
+    info->camTransform.y = lerp(info->camTransform.y, info->camTarget.y, followStrength);
+    info->camTransform.z = lerp(info->camTransform.z, info->camTarget.z, followStrength);
+    info->camTransform.rx = lerp(info->camTransform.rx, info->camTarget.rx, followStrength);
+    info->camTransform.ry = lerp(info->camTransform.ry, info->camTarget.ry, followStrength);
+
+
 
     Mat4f view = matrixTransform(info->camTransform);
     matrixInverse(view, view);
@@ -390,6 +426,9 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
     b->va = info->va;
     b->model = matrixTransform(estimateTransform);
     b->texture = globs.solidTex;
+
+
+
 }
 
 
