@@ -62,6 +62,8 @@ static struct UIGlobs {
 
 
 // TEMP:
+// adds a framebuffer to an area, and resizes based on area size
+// doesnt rezise if area is <= 0 on either axis
 void areaAddFB(blu_Area* area, gfx_Framebuffer* target) {
 
     area->flags |= blu_areaFlags_DRAW_TEXTURE;
@@ -200,15 +202,7 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
     blu_Area* a = blu_areaMake(STR("swerveDisplay"), blu_areaFlags_DRAW_TEXTURE);
     a->texture = info->target->texture;
 
-    int w = (int)a->calculatedSizes[blu_axis_X];
-    int h = (int)a->calculatedSizes[blu_axis_Y];
-
-    if(w != info->target->texture->width || h != info->target->texture->height) {
-        if(w > 0 && h > 0) {
-            gfx_resizeFramebuffer(info->target, w, h);
-        }
-    }
-
+    areaAddFB(a, info->target);
 
     gfx_Pass* p = gfx_registerClearPass(col_darkBlue, info->target);
 
@@ -217,10 +211,8 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
     p->shader = globs.sceneShader2d;
     p->passUniforms.vp = Mat4f(1);
     float height = 4;
-    float width = height * ((float)w/h);
-    if(h != 0) { matrixOrtho(-width/2, width/2, -height/2, height/2, 0, 10000, p->passUniforms.vp); }
-
-
+    float width = height * ((float)info->target->texture->width/info->target->texture->height);
+    matrixOrtho(-width/2, width/2, -height/2, height/2, 0, 10000, p->passUniforms.vp);
 
     V2f translations[] = {
         { -1, 1 },
@@ -375,15 +367,10 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
     info->camTarget.ry -= delta.x * 0.5f;
     info->camTarget.rx -= delta.y * 0.5f;
 
-    int w = (int)a->calculatedSizes[blu_axis_X];
-    int h = (int)a->calculatedSizes[blu_axis_Y];
+    areaAddFB(a, info->fb);
 
-    if(w != info->fb->texture->width || h != info->fb->texture->height) {
-        if(w > 0 && h > 0) {
-            gfx_resizeFramebuffer(info->fb, w, h);
-        }
-    }
-
+    Mat4f proj = Mat4f(1.0f);
+    matrixPerspective(90, (float)info->fb->texture->width / info->fb->texture->height, 0.01, 1000000, proj);
 
 
     blu_parentScope(a) {
@@ -414,9 +401,6 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
     gfx_Pass* p = gfx_registerClearPass(col_darkBlue, info->fb);
 
-    Mat4f proj = Mat4f(1.0f);
-    if(h != 0) {
-        matrixPerspective(90, (float)w / h, 0.01, 1000000, proj); }
 
     // CLEANUP: transform lerp func, also quaternions would be cool
     float followStrength = 0.1f;
