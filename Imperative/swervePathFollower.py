@@ -19,9 +19,9 @@ class SwervePathFollower:
         self.poses = poses
         self.index = 0
 
-        kp = 0.15
+        kp = 0.2
         ki = 0
-        kd = -0.2
+        kd = -0.3
         self.xPID = PIDController(kp, ki, kd)
         self.yPID = PIDController(kp, ki, kd)
 
