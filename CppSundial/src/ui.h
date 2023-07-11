@@ -61,6 +61,22 @@ static struct UIGlobs {
 
 
 
+// TEMP:
+void areaAddFB(blu_Area* area, gfx_Framebuffer* target) {
+
+    area->flags |= blu_areaFlags_DRAW_TEXTURE;
+    area->texture = target->texture;
+
+    // CLEANUP: there are like 6 different instances of this exact piece of code
+    int w = (int)area->calculatedSizes[blu_axis_X];
+    int h = (int)area->calculatedSizes[blu_axis_Y];
+    if(w != target->texture->width || h != target->texture->height) {
+        if(w > 0 && h > 0) {
+            gfx_resizeFramebuffer(target, w, h);
+        }
+    }
+}
+
 
 
 void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
@@ -194,10 +210,7 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
     }
 
 
-    gfx_Pass* p = gfx_registerPass();
-    p->isClearPass = true;
-    p->target = info->target;
-    p->passUniforms.color = col_darkBlue;
+    gfx_Pass* p = gfx_registerClearPass(col_darkBlue, info->target);
 
     p = gfx_registerPass();
     p->target = info->target;
@@ -263,13 +276,14 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
 struct Graph2dInfo {
 
     float vals[GRAPH2D_VCOUNT] = { 0 };
+
+    gfx_Framebuffer* target = nullptr;
 };
 
 void draw_graph2d(Graph2dInfo* info, float dt, float nval) {
 
     memmove(info->vals, info->vals+1, GRAPH2D_VCOUNT - 1);
     info->vals[GRAPH2D_VCOUNT - 1] = nval;
-
 
     blu_Area* a = blu_areaMake(STR("graph2d"), blu_areaFlags_DRAW_BACKGROUND);
     a->style.childLayoutAxis = blu_axis_Y;
@@ -278,7 +292,17 @@ void draw_graph2d(Graph2dInfo* info, float dt, float nval) {
         blu_styleScope {
         blu_style_add_sizeY({blu_sizeKind_REMAINDER});
 
-            a = blu_areaMake(STR("upperBit"), 0);
+            a = blu_areaMake(STR("upperBit"), blu_areaFlags_DRAW_TEXTURE);
+            areaAddFB(a, info->target);
+            gfx_registerClearPass(col_darkBlue, info->target);
+
+            gfx_Pass* p = gfx_registerPass();
+            p->target = info->target;
+            p->shader = globs.sceneShader2d;
+            p->passUniforms.vp = Mat4f(1);
+
+
+
 
             a = blu_areaMake(STR("lowerBit"), 0);
         }
@@ -388,13 +412,7 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
 
 
-
-    gfx_Pass* p = gfx_registerPass();
-    p->isClearPass = true;
-    p->target = info->fb;
-    p->passUniforms.color = col_darkBlue;
-
-
+    gfx_Pass* p = gfx_registerClearPass(col_darkBlue, info->fb);
 
     Mat4f proj = Mat4f(1.0f);
     if(h != 0) {

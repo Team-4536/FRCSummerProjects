@@ -153,6 +153,11 @@ void gfx_bindVertexArray(gfx_Pass* pass, gfx_VertexArray* va);
 void gfx_bindIndexBuffer(gfx_Pass* pass, gfx_IndexBuffer* ib);
 
 gfx_Pass* gfx_registerPass();
+
+// CLEANUP: this?
+// target = nullptr indicates drawing to screen
+gfx_Pass* gfx_registerClearPass(V4f color, gfx_Framebuffer* target);
+
 gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass);
 
 // draws all passes, clears passes and calls after.
@@ -446,6 +451,17 @@ gfx_Pass* gfx_registerPass() {
     *p = gfx_Pass();
     return p;
 }
+
+gfx_Pass* gfx_registerClearPass(V4f color, gfx_Framebuffer* target) {
+    gfx_Pass* out = gfx_registerPass();
+    out->isClearPass = true;
+    out->target = target;
+    out->passUniforms.color = color;
+    return out;
+}
+
+
+
 // Adds and returns new call within the current pass
 gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass) {
     ASSERT(pass);
