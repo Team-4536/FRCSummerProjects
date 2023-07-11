@@ -878,7 +878,6 @@ void _blu_genRenderCallsRecurse(blu_Area* area, Rect2f clip, gfx_Pass* pass) {
 // CLEANUP: rename
 void blu_createPass(gfx_Pass* normalPass) {
 
-    // CLEANUP: get a rect structure here
     V2f start = V2f(
         globs.ogParent->calculatedPosition[blu_axis_X],
         globs.ogParent->calculatedPosition[blu_axis_Y]

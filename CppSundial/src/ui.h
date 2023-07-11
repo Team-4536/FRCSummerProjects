@@ -9,6 +9,7 @@
 #include "colors.h"
 #include "stb_image/stb_image.h"
 
+#include <cstring>
 
 
 
@@ -61,8 +62,6 @@ static struct UIGlobs {
 
 
 
-
-// TODO: make deps clearer
 
 void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
     globs = UIGlobs();
@@ -260,13 +259,37 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
 
 
 
+#define GRAPH2D_VCOUNT 200
+struct Graph2dInfo {
 
+    float vals[GRAPH2D_VCOUNT] = { 0 };
+};
+
+void draw_graph2d(Graph2dInfo* info, float dt, float nval) {
+
+    memmove(info->vals, info->vals+1, GRAPH2D_VCOUNT - 1);
+    info->vals[GRAPH2D_VCOUNT - 1] = nval;
+
+
+    blu_Area* a = blu_areaMake(STR("graph2d"), blu_areaFlags_DRAW_BACKGROUND);
+    a->style.childLayoutAxis = blu_axis_Y;
+
+    blu_parentScope(a) {
+        blu_styleScope {
+        blu_style_add_sizeY({blu_sizeKind_REMAINDER});
+
+            a = blu_areaMake(STR("upperBit"), 0);
+
+            a = blu_areaMake(STR("lowerBit"), 0);
+        }
+
+    }
+};
 
 
 
 // TODO: make controls not apply unless field is "selected"
 // TODO: robot follow mode
-// CLEANUP: dragging seems low res
 
 void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 

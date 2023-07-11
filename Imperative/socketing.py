@@ -6,7 +6,7 @@ from enum import Enum
 import select
 
 # in seconds
-SEND_INTERVAL = 1/60
+SEND_INTERVAL = 1/50
 
 
 
@@ -62,6 +62,7 @@ class Server():
 
         self.telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
 
+        # TODO: host from actual robot
         self.sock = socket.socket(socket.AddressFamily.AF_INET, socket.SOCK_STREAM)
         self.sock.bind(("localhost", 7000))
         self.sock.listen(1) # client backlog

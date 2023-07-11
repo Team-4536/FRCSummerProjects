@@ -108,7 +108,6 @@ bool _net_sockCreateConnect(const char* hostname, const char* port, net_Sock* so
         hints.ai_protocol = IPPROTO_TCP;
 
         addrinfo* resInfo;
-        // CLEANUP: perma allocations here
         err = getaddrinfo(hostname, port, &hints, &resInfo);
         if(err != 0) {
             *outError = net_sockErr_failedAddrInfo;
@@ -174,6 +173,7 @@ struct net_Globs {
     net_Prop* eventStart = nullptr;
     net_Prop* eventEnd = nullptr;
 
+    // TODO: toggle recording / move this out of here
     FILE* logFile;
 
     U32 recvBufStartOffset = 0;
