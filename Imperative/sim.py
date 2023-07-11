@@ -28,8 +28,6 @@ class EncoderSim:
         self.state = self.linearSys.calculateX(self.state, inputVec, dt)
         self.encoder.setPosition(self.state[0])
 
-# TODO: figure a way to make this more functional ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
 
 
 
@@ -47,12 +45,14 @@ class SwerveSim:
 
         self.driveSims: list[EncoderSim] = [ ]
         for i in range(4):
-           sim = EncoderSim(driveMotors[i], plant.DCMotor.NEO(1), driveEncoders[i], 0.1, 6.12) # TODO: VVVVVVVVVVVVVVVVVVVVVVVVV
+           sim = EncoderSim(driveMotors[i], plant.DCMotor.NEO(1), driveEncoders[i], 0.1, 6.12)
            self.driveSims.append(sim)
 
         self.steerSims: list[EncoderSim] = [ ]
         for i in range(4):
-           sim = EncoderSim(steeringMotors[i], plant.DCMotor.NEO(1), steeringEncoders[i], 0.03, 1) # TODO: get real inertia vals #TODO: is this the corect gearing?
+           sim = EncoderSim(steeringMotors[i], plant.DCMotor.NEO(1), steeringEncoders[i], 0.03, 1)
+           # TODO: get real inertia vals
+           # TODO: is this the corect gearing?
            self.steerSims.append(sim)
 
         self.gyro = gyro
@@ -65,7 +65,7 @@ class SwerveSim:
         self.posDeltas: list[V2f] = [] # DEBUG
 
     # TODO: add friction to wheel sims
-    # TODO: get measurements for wheel inertia/friction
+    # TODO: get measurements for wheel friction
     # TODO: vary the "inertia" of each mechanism with speed/rotation speed of drive // add extra resistance when braking and going against current speed somehow
 
     def update(self, dt: float):

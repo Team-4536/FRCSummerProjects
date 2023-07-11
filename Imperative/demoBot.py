@@ -96,16 +96,4 @@ class DemoBot(wpilib.TimedRobot):
 if __name__ == "__main__":
     wpilib.run(DemoBot)
 
-    """
-    r = Robot()
-    r.robotInit()
-    r._simulationInit()
-    r.teleopInit()
-
-    while True:
-        r.robotPeriodic()
-        r._simulationPeriodic()
-        r.teleopPeriodic()
-    # """
-
 
