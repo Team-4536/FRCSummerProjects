@@ -38,6 +38,8 @@ class SwerveEstimator:
             Pose2d()
             )
 
+        self.estimatedPose = V2f(0, 0)
+
     def update(self, curTime: float, gyroAngleCWDeg: float, positionsM: list[float], anglesDEGCW: list[float]):
         r = Rotation2d(math.radians(-gyroAngleCWDeg)) # wpi uses CCW angles
 
@@ -66,7 +68,8 @@ class SwerveEstimator:
 
         transformed = numpy.matmul(posePos, transform)
 
-        return V2f(transformed[3][0], transformed[3][1])
+        self.estimatedPose = V2f(transformed[3][0], transformed[3][1])
+        return self.estimatedPose
 
 
 
