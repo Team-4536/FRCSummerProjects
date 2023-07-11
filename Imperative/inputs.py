@@ -27,4 +27,4 @@ class DemoInputs():
     def __init__(self, driveCtrlr: wpilib.XboxController) -> None:
         self.drive = -deadZone(driveCtrlr.getLeftY())
         self.turning = deadZone(driveCtrlr.getRightX())
-        self.shooter = driveCtrlr.getAButtonPressed()
+        self.turret = driveCtrlr.getRightTriggerAxis() - driveCtrlr.getLeftTriggerAxis()
