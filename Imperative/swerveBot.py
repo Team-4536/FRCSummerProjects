@@ -66,6 +66,8 @@ class SwerveBot(wpilib.TimedRobot):
     def robotPeriodic(self) -> None:
         self.time = timing.TimeData(self.time)
 
+        self.server.putUpdate("time", self.time.timeSinceInit)
+
         prefs = ["FL", "FR", "BL", "BR"]
         for i in range(0, 4):
             self.server.putUpdate(prefs[i] + "DriveSpeed", self.driveMotors[i].get())

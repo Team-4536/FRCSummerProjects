@@ -534,7 +534,7 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                             else if(prop->type == net_propType_F64) {
                                 blu_areaAddDisplayStr(a, str_format(scratch, STR("%f"), (prop->data->f64))); }
                             else if(prop->type == net_propType_STR) {
-                                blu_areaAddDisplayStr(a, str_format(scratch, STR("%s"), (prop->data->str))); }
+                                blu_areaAddDisplayStr(a, str_format(scratch, STR("\"%s\""), (prop->data->str))); }
                             else if(prop->type == net_propType_BOOL) {
                                 blu_areaAddDisplayStr(a, str_format(scratch, STR("%b"), (prop->data->boo)));
                                 a->style.backgroundColor = prop->data->boo? col_green : col_red;

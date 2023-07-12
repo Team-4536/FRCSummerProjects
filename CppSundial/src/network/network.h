@@ -163,8 +163,6 @@ void _net_sockCloseFree(net_Sock* s) {
 
 
 
-
-
 struct net_Globs {
 
     WSADATA wsaData;
@@ -180,11 +178,12 @@ struct net_Globs {
     net_Prop* eventStart = nullptr;
     net_Prop* eventEnd = nullptr;
 
-    // TODO: toggle recording / bianary log files / move this out of here
-    FILE* logFile;
 
     U32 recvBufStartOffset = 0;
     U8* recvBuffer;
+
+
+    FILE* logFile;
 };
 
 static net_Globs globs = net_Globs();
@@ -276,20 +275,6 @@ net_Prop* net_hashGet(str string) {
 
 
 
-
-
-void _net_log(str s) {
-    fwrite(s.chars, 1, s.length, globs.logFile);
-}
-
-
-/*
-TODO: expand data types
-    [ ] bools
-    [ ] v2s
-    [X] strings
-*/
-
 // returns nullptr if failed, else ptr to data & increments current
 U8* _net_getBytes(U8* buf, U32 bufSize, U8** current, U32 count) {
 
@@ -302,8 +287,6 @@ U8* _net_getBytes(U8* buf, U32 bufSize, U8** current, U32 count) {
 
 
 //CLEANUP: includes
-
-
 
 
 /*
@@ -338,24 +321,23 @@ StrList _net_processMessage(U8 kind, str name, U8* data, U8 dataType, U32 dataSi
 
     StrList log = StrList();
 
-    str_listAppend(&log, str_format(scratch, STR("%i\t"), (int)kind), scratch);
     if(kind != net_msgKind_UPDATE &&
        kind != net_msgKind_EVENT) {
-        str_listAppend(&log, STR("Invalid msg type\t"), scratch);
+        str_listAppend(&log, STR("[Invalid msg type]\t"), scratch);
+        str_listAppend(&log, str_format(scratch, STR("%i\t"), (int)kind), scratch);
         return log;
     }
 
-    str_listAppend(&log, str_format(scratch, STR("%i\t"), (int)dataType), scratch);
 
     if(dataType != net_propType_S32 &&
        dataType != net_propType_F64 &&
        dataType != net_propType_STR &&
        dataType != net_propType_BOOL) {
-        str_listAppend(&log, str_format(scratch, STR("Invalid data type\t"), dataType), scratch);
+        str_listAppend(&log, str_format(scratch, STR("[Invalid data type]\t"), dataType), scratch);
+        str_listAppend(&log, str_format(scratch, STR("%i\t"), (int)dataType), scratch);
         return log;
     }
 
-    str_listAppend(&log, str_format(scratch, STR("%i\t"), (int)dataSize), scratch);
     str_listAppend(&log, str_format(scratch, STR("%s\t"), name), scratch);
 
 
@@ -420,10 +402,9 @@ StrList _net_processMessage(U8 kind, str name, U8* data, U8 dataType, U32 dataSi
 }
 
 
+// NOTE: messages are expected to be formatted correctly, if one isn't this will not be able to read future messages
 // return value indicates how much of the buffer was processed
 U32 _net_processPackets(U8* buf, U32 bufSize, BumpAlloc* scratch) {
-
-    // _net_log(str_format(scratch, STR("[PACKET START] size: %i\n"), bufSize));
 
     U8* cur = buf;
     while(true) {
@@ -437,20 +418,18 @@ U32 _net_processPackets(U8* buf, U32 bufSize, BumpAlloc* scratch) {
         U8 valType = messageHeader[2];
         U8 valLen = messageHeader[3];
 
-        // CLEANUP: giving messages a lil too much control
         U8* nameBuf = _net_getBytes(buf, bufSize, &cCopy, nameLen);
         if(!nameBuf) { break; }
         U8* dataBuf = _net_getBytes(buf, bufSize, &cCopy, valLen);
         if(!dataBuf) { break; }
 
         StrList log = _net_processMessage(msgKind, {nameBuf, nameLen}, dataBuf, valType, valLen, scratch);
-        _net_log(str_listCollect(log, scratch));
-        _net_log(STR("\n"));
+        str_listAppend(&log, STR("\n"), scratch);
+        str collected = str_listCollect(log, scratch);
+        fwrite(collected.chars, 1, collected.length, globs.logFile);
 
         cur = cCopy;
     }
-
-    // _net_log(str_format(scratch, STR("[PACKET END] rem: %i\n"), cur - buf));
 
     return cur - buf;
 }
@@ -475,7 +454,9 @@ void net_update(BumpAlloc* scratch) {
         else if(connected) {
             globs.connected = true;
             net_resetTracked();
-            _net_log(str_format(scratch, STR("[CONNECTED]\n")));
+
+            str s = STR("[CONNECTED]\n");
+            fwrite(s.chars, 1, s.length, globs.logFile);
         }
         return;
     }
@@ -487,7 +468,10 @@ void net_update(BumpAlloc* scratch) {
 
     if (recvSize == SOCKET_ERROR) {
         if(WSAGetLastError() != WSAEWOULDBLOCK) {
-            _net_log(str_format(scratch, STR("[ERR]\t%i\n"), WSAGetLastError()));
+
+            str s = str_format(scratch, STR("[ERR]\t%i\n"), WSAGetLastError());
+            fwrite(s.chars, 1, s.length, globs.logFile);
+
             globs.connected = false;
             _net_sockCloseFree(&globs.simSocket);
         }
@@ -515,13 +499,15 @@ void net_update(BumpAlloc* scratch) {
 
 
     if(!globs.connected) {
-        _net_log(str_format(scratch, STR("[DISCONNECTED]\n")));
+        str s = STR("[DISCONNECTED]\n");
+        fwrite(s.chars, 1, s.length, globs.logFile);
     }
 }
 
 void net_cleanup() {
 
-    _net_log(STR("[QUIT]"));
+    str s = STR("[DISCONNECTED]\n");
+    fwrite(s.chars, 1, s.length, globs.logFile);
     fclose(globs.logFile);
 
     _net_sockCloseFree(&globs.simSocket);
