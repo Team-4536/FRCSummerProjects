@@ -30,23 +30,27 @@ class Message():
 
         if(type(value) == int):
             valType = MessageUpdateType.S32
-            valEncoded += int(value).to_bytes(4, 'little', signed=True)
+            # NOTE: ! indicates sending big endian format
+            # https://docs.python.org/3/library/struct.html
+            valEncoded += struct.pack("!l", value)
 
         elif(type(value) == float or type(value) == numpy.float64):
             valType = MessageUpdateType.F64
-            valEncoded += bytearray(struct.pack("d", float(value)))
+            valEncoded += struct.pack("!d", value)
 
-        elif(type(value) == str): assert(False)
+        elif(type(value) == str):
+            assert(False)
+
         else:
             print(f"Invalid type in message: {type(value)}")
             assert(False)
 
 
 
-        self.content += int(kind.value).to_bytes(1, 'little')
-        self.content += len(name).to_bytes(1, 'little')
-        self.content += int(valType.value).to_bytes(1, 'little')
-        self.content += len(valEncoded).to_bytes(1, 'little')
+        self.content += struct.pack("!b", kind.value)
+        self.content += struct.pack("!b", len(name))
+        self.content += struct.pack("!b", valType.value)
+        self.content += struct.pack("!b", len(valEncoded))
 
         self.content += name.encode()
         self.content += valEncoded

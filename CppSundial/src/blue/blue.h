@@ -40,6 +40,7 @@ THE CHECKLIST:
     [ ] drop shadows
     [ ] tooltips/dropdowns
     [ ] text input
+    [ ] text hotkeys
 
     [ ] cleanup
     [ ] batching
@@ -725,7 +726,7 @@ void blu_layout(V2f scSize) {
                 if(axis == blu_axis_Y) {
                     elem->calculatedSizes[axis] = globs.fontHeight + 2*elem->style.textPadding.y;
                     // CLEANUP: what about no text
-                    // TODO: text wrapping/cutoff
+                    // TODO: text wrapping/truncation
                 }
                 else if(axis == blu_axis_X) {
 

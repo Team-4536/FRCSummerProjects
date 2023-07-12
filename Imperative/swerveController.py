@@ -6,6 +6,9 @@ from PIDController import PIDController
 
 #next thing to do: change brake mode from toggle to happen until input received
 
+# TODO: One time, for no reason, this thing had a stroke and wouldnt move
+
+
 class SwerveController:
 
     def __init__(self, turnList, driveList, turnEncoders, driveEncoders) -> None:

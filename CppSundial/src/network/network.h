@@ -280,11 +280,11 @@ void _net_log(str s) {
 TODO: expand data types
     [ ] strings
     [ ] v2s?
-    [ ] matricies
     [ ] arrays
+    [ ] matricies
 */
 
-// TODO: document/improve log spec
+// TODO: document log spec
 // TODO: msg begin markers
 
 // returns nullptr if failed, else ptr to data
@@ -306,9 +306,32 @@ U8* _net_getBytes(U8* buf, U32 bufSize, U8** current, U32 count) {
 /*
 Message layout:
 [U8 kind] [U8 length of name] [U8 data type] [U8 data size] [name] [data]
+info is always big endian
 */
+
+constexpr bool _net_isSystemBigEndian()
+{
+    union {
+        U32 i;
+        char c[4];
+    } x = {0x01020304};
+    return x.c[0] == 1;
+}
+
+
+U8* _net_reverseBytes(U8* data, U32 size, BumpAlloc* scratch) {
+
+    U8* temp = BUMP_PUSH_ARR(scratch, size, U8);
+    for(int i = 0; i < size; i++) {
+        temp[i] = data[size - 1 - i];
+    }
+
+    return temp;
+}
+
+
 // returns log for given message
-StrList _net_processMessage(U8 kind, str name, void* data, U8 dataType, U32 dataSize, BumpAlloc* scratch) {
+StrList _net_processMessage(U8 kind, str name, U8* data, U8 dataType, U32 dataSize, BumpAlloc* scratch) {
 
     StrList log = StrList();
 
@@ -349,13 +372,19 @@ StrList _net_processMessage(U8 kind, str name, void* data, U8 dataType, U32 data
 
         prop->type = (net_PropType)dataType;
         if(prop->type == net_propType_F64) {
+
             prop->data->f64 = *((F64*)data);
+            if(!_net_isSystemBigEndian()) {
+                prop->data->f64 = *((F64*)_net_reverseBytes(data, sizeof(F64), scratch));
+            }
 
             str_listAppend(&log, str_format(scratch, STR("%f\t"), prop->data->f64), scratch);
         }
         else if (prop->type == net_propType_S32) {
-            // TODO: endianness
             prop->data->s32 = *((S32*)data);
+            if(!_net_isSystemBigEndian()) {
+                prop->data->s32= *((S32*)_net_reverseBytes(data, sizeof(S32), scratch));
+            }
             str_listAppend(&log, str_format(scratch, STR("%i\t"), prop->data->s32), scratch);
         }
     }
