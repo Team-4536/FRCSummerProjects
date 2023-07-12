@@ -27,6 +27,7 @@ struct StrList {
 str str_make(const char* c); // use given memory
 str str_make(const char* c, BumpAlloc* arena); // copy c into arena
 str str_copy(str a, BumpAlloc* arena);
+str str_copy(str a, U8* memory);
 str str_join(str l, str r, BumpAlloc* arena);
 str str_substr(str s, U64 start, U64 length);
 const char* str_cstyle(str s, BumpAlloc* arena);
@@ -202,6 +203,11 @@ str str_copy(str a, BumpAlloc* arena) {
     U8* n = BUMP_PUSH_ARR(arena, a.length, U8);
     memcpy(n, a.chars, a.length);
     return { n, a.length };
+}
+
+str str_copy(str a, U8* memory) {
+    memcpy(memory, a.chars, a.length);
+    return { memory, a.length };
 }
 
 str str_join(str l, str r, BumpAlloc* arena) {

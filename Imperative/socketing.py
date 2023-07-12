@@ -39,7 +39,8 @@ class Message():
             valEncoded += struct.pack("!d", value)
 
         elif(type(value) == str):
-            assert(False)
+            valType = MessageUpdateType.STR
+            valEncoded += value.encode()
 
         else:
             print(f"Invalid type in message: {type(value)}")
@@ -47,10 +48,10 @@ class Message():
 
 
 
-        self.content += struct.pack("!b", kind.value)
-        self.content += struct.pack("!b", len(name))
-        self.content += struct.pack("!b", valType.value)
-        self.content += struct.pack("!b", len(valEncoded))
+        self.content += struct.pack("!B", kind.value)
+        self.content += struct.pack("!B", len(name))
+        self.content += struct.pack("!B", valType.value)
+        self.content += struct.pack("!B", len(valEncoded))
 
         self.content += name.encode()
         self.content += valEncoded
@@ -112,7 +113,7 @@ class Server():
                 self.cliSock = None
                 print(f"[SOCKETS] Client ended with exception {repr(e)}")
 
-    def putUpdate(self, name: str, value: float|int):
+    def putUpdate(self, name: str, value: float|int|str):
 
         self.telemTable.putValue(name, value)
 

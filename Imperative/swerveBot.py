@@ -90,6 +90,12 @@ class SwerveBot(wpilib.TimedRobot):
 
         #TODO: debug expression in cpp sundial
 
+        if self.isDisabled(): opmode = "disabled"
+        elif self.isAutonomousEnabled(): opmode = "auto"
+        elif self.isTeleopEnabled(): opmode = "teleop"
+        else: opmode = "????????"
+        self.server.putUpdate("Opmode", opmode)
+
 
         self.server.update(self.time.timeSinceInit)
 

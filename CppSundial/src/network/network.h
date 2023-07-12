@@ -31,6 +31,11 @@ enum net_MsgKind {
 union net_PropData {
     S32 s32;
     F64 f64;
+
+    struct {
+        str str;
+        U8 chars[256];
+    };
 };
 
 struct net_Prop {
@@ -173,7 +178,7 @@ struct net_Globs {
     net_Prop* eventStart = nullptr;
     net_Prop* eventEnd = nullptr;
 
-    // TODO: toggle recording / move this out of here
+    // TODO: toggle recording / bianary log files / move this out of here
     FILE* logFile;
 
     U32 recvBufStartOffset = 0;
@@ -278,16 +283,14 @@ void _net_log(str s) {
 
 /*
 TODO: expand data types
-    [ ] strings
+    [ ] bools
     [ ] v2s?
+    [ ] strings
     [ ] arrays
     [ ] matricies
 */
 
-// TODO: document log spec
-// TODO: msg begin markers
-
-// returns nullptr if failed, else ptr to data
+// returns nullptr if failed, else ptr to data & increments current
 U8* _net_getBytes(U8* buf, U32 bufSize, U8** current, U32 count) {
 
     ASSERT(*current >= buf);
@@ -345,7 +348,8 @@ StrList _net_processMessage(U8 kind, str name, U8* data, U8 dataType, U32 dataSi
     str_listAppend(&log, str_format(scratch, STR("%i\t"), (int)dataType), scratch);
 
     if(dataType != net_propType_S32 &&
-       dataType != net_propType_F64) {
+       dataType != net_propType_F64 &&
+       dataType != net_propType_STR) {
         str_listAppend(&log, str_format(scratch, STR("Invalid data type\t"), dataType), scratch);
         return log;
     }
@@ -386,6 +390,10 @@ StrList _net_processMessage(U8 kind, str name, U8* data, U8 dataType, U32 dataSi
                 prop->data->s32= *((S32*)_net_reverseBytes(data, sizeof(S32), scratch));
             }
             str_listAppend(&log, str_format(scratch, STR("%i\t"), prop->data->s32), scratch);
+        }
+        else if(prop->type == net_propType_STR) {
+            prop->data->str = str_copy({ (const U8*)data, dataSize }, prop->data->chars);
+            str_listAppend(&log, str_format(scratch, STR("%s\t"), prop->data->str), scratch);
         }
     }
     else if(kind == net_msgKind_EVENT) {

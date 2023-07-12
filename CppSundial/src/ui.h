@@ -223,6 +223,8 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
         { -1, -1},
         { 1, -1 }
     };
+
+    // TODO: hash get is not typesafe
     net_Prop* props[] = {
         net_hashGet(STR("FLSteerPos")),
         net_hashGet(STR("FRSteerPos")),
@@ -530,6 +532,8 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                                 blu_areaAddDisplayStr(a, str_format(scratch, STR("%i"), (prop->data->s32))); }
                             else if(prop->type == net_propType_F64) {
                                 blu_areaAddDisplayStr(a, str_format(scratch, STR("%f"), (prop->data->f64))); }
+                            else if(prop->type == net_propType_STR) {
+                                blu_areaAddDisplayStr(a, str_format(scratch, STR("%s"), (prop->data->str))); }
                         }
                     }
                 }
