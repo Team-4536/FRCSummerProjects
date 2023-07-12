@@ -20,7 +20,8 @@ enum net_SockErr {
 enum net_PropType {
     net_propType_S32,
     net_propType_F64,
-    net_propType_STR
+    net_propType_STR,
+    net_propType_BOOL
 };
 
 enum net_MsgKind {
@@ -31,6 +32,7 @@ enum net_MsgKind {
 union net_PropData {
     S32 s32;
     F64 f64;
+    U8 boo;
 
     struct {
         str str;
@@ -284,10 +286,8 @@ void _net_log(str s) {
 /*
 TODO: expand data types
     [ ] bools
-    [ ] v2s?
-    [ ] strings
-    [ ] arrays
-    [ ] matricies
+    [ ] v2s
+    [X] strings
 */
 
 // returns nullptr if failed, else ptr to data & increments current
@@ -349,7 +349,8 @@ StrList _net_processMessage(U8 kind, str name, U8* data, U8 dataType, U32 dataSi
 
     if(dataType != net_propType_S32 &&
        dataType != net_propType_F64 &&
-       dataType != net_propType_STR) {
+       dataType != net_propType_STR &&
+       dataType != net_propType_BOOL) {
         str_listAppend(&log, str_format(scratch, STR("Invalid data type\t"), dataType), scratch);
         return log;
     }
@@ -394,6 +395,10 @@ StrList _net_processMessage(U8 kind, str name, U8* data, U8 dataType, U32 dataSi
         else if(prop->type == net_propType_STR) {
             prop->data->str = str_copy({ (const U8*)data, dataSize }, prop->data->chars);
             str_listAppend(&log, str_format(scratch, STR("%s\t"), prop->data->str), scratch);
+        }
+        else if(prop->type == net_propType_BOOL) {
+            prop->data->boo = *data;
+            str_listAppend(&log, str_format(scratch, STR("%b\t"), prop->data->boo), scratch);
         }
     }
     else if(kind == net_msgKind_EVENT) {

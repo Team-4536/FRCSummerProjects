@@ -232,7 +232,7 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
         net_hashGet(STR("BRSteerPos"))
     };
 
-    net_Prop* angle = net_hashGet(STR("Yaw"));
+    net_Prop* angle = net_hashGet(STR("yaw"));
 
     Mat4f temp;
 
@@ -333,12 +333,12 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
 
 
-    net_Prop* posX = net_hashGet(STR("PosX"));
-    net_Prop* posY = net_hashGet(STR("PosY"));
-    net_Prop* yaw = net_hashGet(STR("Yaw"));
+    net_Prop* posX = net_hashGet(STR("posX"));
+    net_Prop* posY = net_hashGet(STR("posY"));
+    net_Prop* yaw = net_hashGet(STR("yaw"));
 
-    net_Prop* estX = net_hashGet(STR("EstX"));
-    net_Prop* estY = net_hashGet(STR("EstY"));
+    net_Prop* estX = net_hashGet(STR("estX"));
+    net_Prop* estY = net_hashGet(STR("estY"));
 
     Transform robotTransform = Transform();
     robotTransform.rx = -90; // CLEANUP/TODO: temp constants, until a model is made
@@ -526,14 +526,19 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                             str n = str_format(scratch, STR("\"%s\""), prop->name);
                             blu_areaAddDisplayStr(a, n);
 
-                            a = blu_areaMake(STR("value"), blu_areaFlags_DRAW_TEXT);
+                            a = blu_areaMake(STR("value"), blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
                             a->style.backgroundColor = col_darkGray;
+
                             if(prop->type == net_propType_S32) {
                                 blu_areaAddDisplayStr(a, str_format(scratch, STR("%i"), (prop->data->s32))); }
                             else if(prop->type == net_propType_F64) {
                                 blu_areaAddDisplayStr(a, str_format(scratch, STR("%f"), (prop->data->f64))); }
                             else if(prop->type == net_propType_STR) {
                                 blu_areaAddDisplayStr(a, str_format(scratch, STR("%s"), (prop->data->str))); }
+                            else if(prop->type == net_propType_BOOL) {
+                                blu_areaAddDisplayStr(a, str_format(scratch, STR("%b"), (prop->data->boo)));
+                                a->style.backgroundColor = prop->data->boo? col_green : col_red;
+                            }
                         }
                     }
                 }

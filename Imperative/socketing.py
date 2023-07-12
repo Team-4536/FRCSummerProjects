@@ -18,10 +18,11 @@ class MessageUpdateType(Enum):
     S32 = 0
     F64 = 1
     STR = 2
+    BOOL = 3
 
 class Message():
 
-    def __init__(self, kind: MessageKind, name: str, value: float|int|str) -> None:
+    def __init__(self, kind: MessageKind, name: str, value: float|int|str|bool) -> None:
 
         self.content = b""
 
@@ -41,6 +42,11 @@ class Message():
         elif(type(value) == str):
             valType = MessageUpdateType.STR
             valEncoded += value.encode()
+
+        elif(type(value) == bool):
+            valType = MessageUpdateType.BOOL
+            valEncoded += struct.pack("!B", 1 if value else 0)
+
 
         else:
             print(f"Invalid type in message: {type(value)}")

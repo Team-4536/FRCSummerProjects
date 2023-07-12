@@ -112,6 +112,11 @@ str str_format(BumpAlloc* arena, str fmt, ...) {
                     out.length++;
                 }
             }
+            else if(*ptr == 'b') {
+                str boolStr = va_arg(argp, int)? STR("true") : STR("false");
+                str_copy(boolStr, arena);
+                out.length += boolStr.length;
+            }
             else {
                 *BUMP_PUSH_NEW(arena, char) = *ptr;
                 out.length++;
@@ -167,6 +172,12 @@ void str_printf(str fmt, ...) {
                 for(int i = 0; i < 10; i++) {
                     putchar(buf[i]);
                     if(buf[i] == '\0') { break; }
+                }
+            }
+            else if(*ptr == 'b') {
+                str boolStr = va_arg(argp, int)? STR("true") : STR("false");
+                for(int i = 0; i < boolStr.length; i++) {
+                    putchar(boolStr.chars[i]);
                 }
             }
             else {

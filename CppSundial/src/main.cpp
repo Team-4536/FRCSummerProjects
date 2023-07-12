@@ -39,6 +39,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 
 int main() {
 
+
     BumpAlloc lifetimeArena;
     BumpAlloc frameArena;
     bump_allocate(&lifetimeArena, 1000000);
