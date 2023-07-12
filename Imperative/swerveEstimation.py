@@ -74,7 +74,5 @@ class SwerveEstimator:
 
 
 
-# TODO: sensor noise
-
 
 

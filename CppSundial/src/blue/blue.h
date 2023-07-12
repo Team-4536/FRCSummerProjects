@@ -271,7 +271,7 @@ struct blu_Glyph {
 
 struct blu_Globs {
 
-    blu_Area* currentParent = nullptr; // TODO: replace with currentArea
+    blu_Area* currentParent = nullptr; // CLEANUP: replace with currentArea
     blu_Area* ogParent = nullptr;
 
     blu_Area** hash = nullptr; // array of pointers to the actual area structs, for hash-based access
