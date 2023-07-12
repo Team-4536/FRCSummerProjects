@@ -192,11 +192,6 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
 
 
 
-
-
-
-
-// TODO: scale when to small horizontally
 void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
 
     blu_Area* a = blu_areaMake(STR("swerveDisplay"), blu_areaFlags_DRAW_TEXTURE);
@@ -209,10 +204,18 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
     p = gfx_registerPass();
     p->target = info->target;
     p->shader = globs.sceneShader2d;
-    p->passUniforms.vp = Mat4f(1);
-    float height = 4;
-    float width = height * ((float)info->target->texture->width/info->target->texture->height);
+
+    float aspect = ((float)info->target->texture->width/info->target->texture->height);
+    float size = 4;
+    float width = size * aspect;
+    float height = size;
+
+    if(aspect < 1) {
+        width = 4;
+        height = width * (1/aspect);
+    }
     matrixOrtho(-width/2, width/2, -height/2, height/2, 0, 10000, p->passUniforms.vp);
+
 
     V2f translations[] = {
         { -1, 1 },
