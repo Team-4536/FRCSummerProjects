@@ -514,13 +514,13 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                 blu_areaAddDisplayStr(a, STR("SEND"));
                 if(blu_interactionFromWidget(a).clicked) {
 
-                    net_Message* m = BUMP_PUSH_NEW(scratch, net_Message);
-                    m->kind = net_msgKind_EVENT;
-                    m->name = str_copy(STR("Thing"), scratch);
+                    net_Message m;
+                    m.kind = net_msgKind_EVENT;
+                    m.name = str_copy(STR("Thing"), scratch);
 
-                    m->dataType = net_propType_STR;
-                    m->data.str = str_copy(STR("Hello from c--"), m->data.chars);
-                    net_putMessage(m);
+                    m.dataType = net_propType_STR;
+                    m.data.str = str_copy(STR("Hello from c--"), m.data.chars);
+                    net_putMessage(m, scratch);
                 }
 
                 net_Prop** tracked;
