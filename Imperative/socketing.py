@@ -50,8 +50,8 @@ class Server():
         self.lastSendTime = 0
 
 
-        self.tracked: dict[str, int|float|str|bool]
-        self.events: list[str]
+        self.tracked: dict[str, int|float|str|bool] = { }
+        self.events: list[str] = [ ]
         self.recvBuf: bytes = b""
 
         Server.inst = self
@@ -119,6 +119,7 @@ class Server():
                 self.recvBuf = self.recvBuf[consumed:]
 
                 if(msg != None):
+                    print("Message got")
                     if(msg.kind == MessageKind.UPDATE):
                         self.tracked.update({ msg.name : msg.data })
                     elif(msg.kind == MessageKind.EVENT):
