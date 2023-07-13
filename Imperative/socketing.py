@@ -7,7 +7,7 @@ import select
 from typing import Any
 
 # in seconds
-SEND_INTERVAL = 1/50
+SEND_INTERVAL = 1/10
 
 
 
