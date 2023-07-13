@@ -67,7 +67,7 @@ struct net_Message {
 
 
 void net_init();
-void net_update(BumpAlloc* scratch);
+void net_update(BumpAlloc* scratch, float curTime);
 void net_cleanup();
 
 void net_resetTracked();
@@ -103,6 +103,8 @@ void net_putMessage(net_Message message, BumpAlloc* scratch);
 #define NET_RECV_BUFFER_SIZE 2048
 #define NET_SEND_BUFFER_SIZE 2048
 
+#define NET_SEND_INTERVAL (1/50.0f)
+// #define NET_SEND_INTERVAL (1/50.0f)
 
 
 
@@ -195,11 +197,8 @@ struct net_Globs {
 
 
     U32 recvBufStartOffset = 0;
-    U8* recvBuffer;
-
-
-    // TODO: send interval
-
+    U8* recvBuffer = nullptr;
+    float lastSendTime = 0;
     BumpAlloc sendArena;
 
 
@@ -505,7 +504,7 @@ U32 _net_processPackets(U8* buf, U32 bufSize, BumpAlloc* scratch) {
 
 // Event props are put in scratch, as well as misc things
 // Tracked props are stored in a resArena global.
-void net_update(BumpAlloc* scratch) {
+void net_update(BumpAlloc* scratch, float curTime) {
 
     globs.eventStart = nullptr;
     globs.eventEnd = nullptr;
@@ -525,35 +524,35 @@ void net_update(BumpAlloc* scratch) {
             fwrite(s.chars, 1, s.length, globs.logFile);
         }
 
-        bump_clear(&globs.sendArena);
-        return;
     }
 
 
 
     // SEND LOOP ///////////////////////////////////////////////////////////////////////////
 
-    U8* start = (U8*)globs.sendArena.start;
-    U8* end = (U8*)globs.sendArena.end;
-    while (start < end) {
-        int res = send(globs.simSocket.s, (const char*)start, min(end - start, NET_PACKET_SIZE), 0);
-        if(res == SOCKET_ERROR) {
-            if(WSAGetLastError() != WSAEWOULDBLOCK) {
+    if(globs.lastSendTime + NET_SEND_INTERVAL < curTime) {
+        globs.lastSendTime = curTime;
 
-                // TODO: file write err handling
-                str s = str_format(scratch, STR("[SEND ERR]\t%i\n"), WSAGetLastError());
-                fwrite(s.chars, 1, s.length, globs.logFile);
+        U8* start = (U8*)globs.sendArena.start;
+        U8* end = (U8*)globs.sendArena.end;
+        while (start < end && globs.connected) {
+            int res = send(globs.simSocket.s, (const char*)start, min(end - start, NET_PACKET_SIZE), 0);
+            if(res == SOCKET_ERROR) {
+                if(WSAGetLastError() != WSAEWOULDBLOCK) {
 
-                globs.connected = false;
-                _net_sockCloseFree(&globs.simSocket);
-                break;
+                    // TODO: file write err handling
+                    str s = str_format(scratch, STR("[SEND ERR]\t%i\n"), WSAGetLastError());
+                    fwrite(s.chars, 1, s.length, globs.logFile);
+
+                    globs.connected = false;
+                    _net_sockCloseFree(&globs.simSocket);
+                }
             }
+            else { start += res; }
         }
-        else { start += res; }
+
+        bump_clear(&globs.sendArena);
     }
-
-    bump_clear(&globs.sendArena);
-
 
     // RECV LOOP ///////////////////////////////////////////////////////////////////////////
 
@@ -598,6 +597,7 @@ void net_update(BumpAlloc* scratch) {
         str s = STR("[DISCONNECTED]\n");
         fwrite(s.chars, 1, s.length, globs.logFile);
     }
+
 }
 
 void net_cleanup() {
