@@ -472,13 +472,12 @@ gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass) {
 
     if(!pass->startCall) {
         pass->startCall = block;
-        pass->endCall = block; }
-
-    // TODO: sll macros
-
+        pass->endCall = block;
+    }
     else {
         pass->endCall->_next = block;
-        pass->endCall = block; }
+        pass->endCall = block;
+    }
 
     return block;
 }

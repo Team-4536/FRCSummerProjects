@@ -15,7 +15,7 @@ class MessageKind(IntEnum):
     UPDATE = 0
     EVENT = 1
 
-class MessageUpdateType(IntEnum):
+class PropType(IntEnum):
     S32 = 0
     F64 = 1
     STR = 2
@@ -59,6 +59,8 @@ class Server():
 
     def update(self, curTime: float):
 
+        self.events.clear()
+
         if self.cliSock == None:
 
             rlist, wlist, elist = select.select([self.servSock], [], [], 0)
@@ -81,38 +83,49 @@ class Server():
             while len(self.sendEventList) > 0:
                 content += self.sendEventList.pop(0)
 
-            try:
-                self.cliSock.send(content)
-            except Exception as e:
-                self.cliSock.close()
-                self.cliSock = None
-                print(f"[SOCKETS] Client ended with exception {repr(e)}")
-                return
+            while len(content) > 0:
 
-
-
-        while True:
-            rlist, wlist, elist = select.select([self.cliSock], [], [], 0)
-            if(len(rlist) != 0):
-
-                r = self.cliSock.recv(1024, 0)
-                if(len(r) == 0):
+                try:
+                    res = self.cliSock.send(content)
+                except Exception as e:
                     self.cliSock.close()
                     self.cliSock = None
-                    print(f"[SOCKETS] Client disconnected.")
+                    print(f"[SOCKETS] Client ended with exception {repr(e)}")
                     break
 
-                self.recvBuf += r
-            else:
-                break
+                content = content[res:]
 
-        while True:
-            msg, consumed = self.decodeMessage(self.recvBuf)
-            if consumed == 0: break
-            self.recvBuf = self.recvBuf[consumed:]
 
-            if(msg != None):
-                print(f"Message! \'{str(msg.kind)}\' \'{msg.name}\' {msg.data}")
+
+        if self.cliSock != None:
+            while True:
+                rlist, wlist, elist = select.select([self.cliSock], [], [], 0)
+                if(len(rlist) != 0):
+
+                    r = self.cliSock.recv(1024, 0)
+                    if(len(r) == 0):
+                        self.cliSock.close()
+                        self.cliSock = None
+                        print(f"[SOCKETS] Client disconnected.")
+                        break
+
+                    self.recvBuf += r
+                else:
+                    break
+
+            while True:
+                msg, consumed = self.decodeMessage(self.recvBuf)
+                if consumed == 0: break
+                self.recvBuf = self.recvBuf[consumed:]
+
+                if(msg != None):
+                    if(msg.kind == MessageKind.UPDATE):
+                        self.tracked.update({ msg.name : msg.data })
+                    elif(msg.kind == MessageKind.EVENT):
+                        self.events.append(msg.name)
+                    else:
+                        print("[SOCKETS] something has gone terribly wrong")
+                        assert(False)
 
 
 
@@ -138,21 +151,21 @@ class Server():
         valEncoded = b""
 
         if(type(value) == int):
-            valType = MessageUpdateType.S32
+            valType = PropType.S32
             # NOTE: ! indicates sending big endian format
             # https://docs.python.org/3/library/struct.html
             valEncoded += struct.pack("!l", value)
 
         elif(type(value) == float or type(value) == numpy.float64):
-            valType = MessageUpdateType.F64
+            valType = PropType.F64
             valEncoded += struct.pack("!d", value)
 
         elif(type(value) == str):
-            valType = MessageUpdateType.STR
+            valType = PropType.STR
             valEncoded += value.encode()
 
         elif(type(value) == bool):
-            valType = MessageUpdateType.BOOL
+            valType = PropType.BOOL
             valEncoded += struct.pack("!B", 1 if value else 0)
 
 
@@ -180,7 +193,7 @@ class Server():
     def decodeMessage(self, buffer: bytes) -> tuple[Message|None, int]:
 
         if(len(buffer) < 4): return (None, 0)
-        header = struct.unpack("!BBBB", buffer)
+        header = struct.unpack("!BBBB", buffer[:4])
         buffer = buffer[4:]
 
 
@@ -192,7 +205,7 @@ class Server():
         nameLen = int(header[1])
 
         found = False
-        for val in [e.value for e in MessageUpdateType]:
+        for val in [e.value for e in PropType]:
             if header[2] == val:
                 found = True
         if not found: return (None, 3)
@@ -206,17 +219,18 @@ class Server():
         if(len(buffer) < (nameLen + dataSize)):
             return None, 0
 
+
         name = buffer[:nameLen].decode()
-        buffer = buffer[:nameLen]
+        buffer = buffer[nameLen:]
         dataBytes = buffer[:dataSize]
 
 
 
-        dataType = MessageKind(header[2])
-        if(dataType == MessageUpdateType.S32): data = int(struct.unpack("!l", dataBytes)[0])
-        elif(dataType == MessageUpdateType.F64): data = float(struct.unpack("!d", dataBytes)[0])
-        elif(dataType == MessageUpdateType.STR): data = dataBytes.decode()
-        elif(dataType == MessageUpdateType.BOOL): data = True if dataBytes[0] != 0 else False
+        dataType = PropType(header[2])
+        if(dataType == PropType.S32): data = int(struct.unpack("!l", dataBytes)[0])
+        elif(dataType == PropType.F64): data = float(struct.unpack("!d", dataBytes)[0])
+        elif(dataType == PropType.STR): data = dataBytes.decode()
+        elif(dataType == PropType.BOOL): data = True if dataBytes[0] != 0 else False
         else: assert(False)
 
 

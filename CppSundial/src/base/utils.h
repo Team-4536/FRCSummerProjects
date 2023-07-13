@@ -9,6 +9,25 @@
 #include "base/allocators.h"
 #include <math.h> // CLEANUP: get this out of here
 
+
+
+
+
+// first, last, and n should all be ptrs to the node struct
+// uses prop "next" as link ptr
+#define SLL_APPEND(first, last, n) \
+    if(!first) { \
+        first = n; \
+        last = n; \
+    } \
+    else { \
+        last->next = n; \
+        last = n; \
+    } \
+
+
+
+
 #define min(a, b) ((a)<(b)?(a):(b))
 #define max(a, b) ((a)>(b)?(a):(b))
 

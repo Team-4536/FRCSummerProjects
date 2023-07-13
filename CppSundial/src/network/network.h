@@ -29,6 +29,7 @@ enum net_MsgKind {
     net_msgKind_EVENT
 };
 
+// NOTE: contains space to fit string chars
 union net_PropData {
     S32 s32;
     F64 f64;
@@ -53,6 +54,16 @@ struct net_Prop {
 
 
 
+struct net_Message {
+    net_MsgKind kind;
+    str name;
+    net_PropType dataType;
+    net_PropData data;
+    net_Message* next;
+};
+
+
+
 
 
 void net_init();
@@ -68,6 +79,8 @@ net_Prop* net_getEvents();
 
 net_Prop* net_hashGet(str string);
 
+void net_putMessage(net_Message* msg);
+
 
 #ifdef NET_IMPL
 
@@ -79,6 +92,7 @@ net_Prop* net_hashGet(str string);
 
 #include "base/hashtable.h"
 #include "base/arr.h"
+#include "base/utils.h"
 
 
 #define NET_HASH_COUNT 10000
@@ -181,6 +195,9 @@ struct net_Globs {
 
     U32 recvBufStartOffset = 0;
     U8* recvBuffer;
+    net_Message* sendFirst = nullptr; // LL allocated in other modules, iterated and sent every frame
+    net_Message* sendLast = nullptr;
+    // TODO: send interval
 
 
     FILE* logFile;
@@ -305,15 +322,23 @@ constexpr bool _net_isSystemBigEndian()
 }
 
 
-U8* _net_reverseBytes(U8* data, U32 size, BumpAlloc* scratch) {
-
-    U8* temp = BUMP_PUSH_ARR(scratch, size, U8);
+// NOTE: unsafe to use with overlapping src and dst
+U8* _net_reverseBytes(U8* data, U32 size, U8* dest) {
     for(int i = 0; i < size; i++) {
-        temp[i] = data[size - 1 - i];
-    }
-
-    return temp;
+        dest[i] = data[size - 1 - i]; }
+    return dest;
 }
+
+
+
+// NOTE: msg needs to remain allocated until net_update() is called
+void net_putMessage(net_Message* msg) {
+    SLL_APPEND(globs.sendFirst, globs.sendLast, msg);
+    // TODO:? ctor functions or no?
+}
+
+
+
 
 
 // returns log for given message
@@ -358,11 +383,13 @@ StrList _net_processMessage(U8 kind, str name, U8* data, U8 dataType, U32 dataSi
 
 
         prop->type = (net_PropType)dataType;
+
         if(prop->type == net_propType_F64) {
 
             prop->data->f64 = *((F64*)data);
             if(!_net_isSystemBigEndian()) {
-                prop->data->f64 = *((F64*)_net_reverseBytes(data, sizeof(F64), scratch));
+                U8* buf = BUMP_PUSH_ARR(scratch, sizeof(F64), U8);
+                prop->data->f64 = *((F64*)_net_reverseBytes(data, sizeof(F64), buf));
             }
 
             str_listAppend(&log, str_format(scratch, STR("%f\t"), prop->data->f64), scratch);
@@ -370,7 +397,8 @@ StrList _net_processMessage(U8 kind, str name, U8* data, U8 dataType, U32 dataSi
         else if (prop->type == net_propType_S32) {
             prop->data->s32 = *((S32*)data);
             if(!_net_isSystemBigEndian()) {
-                prop->data->s32= *((S32*)_net_reverseBytes(data, sizeof(S32), scratch));
+                U8* buf = BUMP_PUSH_ARR(scratch, sizeof(S32), U8);
+                prop->data->s32 = *((S32*)_net_reverseBytes(data, sizeof(S32), buf));
             }
             str_listAppend(&log, str_format(scratch, STR("%i\t"), prop->data->s32), scratch);
         }
@@ -434,15 +462,16 @@ U32 _net_processPackets(U8* buf, U32 bufSize, BumpAlloc* scratch) {
     return cur - buf;
 }
 
-
-
-
 // Event props are put in scratch, as well as misc things
 // Tracked props are stored in a resArena global.
 void net_update(BumpAlloc* scratch) {
 
     globs.eventStart = nullptr;
     globs.eventEnd = nullptr;
+
+    net_Message* firstSend = globs.sendFirst;
+    globs.sendFirst = nullptr;
+    globs.sendLast = nullptr;
 
     net_SockErr err;
 
@@ -463,13 +492,82 @@ void net_update(BumpAlloc* scratch) {
 
 
 
+    // SEND LOOP ///////////////////////////////////////////////////////////////////////////
+
+    // TODO: batching
+    net_Message* message = firstSend;
+    while(message) {
+
+        U32 bufSize = 4; // header
+        bufSize += message->name.length;
+
+        U32 dataLen = 0;
+        if(message->dataType == net_propType_S32) { dataLen = sizeof(S32); }
+        else if(message->dataType == net_propType_F64) { dataLen = sizeof(F64); }
+        else if(message->dataType == net_propType_BOOL) { dataLen = sizeof(U8); }
+        else if(message->dataType == net_propType_STR) { dataLen = message->data.str.length; }
+        else { ASSERT(false); }
+        bufSize += dataLen;
+
+
+
+        U8* buffer = BUMP_PUSH_ARR(scratch, bufSize, U8);
+        buffer[0] = message->kind;
+        ASSERT(message->name.length < 256);
+        buffer[1] = message->name.length;
+        buffer[2] = message->dataType;
+        buffer[3] = dataLen;
+        str_copy(message->name, &(buffer[4]));
+
+        U8* dataLoc = &(buffer[4 + message->name.length]);
+        if(message->dataType == net_propType_S32) { *(S32*)(dataLoc) = message->data.s32; }
+        else if(message->dataType == net_propType_F64) { *(F64*)(dataLoc) = message->data.f64; }
+        else if(message->dataType == net_propType_BOOL) { *dataLoc = message->data.boo; }
+        else if(message->dataType == net_propType_STR) { str_copy(message->data.str, dataLoc); }
+        else { ASSERT(false); }
+
+        // NOTE: IF ADDING TYPES THAT HAVE DYNAMIC SIZING/IGNORE BYTE ORDER FROM SYSTEM CHANGE THIS
+        // VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
+        if(message->dataType != net_propType_STR) {
+            if(!_net_isSystemBigEndian()) {
+                U8* n = _net_reverseBytes(dataLoc, dataLen, BUMP_PUSH_ARR(scratch, dataLen, U8));
+                memcpy(dataLoc, n, dataLen);
+            }
+        }
+
+
+        int consumed = 0;
+        while (consumed < bufSize) {
+            int res = send(globs.simSocket.s, (const char*)buffer, bufSize, 0);
+            if(res == SOCKET_ERROR) {
+                if(WSAGetLastError() != WSAEWOULDBLOCK) {
+
+                    // TODO: file write err handling
+                    str s = str_format(scratch, STR("[SEND ERR]\t%i\n"), WSAGetLastError());
+                    fwrite(s.chars, 1, s.length, globs.logFile);
+
+                    globs.connected = false;
+                    _net_sockCloseFree(&globs.simSocket);
+                    break;
+                }
+            }
+            else { consumed += res; }
+        }
+
+        message = message->next;
+    }
+
+
+    // RECV LOOP ///////////////////////////////////////////////////////////////////////////
+
+    // TODO: make loop
     U8* buf = (globs.recvBuffer + globs.recvBufStartOffset);
     int recvSize = recv(globs.simSocket.s, (char*)buf, NET_RECV_SIZE, 0);
 
     if (recvSize == SOCKET_ERROR) {
         if(WSAGetLastError() != WSAEWOULDBLOCK) {
 
-            str s = str_format(scratch, STR("[ERR]\t%i\n"), WSAGetLastError());
+            str s = str_format(scratch, STR("[RECV ERR]\t%i\n"), WSAGetLastError());
             fwrite(s.chars, 1, s.length, globs.logFile);
 
             globs.connected = false;
@@ -494,8 +592,6 @@ void net_update(BumpAlloc* scratch) {
             globs.recvBufStartOffset = remSize;
         }
     }
-
-
 
 
     if(!globs.connected) {

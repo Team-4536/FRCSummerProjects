@@ -175,8 +175,6 @@ int main() {
         glfwGetCursorPos(window, &mx, &my);
         bool leftPressed = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)? true : false;
 
-        net_update(&frameArena);
-
         blu_beginFrame();
 
 
@@ -217,6 +215,8 @@ int main() {
         }
 
         gfx_drawPasses(w, h);
+
+        net_update(&frameArena);
 
         bump_clear(&frameArena);
 
