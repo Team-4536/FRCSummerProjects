@@ -101,7 +101,11 @@ class SwerveBot(wpilib.TimedRobot):
         self.server.putUpdate("enabled", self.isEnabled())
 
 
+        self.server.putUpdate("TimeMirror", self.server.tracked.get("Time", -1))
+
+
         self.server.update(self.time.timeSinceInit)
+
 
 
 
