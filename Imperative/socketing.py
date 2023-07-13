@@ -42,7 +42,6 @@ class Server():
         self.servSock.bind(("localhost", 7000))
         self.servSock.listen(1) # client backlog
         self.servSock.setblocking(False)
-        print("Server loaded")
 
         self.sendMsgMap: dict[str, bytes] = { }
         self.sendEventList: list[bytes] = [ ]

@@ -54,18 +54,6 @@ struct net_Prop {
 
 
 
-struct net_Message {
-    net_MsgKind kind;
-    str name;
-    net_PropType dataType;
-    net_PropData data;
-    net_Message* next;
-};
-
-
-
-
-
 void net_init();
 void net_update(BumpAlloc* scratch, float curTime);
 void net_cleanup();
@@ -79,7 +67,12 @@ net_Prop* net_getEvents();
 
 net_Prop* net_hashGet(str string);
 
-void net_putMessage(net_Message message, BumpAlloc* scratch);
+
+void net_putMessage(str name, F64 data, BumpAlloc* scratch);
+void net_putMessage(str name, S32 data, BumpAlloc* scratch);
+void net_putMessage(str name, bool data, BumpAlloc* scratch);
+void net_putMessage(str name, str data, BumpAlloc* scratch);
+void net_putEvent(str name, BumpAlloc* scratch);
 
 
 #ifdef NET_IMPL
@@ -336,8 +329,16 @@ U8* _net_reverseBytes(U8* data, U32 size, U8* dest) {
 
 
 
-// TODO:? ctor functions or no?
-void net_putMessage(net_Message message, BumpAlloc* scratch) {
+
+
+struct net_Message {
+    net_MsgKind kind;
+    str name;
+    net_PropType dataType;
+    net_PropData data;
+};
+
+void _net_putMessage(net_Message message, BumpAlloc* scratch) {
 
     U32 bufSize = 4; // header
     bufSize += message.name.length;
@@ -377,6 +378,47 @@ void net_putMessage(net_Message message, BumpAlloc* scratch) {
     }
 }
 
+
+void net_putMessage(str name, F64 data, BumpAlloc* scratch) {
+    net_Message m;
+    m.kind = net_msgKind_UPDATE;
+    m.name = name;
+    m.dataType = net_propType_F64;
+    m.data.f64 = data;
+    _net_putMessage(m, scratch);
+}
+void net_putMessage(str name, S32 data, BumpAlloc* scratch) {
+    net_Message m;
+    m.kind = net_msgKind_UPDATE;
+    m.name = name;
+    m.dataType = net_propType_S32;
+    m.data.s32 = data;
+    _net_putMessage(m, scratch);
+}
+void net_putMessage(str name, bool data, BumpAlloc* scratch) {
+    net_Message m;
+    m.kind = net_msgKind_UPDATE;
+    m.name = name;
+    m.dataType = net_propType_BOOL;
+    m.data.boo = data? 1 : 0;
+    _net_putMessage(m, scratch);
+}
+void net_putMessage(str name, str data, BumpAlloc* scratch) {
+    net_Message m;
+    m.kind = net_msgKind_UPDATE;
+    m.name = name;
+    m.dataType = net_propType_STR;
+    m.data.str = data;
+    _net_putMessage(m, scratch);
+}
+void net_putEvent(str name, BumpAlloc* scratch) {
+    net_Message m;
+    m.kind = net_msgKind_EVENT;
+    m.name = name;
+    m.dataType = net_propType_BOOL;
+    m.data.boo = 0;
+    _net_putMessage(m, scratch);
+}
 
 
 
@@ -536,6 +578,7 @@ void net_update(BumpAlloc* scratch, float curTime) {
         U8* start = (U8*)globs.sendArena.start;
         U8* end = (U8*)globs.sendArena.end;
         while (start < end && globs.connected) {
+            // TODO: sent message logging
             int res = send(globs.simSocket.s, (const char*)start, min(end - start, NET_PACKET_SIZE), 0);
             if(res == SOCKET_ERROR) {
                 if(WSAGetLastError() != WSAEWOULDBLOCK) {
