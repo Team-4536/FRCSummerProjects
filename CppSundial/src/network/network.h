@@ -98,9 +98,9 @@ void net_putMessage(net_Message message, BumpAlloc* scratch);
 #define NET_HASH_COUNT 10000
 #define NET_MAX_PROP_COUNT 10000
 #define NET_RES_SIZE 10000
-#define NET_RECV_SIZE 1024
-#define NET_RECV_BUFFER_SIZE 2048
 
+#define NET_PACKET_SIZE 1024
+#define NET_RECV_BUFFER_SIZE 2048
 #define NET_SEND_BUFFER_SIZE 2048
 
 
@@ -536,8 +536,7 @@ void net_update(BumpAlloc* scratch) {
     U8* start = (U8*)globs.sendArena.start;
     U8* end = (U8*)globs.sendArena.end;
     while (start < end) {
-        // TODO: eirughslzirkughsilerughsildughsdlfiughseilrgu
-        int res = send(globs.simSocket.s, (const char*)start, min(end - start, NET_RECV_SIZE), 0);
+        int res = send(globs.simSocket.s, (const char*)start, min(end - start, NET_PACKET_SIZE), 0);
         if(res == SOCKET_ERROR) {
             if(WSAGetLastError() != WSAEWOULDBLOCK) {
 
@@ -558,36 +557,39 @@ void net_update(BumpAlloc* scratch) {
 
     // RECV LOOP ///////////////////////////////////////////////////////////////////////////
 
-    // TODO: make loop
-    U8* buf = (globs.recvBuffer + globs.recvBufStartOffset);
-    int recvSize = recv(globs.simSocket.s, (char*)buf, NET_RECV_SIZE, 0);
+    // NOTE: this is acting as an if, loop is normally broken when there is no more left to recieve
+    while(globs.connected) {
 
-    if (recvSize == SOCKET_ERROR) {
-        if(WSAGetLastError() != WSAEWOULDBLOCK) {
+        U8* buf = (globs.recvBuffer + globs.recvBufStartOffset);
+        int recvSize = recv(globs.simSocket.s, (char*)buf, NET_PACKET_SIZE, 0);
 
-            str s = str_format(scratch, STR("[RECV ERR]\t%i\n"), WSAGetLastError());
-            fwrite(s.chars, 1, s.length, globs.logFile);
-
+        if (recvSize == SOCKET_ERROR) {
+            if(WSAGetLastError() != WSAEWOULDBLOCK) {
+                str s = str_format(scratch, STR("[RECV ERR]\t%i\n"), WSAGetLastError());
+                fwrite(s.chars, 1, s.length, globs.logFile);
+                globs.connected = false;
+                _net_sockCloseFree(&globs.simSocket);
+            }
+            break;
+        }
+        // size is 0, indicating shutdown
+        else if (recvSize == 0) {
             globs.connected = false;
             _net_sockCloseFree(&globs.simSocket);
         }
-    }
-    // size is 0, indicating shutdown
-    else if (recvSize == 0) {
-        globs.connected = false;
-        _net_sockCloseFree(&globs.simSocket);
-    }
-    // buffer received
-    else if (recvSize > 0) {
+        // buffer received
+        else if (recvSize > 0) {
 
-        U32 bufSize = globs.recvBufStartOffset + recvSize;
-        U32 endOfMessages = _net_processPackets(globs.recvBuffer, bufSize, scratch);
+            U32 bufSize = globs.recvBufStartOffset + recvSize;
+            U32 consumed = _net_processPackets(globs.recvBuffer, bufSize, scratch);
 
-        if(endOfMessages > 0) {
-            U8* remainder = globs.recvBuffer + endOfMessages;
-            U32 remSize = (bufSize - endOfMessages);
-            memmove(globs.recvBuffer, remainder, remSize);
-            globs.recvBufStartOffset = remSize;
+            if(consumed > 0) {
+                U8* remainder = globs.recvBuffer + consumed;
+                U32 remSize = (bufSize - consumed);
+                memmove(globs.recvBuffer, remainder, remSize);
+                globs.recvBufStartOffset = remSize;
+            }
+            else { break; }
         }
     }
 
