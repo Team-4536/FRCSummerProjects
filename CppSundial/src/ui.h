@@ -92,6 +92,10 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
 
 
 
+
+    bool res = gfx_loadOBJMesh("res/models/Chassis2.obj", frameArena, nullptr, nullptr);
+    ASSERT(res);
+
     globs.fieldInfo.fb = gfx_registerFramebuffer();
 
     float vaData[] = {
