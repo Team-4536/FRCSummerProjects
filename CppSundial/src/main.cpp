@@ -43,7 +43,7 @@ int main() {
     BumpAlloc lifetimeArena;
     BumpAlloc frameArena;
     bump_allocate(&lifetimeArena, 1000000);
-    bump_allocate(&frameArena, 1000000);
+    bump_allocate(&frameArena, 10000000);
 
 
     GLFWwindow* window = nullptr;

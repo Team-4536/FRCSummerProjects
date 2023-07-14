@@ -1,5 +1,4 @@
 #pragma once
-
 #include "base/utils.h"
 #include "base/config.h"
 #include "base/str.h"
@@ -52,6 +51,8 @@ TESTING CHECKLIST:
 [ ] test out of memory things
 [ ] make a fuzzing thing
 */
+
+// TODO: get rid of str on outward functions
 
 
 enum blu_Axis{
