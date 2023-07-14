@@ -10,6 +10,9 @@ def deadZone(input: float) -> float:
 
 
 class FlymerInputs():
+
+    # TODO: switch keyboard/controller modes from sundial
+
     def __init__(self, driveCtrlr: wpilib.XboxController, armCtrlr: wpilib.XboxController) -> None:
         self.driveX = deadZone(driveCtrlr.getLeftX())
         self.driveY = deadZone((-driveCtrlr.getLeftY()))

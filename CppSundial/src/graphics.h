@@ -90,14 +90,14 @@ struct gfx_UniformBlock {
     gfx_Texture* fontTexture = nullptr;
     V4f color = V4f(0, 0, 0, 1);
 
-    Mat4f model = Mat4f();
+    Mat4f model = Mat4f(1);
 
     gfx_VertexArray* va = nullptr;
     gfx_IndexBuffer* ib = nullptr;
 
     // PASS UNIS ========================
 
-    Mat4f vp = Mat4f(0.0f);
+    Mat4f vp = Mat4f(1);
 
     //
 
@@ -153,6 +153,11 @@ void gfx_bindVertexArray(gfx_Pass* pass, gfx_VertexArray* va);
 void gfx_bindIndexBuffer(gfx_Pass* pass, gfx_IndexBuffer* ib);
 
 gfx_Pass* gfx_registerPass();
+
+// CLEANUP: this?
+// target = nullptr indicates drawing to screen
+gfx_Pass* gfx_registerClearPass(V4f color, gfx_Framebuffer* target);
+
 gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass);
 
 // draws all passes, clears passes and calls after.
@@ -446,6 +451,17 @@ gfx_Pass* gfx_registerPass() {
     *p = gfx_Pass();
     return p;
 }
+
+gfx_Pass* gfx_registerClearPass(V4f color, gfx_Framebuffer* target) {
+    gfx_Pass* out = gfx_registerPass();
+    out->isClearPass = true;
+    out->target = target;
+    out->passUniforms.color = color;
+    return out;
+}
+
+
+
 // Adds and returns new call within the current pass
 gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass) {
     ASSERT(pass);
@@ -456,13 +472,12 @@ gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass) {
 
     if(!pass->startCall) {
         pass->startCall = block;
-        pass->endCall = block; }
-
-    // TODO: sll macros
-
+        pass->endCall = block;
+    }
     else {
         pass->endCall->_next = block;
-        pass->endCall = block; }
+        pass->endCall = block;
+    }
 
     return block;
 }

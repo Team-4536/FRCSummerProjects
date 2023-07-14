@@ -66,7 +66,6 @@ class Robot(wpilib.TimedRobot):
         self.buttonPanel = wpilib.Joystick(2)
 
 
-        # TODO: imperative refactor
         inits.makeDemo(self.procs, self.data, not self.isSimulation())
         # inits.makeFlymer(self.procs, self.data, not self.isSimulation())
 
@@ -78,7 +77,6 @@ class Robot(wpilib.TimedRobot):
             if found: break
         assert(found)
 
-        # TODO: imperative refactor
         found = False
         for kv in self.data.items():
             if isinstance(kv[1], Input.InputProfile):
@@ -109,7 +107,6 @@ class Robot(wpilib.TimedRobot):
 
 
         # TODO: exception saftey
-        # TODO: imperitive refactor
         self.data[tags.INPUT].update(self.driveController, self.armController, self.buttonPanel)
 
 

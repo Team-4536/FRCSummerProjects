@@ -3,11 +3,14 @@ import wpimath.system.plant as plant
 import wpimath.system as sys
 import wpilib
 import navx
+import random
 
 from virtualGyro import VirtualGyro
 from real import V2f, angleWrap
 
 
+# TODO: get real measurements
+ENCODER_STD_DEV = 0.001
 
 class EncoderSim:
 
@@ -26,13 +29,13 @@ class EncoderSim:
 
         inputVec = [self.motor.get() * self.motorSpec.nominalVoltage] # TODO: check if this is correct
         self.state = self.linearSys.calculateX(self.state, inputVec, dt)
-        self.encoder.setPosition(self.state[0])
 
-# TODO: figure a way to make this more functional ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
+        self.encoder.setPosition(random.normalvariate(self.state[0], ENCODER_STD_DEV))
 
 
 
+
+# NOTE: directly contains 8 encoder sims to manage hardware
 class SwerveSim:
 
     def __init__(self,
@@ -47,12 +50,14 @@ class SwerveSim:
 
         self.driveSims: list[EncoderSim] = [ ]
         for i in range(4):
-           sim = EncoderSim(driveMotors[i], plant.DCMotor.NEO(1), driveEncoders[i], 0.1, 6.12) # TODO: VVVVVVVVVVVVVVVVVVVVVVVVV
+           sim = EncoderSim(driveMotors[i], plant.DCMotor.NEO(1), driveEncoders[i], 0.1, 6.12)
            self.driveSims.append(sim)
 
         self.steerSims: list[EncoderSim] = [ ]
         for i in range(4):
-           sim = EncoderSim(steeringMotors[i], plant.DCMotor.NEO(1), steeringEncoders[i], 0.03, 1) # TODO: get real inertia vals #TODO: is this the corect gearing?
+           sim = EncoderSim(steeringMotors[i], plant.DCMotor.NEO(1), steeringEncoders[i], 0.03, 1)
+           # TODO: get real inertia vals
+           # TODO: is this the corect gearing?
            self.steerSims.append(sim)
 
         self.gyro = gyro
@@ -65,7 +70,7 @@ class SwerveSim:
         self.posDeltas: list[V2f] = [] # DEBUG
 
     # TODO: add friction to wheel sims
-    # TODO: get measurements for wheel inertia/friction
+    # TODO: get measurements for wheel friction
     # TODO: vary the "inertia" of each mechanism with speed/rotation speed of drive // add extra resistance when braking and going against current speed somehow
 
     def update(self, dt: float):

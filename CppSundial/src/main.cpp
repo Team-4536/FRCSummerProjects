@@ -39,6 +39,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 
 int main() {
 
+
     BumpAlloc lifetimeArena;
     BumpAlloc frameArena;
     bump_allocate(&lifetimeArena, 1000000);
@@ -46,11 +47,14 @@ int main() {
 
 
     GLFWwindow* window = nullptr;
-    GLFWcursor* hoverCursor = nullptr;
+    GLFWcursor* typeCursor = nullptr;
+    GLFWcursor* handCursor = nullptr;
+    GLFWcursor* resizeHCursor = nullptr;
+    GLFWcursor* resizeVCursor = nullptr;
     // GLFW INIT AND WINDOW CREATION ===============================================================================
     {
         assert(glfwInit());
-        glfwSetErrorCallback([](int error, const char* description) { printf("%s\n", description); });
+        glfwSetErrorCallback([](int error, const char* description) { printf("[GLFW] %s\n", description); });
 
         glfwWindowHint(GLFW_MAXIMIZED, true);
         glfwWindowHint(GLFW_RESIZABLE, true);
@@ -65,7 +69,10 @@ int main() {
         glfwSwapInterval(1);
 
 
-        hoverCursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
+        handCursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
+        typeCursor = glfwCreateStandardCursor(GLFW_IBEAM_CURSOR);
+        resizeHCursor = glfwCreateStandardCursor(GLFW_HRESIZE_CURSOR);
+        resizeVCursor = glfwCreateStandardCursor(GLFW_VRESIZE_CURSOR);
         glfwSetScrollCallback(window, scroll_callback);
         // glfwSetKeyCallback(window, updateInput);
         // glfwSetCursorPosCallback(window, updateMousePos);
@@ -89,7 +96,7 @@ int main() {
         glEnable(GL_DEBUG_OUTPUT);
         glDebugMessageCallback(
         [](GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char* message, const void* userParam) {
-            printf("%s\n", message);
+            printf("[GL] %s\n", message);
         }, 0);
     }
 
@@ -101,7 +108,7 @@ int main() {
     blu_init(solidTex);
     blu_loadFont("C:/windows/fonts/consola.ttf");
 
-    ui_init(&frameArena);
+    ui_init(&frameArena, solidTex);
     net_init();
 
 
@@ -154,9 +161,6 @@ int main() {
     }
 
 
-
-    // TODO: framerate caps
-
     F64 prevTime = glfwGetTime();
     while(!glfwWindowShouldClose(window)) {
 
@@ -171,8 +175,6 @@ int main() {
         glfwGetCursorPos(window, &mx, &my);
         bool leftPressed = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)? true : false;
 
-        net_update(&frameArena);
-
         blu_beginFrame();
 
 
@@ -185,7 +187,15 @@ int main() {
 
 
 
-        blu_input(V2f((F32)mx, (F32)my), leftPressed, windowScrollDelta);
+        blu_Cursor c;
+        blu_input(V2f((F32)mx, (F32)my), leftPressed, windowScrollDelta, &c);
+        if(c == blu_cursor_norm) { glfwSetCursor(window, nullptr); }
+        else if(c == blu_cursor_hand) { glfwSetCursor(window, handCursor); }
+        else if(c == blu_cursor_resizeH) { glfwSetCursor(window, resizeHCursor); }
+        else if(c == blu_cursor_resizeV) { glfwSetCursor(window, resizeVCursor); }
+        else if(c == blu_cursor_type) { glfwSetCursor(window, typeCursor); }
+        else { ASSERT(false); }
+
         blu_layout(V2f(w, h));
 
         { // BLU RENDERING
@@ -205,6 +215,8 @@ int main() {
         }
 
         gfx_drawPasses(w, h);
+
+        net_update(&frameArena, (F32)time);
 
         bump_clear(&frameArena);
 

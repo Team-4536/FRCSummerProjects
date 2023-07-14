@@ -7,177 +7,183 @@
 #include "GLFW/glfw3.h"
 #include "network/network.h"
 #include "colors.h"
+#include "stb_image/stb_image.h"
+
+#include <cstring>
 
 
-static struct UIGlobs {
 
-    gfx_Shader* sceneShader = nullptr;
-    gfx_Framebuffer* sceneFB = nullptr;
 
-    gfx_VertexArray* sceneVA = nullptr;
-    gfx_IndexBuffer* sceneIB = nullptr;
 
-    V4f camPos = { 0, 0, 2, 0 };
-    V2i viewPortSize = { 0, 0 };
+struct FieldInfo {
+    gfx_Framebuffer* fb = nullptr;
 
-    V2f windowPos = V2f(350, 100);
+    gfx_VertexArray* va = nullptr;
+    gfx_IndexBuffer* ib = nullptr;
 
+    gfx_Texture* fieldTex = nullptr;
+
+    Transform camTransform;
+    Transform camTarget;
+};
+
+struct NetInfo {
     float clipSize = 0;
     float clipPos = 0;
     float clipMax = 1000;
     // TODO: adaptive max size
+};
 
-} globs;
-
-
-
-// TODO: make deps clearer
-
-void ui_init(BumpAlloc* frameArena) {
-    globs = UIGlobs();
-    globs.sceneFB = gfx_registerFramebuffer();
-
-    float vaData[] = {
-        -.5, -.5, 0,        0, 0,
-        -.5, 0.5, 0,        0, 0,
-        0.5, 0.5, 0,        0, 0,
-        0.5, -.5, 0,        0, 0
-    };
-    globs.sceneVA = gfx_registerVertexArray(gfx_vtype_POS3F_UV, vaData, sizeof(vaData), false);
-
-    U32 ibData[] = {
-        0, 1, 2,
-        2, 3, 0 };
-    globs.sceneIB = gfx_registerIndexBuffer(ibData, sizeof(ibData) / sizeof(U32));
-
-
-
-    {
-        globs.sceneShader = gfx_registerShader(gfx_vtype_POS3F_UV, "res/shaders/scene.vert", "res/shaders/scene.frag", frameArena);
-
-        globs.sceneShader->passUniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
-            int loc;
-
-            loc = glGetUniformLocation(pass->shader->id, "uVP");
-            glUniformMatrix4fv(loc, 1, false, &(uniforms->vp)[0]);
-        };
-
-        globs.sceneShader->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
-            int loc;
-
-            loc = glGetUniformLocation(pass->shader->id, "uColor");
-            glUniform4f(loc, uniforms->color.x, uniforms->color.y, uniforms->color.z, uniforms->color.w);
-
-            loc = glGetUniformLocation(pass->shader->id, "uModel");
-            glUniformMatrix4fv(loc, 1, false, &(uniforms->model)[0]);
-
-            gfx_bindVertexArray(pass, uniforms->va);
-            gfx_bindIndexBuffer(pass, uniforms->ib);
-        };
-    }
-
-}
-
-
-
-enum Component {
-    comp_field,
-    comp_network,
-    comp_status,
-
-    comp_driveSwerve,
-    comp_driveMech,
-    comp_driveTank,
+struct SwerveDriveInfo {
+    gfx_Framebuffer* target = nullptr;
+    gfx_Texture* wheelTex = nullptr;
+    gfx_Texture* treadTex = nullptr;
+    gfx_Texture* arrowTex = nullptr;
 };
 
 
 
+static struct UIGlobs {
+
+    gfx_Shader* sceneShader3d = nullptr;
+    gfx_Shader* sceneShader2d = nullptr;
+    gfx_Texture* solidTex;
+
+    float rightSize = 400;
+    float botSize = 200;
 
 
-void draw_field(float dt, GLFWwindow* window) {
+    FieldInfo fieldInfo = FieldInfo();
+    NetInfo netInfo = NetInfo();
+    SwerveDriveInfo swerveInfo = SwerveDriveInfo();
+} globs;
 
 
-    // TODO: real camera controller
-    F32 moveSpeed = 3;
-    globs.camPos.x += (glfwGetKey(window, GLFW_KEY_D) - glfwGetKey(window, GLFW_KEY_A)) * moveSpeed * dt;
-    globs.camPos.y += (glfwGetKey(window, GLFW_KEY_W) - glfwGetKey(window, GLFW_KEY_S)) * moveSpeed * dt;
-    globs.camPos.z += (glfwGetKey(window, GLFW_KEY_Q) - glfwGetKey(window, GLFW_KEY_E)) * moveSpeed * dt;
 
 
-    net_Prop* posX = net_hashGet(STR("PosX"));
-    net_Prop* posY = net_hashGet(STR("PosY"));
-    net_Prop* yaw = net_hashGet(STR("Yaw"));
+// TEMP:
+// adds a framebuffer to an area, and resizes based on area size
+// doesnt rezise if area is <= 0 on either axis
+void areaAddFB(blu_Area* area, gfx_Framebuffer* target) {
 
-    net_Prop* estX = net_hashGet(STR("EstX"));
-    net_Prop* estY = net_hashGet(STR("EstY"));
+    area->flags |= blu_areaFlags_DRAW_TEXTURE;
+    area->texture = target->texture;
 
-    Mat4f robotTransform = Mat4f(1);
-    if(posX && posY && yaw) {
-        matrixTransform(
-            (F32)posX->data->f64,
-            (F32)posY->data->f64,
-            0,
-            -(F32)yaw->data->f64,
-            robotTransform);
+    // CLEANUP: there are like 6 different instances of this exact piece of code
+    int w = (int)area->calculatedSizes[blu_axis_X];
+    int h = (int)area->calculatedSizes[blu_axis_Y];
+    if(w != target->texture->width || h != target->texture->height) {
+        if(w > 0 && h > 0) {
+            gfx_resizeFramebuffer(target, w, h);
+        }
     }
-
-    Mat4f estimateTransform = Mat4f(1);
-    if(estX && estY && yaw) {
-        matrixTransform(
-            (F32)estX->data->f64,
-            (F32)estY->data->f64,
-            0,
-            -(F32)yaw->data->f64,
-            estimateTransform);
-    }
+}
 
 
 
-    blu_Area* a = blu_areaMake(STR("fbdisplay"), blu_areaFlags_DRAW_TEXTURE);
-    a->texture = globs.sceneFB->texture;
+void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
+    globs = UIGlobs();
 
-    int w = (int)a->calculatedSizes[blu_axis_X];
-    int h = (int)a->calculatedSizes[blu_axis_Y];
+    globs.solidTex = solidTex;
 
-    if(w != globs.sceneFB->texture->width || h != globs.sceneFB->texture->height) {
-        gfx_resizeFramebuffer(globs.sceneFB, w, h); }
-
-
-
-
-    gfx_Pass* p = gfx_registerPass();
-    p->isClearPass = true;
-    p->target = globs.sceneFB;
-    p->passUniforms.color = V4f(0, 0, 0, 1);
+    int w, h, bpp;
+    stbi_set_flip_vertically_on_load(1);
+    U8* data;
 
 
 
-    Mat4f proj = Mat4f(1.0f);
-    if(h != 0) {
-        matrixPerspective(90, (float)w / h, 0.01, 1000000, proj); }
+    globs.fieldInfo.fb = gfx_registerFramebuffer();
 
-    Mat4f view;
-    matrixTranslation(globs.camPos.x, globs.camPos.y, globs.camPos.z, view);
-    matrixInverse(view, view);
+    float vaData[] = {
+        -.5, -.5, 0,        0, 0,
+        -.5, 0.5, 0,        0, 1,
+        0.5, 0.5, 0,        1, 1,
+        0.5, -.5, 0,        1, 0
+    };
+    globs.fieldInfo.va = gfx_registerVertexArray(gfx_vtype_POS3F_UV, vaData, sizeof(vaData), false);
 
-    p = gfx_registerPass();
-    p->target = globs.sceneFB;
-    p->shader = globs.sceneShader;
-    p->passUniforms.vp = view * proj;
+    U32 ibData[] = {
+        0, 1, 2,
+        2, 3, 0 };
+    globs.fieldInfo.ib = gfx_registerIndexBuffer(ibData, sizeof(ibData) / sizeof(U32));
+
+    data = stbi_load("res/textures/field.png", &w, &h, &bpp, 4);
+    ASSERT(data);
+    globs.fieldInfo.fieldTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
 
 
 
-    gfx_UniformBlock* b = gfx_registerCall(p);
-    b->color = V4f(1, 1, 1, 1);
-    b->ib = globs.sceneIB;
-    b->va = globs.sceneVA;
-    b->model = robotTransform;
 
-    b = gfx_registerCall(p);
-    b->color = V4f(1, 1, 1, 0.5);
-    b->ib = globs.sceneIB;
-    b->va = globs.sceneVA;
-    b->model = estimateTransform;
+    globs.swerveInfo.target = gfx_registerFramebuffer();
+
+    data = stbi_load("res/textures/swerveWheel.png", &w, &h, &bpp, 4);
+    ASSERT(data);
+    globs.swerveInfo.wheelTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
+
+    data = stbi_load("res/textures/swerveTread.png", &w, &h, &bpp, 4);
+    ASSERT(data);
+    globs.swerveInfo.treadTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
+
+    data = stbi_load("res/textures/vector.png", &w, &h, &bpp, 4);
+    ASSERT(data);
+    globs.swerveInfo.arrowTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
+
+
+
+
+
+
+
+    globs.sceneShader2d = gfx_registerShader(gfx_vtype_POS2F_UV, "res/shaders/2d.vert", "res/shaders/2d.frag", frameArena);
+
+    globs.sceneShader2d->passUniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
+        int loc = glGetUniformLocation(pass->shader->id, "uVP");
+        glUniformMatrix4fv(loc, 1, false, &(uniforms->vp)[0]);
+
+        gfx_bindVertexArray(pass, gfx_getQuadVA());
+        gfx_bindIndexBuffer(pass, gfx_getQuadIB());
+    };
+    globs.sceneShader2d->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
+
+        int loc = glGetUniformLocation(pass->shader->id, "uModel");
+        glUniformMatrix4fv(loc, 1, false, &(uniforms->model)[0]);
+
+        loc = glGetUniformLocation(pass->shader->id, "uSrcStart");
+        glUniform2f(loc, uniforms->srcStart.x, uniforms->srcStart.y);
+        loc = glGetUniformLocation(pass->shader->id, "uSrcEnd");
+        glUniform2f(loc, uniforms->srcEnd.x, uniforms->srcEnd.y);
+
+        loc = glGetUniformLocation(pass->shader->id, "uTexture");
+        glUniform1i(loc, 0);
+        glActiveTexture(GL_TEXTURE0 + 0);
+        glBindTexture(GL_TEXTURE_2D, uniforms->texture->id);
+    };
+
+
+
+
+
+    globs.sceneShader3d = gfx_registerShader(gfx_vtype_POS3F_UV, "res/shaders/3d.vert", "res/shaders/3d.frag", frameArena);
+
+    globs.sceneShader3d->passUniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
+        int loc = glGetUniformLocation(pass->shader->id, "uVP");
+        glUniformMatrix4fv(loc, 1, false, &(uniforms->vp)[0]);
+    };
+    globs.sceneShader3d->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
+        int loc = glGetUniformLocation(pass->shader->id, "uColor");
+        glUniform4f(loc, uniforms->color.x, uniforms->color.y, uniforms->color.z, uniforms->color.w);
+
+        loc = glGetUniformLocation(pass->shader->id, "uModel");
+        glUniformMatrix4fv(loc, 1, false, &(uniforms->model)[0]);
+
+        loc = glGetUniformLocation(pass->shader->id, "uTexture");
+        glUniform1i(loc, 0);
+        glActiveTexture(GL_TEXTURE0 + 0);
+        glBindTexture(GL_TEXTURE_2D, uniforms->texture->id);
+
+        gfx_bindVertexArray(pass, uniforms->va);
+        gfx_bindIndexBuffer(pass, uniforms->ib);
+    };
 }
 
 
@@ -185,11 +191,289 @@ void draw_field(float dt, GLFWwindow* window) {
 
 
 
-void draw_network(float dt, BumpAlloc* scratch) {
+
+void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
+
+    blu_Area* a = blu_areaMake(STR("swerveDisplay"), blu_areaFlags_DRAW_TEXTURE);
+    a->texture = info->target->texture;
+
+    areaAddFB(a, info->target);
+
+    gfx_Pass* p = gfx_registerClearPass(col_darkBlue, info->target);
+
+    p = gfx_registerPass();
+    p->target = info->target;
+    p->shader = globs.sceneShader2d;
+
+    float aspect = ((float)info->target->texture->width/info->target->texture->height);
+    float size = 4;
+    float width = size * aspect;
+    float height = size;
+
+    if(aspect < 1) {
+        width = 4;
+        height = width * (1/aspect);
+    }
+    matrixOrtho(-width/2, width/2, -height/2, height/2, 0, 10000, p->passUniforms.vp);
+
+
+    V2f translations[] = {
+        { -1, 1 },
+        { 1, 1},
+        { -1, -1},
+        { 1, -1 }
+    };
+
+    // TODO: hash get is not typesafe
+    net_Prop* props[] = {
+        net_hashGet(STR("FLSteerPos")),
+        net_hashGet(STR("FRSteerPos")),
+        net_hashGet(STR("BLSteerPos")),
+        net_hashGet(STR("BRSteerPos"))
+    };
+
+    net_Prop* angle = net_hashGet(STR("yaw"));
+
+    Mat4f temp;
+
+
+    for(int i = 0; i < 4; i++) {
+        gfx_UniformBlock* b = gfx_registerCall(p);
+        b->texture = info->wheelTex;
+
+        matrixTranslation(translations[i].x, translations[i].y, 0, b->model);
+        matrixScale(1, 1, 0, temp);
+        b->model = b->model * temp;
+
+        if(angle) {
+            matrixZRotation(-(F32)angle->data->f64, temp);
+            b->model = b->model * temp;
+        }
+
+        if(props[i]) {
+            matrixZRotation(-(F32)props[i]->data->f64 * 360, temp);
+            b->model = temp * b->model;
+        }
+    }
+
+    gfx_UniformBlock* b = gfx_registerCall(p);
+    b->texture = info->arrowTex;
+    if(angle) {
+        matrixZRotation(-(F32)angle->data->f64, b->model); }
+
+    matrixScale((F32)info->arrowTex->width / info->arrowTex->height, 1, 1, temp);
+    b->model = temp * b->model;
+}
+
+
+
+
+
+#define GRAPH2D_VCOUNT 200
+struct Graph2dInfo {
+
+    float vals[GRAPH2D_VCOUNT] = { 0 };
+
+    gfx_Framebuffer* target = nullptr;
+};
+
+void draw_graph2d(Graph2dInfo* info, float dt, float nval) {
+
+    memmove(info->vals, info->vals+1, GRAPH2D_VCOUNT - 1);
+    info->vals[GRAPH2D_VCOUNT - 1] = nval;
+
+    blu_Area* a = blu_areaMake(STR("graph2d"), blu_areaFlags_DRAW_BACKGROUND);
+    a->style.childLayoutAxis = blu_axis_Y;
+
+    blu_parentScope(a) {
+        blu_styleScope {
+        blu_style_add_sizeY({blu_sizeKind_REMAINDER});
+
+            a = blu_areaMake(STR("upperBit"), blu_areaFlags_DRAW_TEXTURE);
+            areaAddFB(a, info->target);
+            gfx_registerClearPass(col_darkBlue, info->target);
+
+            gfx_Pass* p = gfx_registerPass();
+            p->target = info->target;
+            p->shader = globs.sceneShader2d;
+            p->passUniforms.vp = Mat4f(1);
+
+
+
+
+            a = blu_areaMake(STR("lowerBit"), 0);
+        }
+
+    }
+};
+
+
+
+// TODO: make controls not apply unless field is "selected"
+// TODO: robot follow mode
+
+void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
+
+    V4f mVec = { 0, 0, 0, 0 };
+
+    F32 moveSpeed = 3;
+    mVec.x += (glfwGetKey(window, GLFW_KEY_D) - glfwGetKey(window, GLFW_KEY_A)) * moveSpeed * dt;
+    mVec.z -= (glfwGetKey(window, GLFW_KEY_W) - glfwGetKey(window, GLFW_KEY_S)) * moveSpeed * dt;
+    mVec.y += (glfwGetKey(window, GLFW_KEY_E) - glfwGetKey(window, GLFW_KEY_Q)) * moveSpeed * dt;
+
+    Mat4f ry;
+    Mat4f rx;
+    matrixYRotation(info->camTransform.ry, ry);
+    matrixXRotation(info->camTransform.rx, rx);
+    mVec = mVec * (rx * ry);
+
+    info->camTarget.x += mVec.x;
+    info->camTarget.y += mVec.y;
+    info->camTarget.z += mVec.z;
+
+
+
+    net_Prop* posX = net_hashGet(STR("posX"));
+    net_Prop* posY = net_hashGet(STR("posY"));
+    net_Prop* yaw = net_hashGet(STR("yaw"));
+
+    net_Prop* estX = net_hashGet(STR("estX"));
+    net_Prop* estY = net_hashGet(STR("estY"));
+
+    Transform robotTransform = Transform();
+    robotTransform.rx = -90; // CLEANUP/TODO: temp constants, until a model is made
+    robotTransform.sx = 0.711f;
+    robotTransform.sy = 0.711f;
+    if(posX && posY && yaw) {
+        robotTransform.x = (F32)posX->data->f64;
+        robotTransform.z = -(F32)posY->data->f64;
+        robotTransform.ry = -(F32)yaw->data->f64;
+    }
+
+    Transform estimateTransform = Transform();
+    estimateTransform.rx = -90;
+    estimateTransform.sx = 0.711f;
+    estimateTransform.sy = 0.711f;
+    if(estX && estY && yaw) {
+
+        Transform t = Transform();
+        estimateTransform.x = (F32)estX->data->f64;
+        estimateTransform.z = -(F32)estY->data->f64;
+        estimateTransform.ry = -(F32)yaw->data->f64;
+    }
+
+
+
+
+    blu_Area* a = blu_areaMake(STR("fieldDisplay"), blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE);
+    a->texture = info->fb->texture;
+
+    V2f delta = blu_interactionFromWidget(a).dragDelta;
+    info->camTarget.ry -= delta.x * 0.5f;
+    info->camTarget.rx -= delta.y * 0.5f;
+
+    areaAddFB(a, info->fb);
+
+    Mat4f proj = Mat4f(1.0f);
+    matrixPerspective(90, (float)info->fb->texture->width / info->fb->texture->height, 0.01, 1000000, proj);
+
+
+    blu_parentScope(a) {
+        blu_styleScope {
+        blu_style_add_sizeX({ blu_sizeKind_PX, 50 });
+        blu_style_add_sizeY({ blu_sizeKind_PX, 50 });
+
+            // TODO: button textures
+            a = blu_areaMake(STR("homeButton"), blu_areaFlags_CLICKABLE | blu_areaFlags_CENTER_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_FLOATING | blu_areaFlags_HOVER_ANIM);
+            a->offset = V2f(0, 0);
+            a->cursor = blu_cursor_hand;
+            V4f tra = V4f(1, 1, 1, 0.5f);
+            a->style.backgroundColor = v4f_lerp(col_darkGray * tra, col_white * tra, a->target_hoverAnim);
+            blu_areaAddDisplayStr(a, STR("H"));
+
+            if(blu_interactionFromWidget(a).clicked) {
+                // HOME TARGET (above the field)
+                info->camTarget = {
+                    0, 10, 0,
+                    -90, 0, 0,
+                    1, 1, 1
+                    };
+            }
+        }
+    }
+
+
+
+    gfx_Pass* p = gfx_registerClearPass(col_darkBlue, info->fb);
+
+
+    // CLEANUP: transform lerp func, also quaternions would be cool
+    float followStrength = 0.1f;
+    info->camTransform.x = lerp(info->camTransform.x, info->camTarget.x, followStrength);
+    info->camTransform.y = lerp(info->camTransform.y, info->camTarget.y, followStrength);
+    info->camTransform.z = lerp(info->camTransform.z, info->camTarget.z, followStrength);
+    info->camTransform.rx = lerp(info->camTransform.rx, info->camTarget.rx, followStrength);
+    info->camTransform.ry = lerp(info->camTransform.ry, info->camTarget.ry, followStrength);
+
+
+
+    Mat4f view = matrixTransform(info->camTransform);
+    matrixInverse(view, view);
+
+    p = gfx_registerPass();
+    p->target = info->fb;
+    p->shader = globs.sceneShader3d;
+    p->passUniforms.vp = view * proj;
+
+
+    gfx_UniformBlock* b;
+
+
+    b = gfx_registerCall(p);
+    b->color = V4f(1, 1, 1, 1);
+    b->ib = info->ib;
+    b->va = info->va;
+    b->texture = info->fieldTex;
+
+    Transform field = Transform(); // TODO/CLEANUP: get a field model
+    field.rx = -90;
+    field.y = -0.2f;
+    field.sx = 16.4846;
+    field.sy = 8.1026;
+    b->model = matrixTransform(field);
+
+
+    b = gfx_registerCall(p);
+    b->color = V4f(1, 0, 0, 1);
+    b->ib = info->ib;
+    b->va = info->va;
+    b->model = matrixTransform(robotTransform);
+    b->texture = globs.solidTex;
+
+    b = gfx_registerCall(p);
+    b->color = V4f(1, 0, 0, 0.5);
+    b->ib = info->ib;
+    b->va = info->va;
+    b->model = matrixTransform(estimateTransform);
+    b->texture = globs.solidTex;
+
+
+
+}
+
+
+
+
+
+
+
+
+
+void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
     blu_Area* a;
 
     a = blu_areaMake(STR("left"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
-    globs.clipSize = a->calculatedSizes[blu_axis_Y];
+    info->clipSize = a->calculatedSizes[blu_axis_Y];
     a->style.childLayoutAxis = blu_axis_X;
     blu_parentScope(a) {
 
@@ -197,7 +481,7 @@ void draw_network(float dt, BumpAlloc* scratch) {
         blu_Area* clip = a;
         a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
         a->style.childLayoutAxis = blu_axis_Y;
-        globs.clipPos += blu_interactionFromWidget(a).scrollDelta * 40;
+        info->clipPos += blu_interactionFromWidget(a).scrollDelta * 40;
         blu_parentScope(a) {
 
             blu_styleScope {
@@ -242,12 +526,19 @@ void draw_network(float dt, BumpAlloc* scratch) {
                             str n = str_format(scratch, STR("\"%s\""), prop->name);
                             blu_areaAddDisplayStr(a, n);
 
-                            a = blu_areaMake(STR("value"), blu_areaFlags_DRAW_TEXT);
+                            a = blu_areaMake(STR("value"), blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
                             a->style.backgroundColor = col_darkGray;
+
                             if(prop->type == net_propType_S32) {
                                 blu_areaAddDisplayStr(a, str_format(scratch, STR("%i"), (prop->data->s32))); }
                             else if(prop->type == net_propType_F64) {
                                 blu_areaAddDisplayStr(a, str_format(scratch, STR("%f"), (prop->data->f64))); }
+                            else if(prop->type == net_propType_STR) {
+                                blu_areaAddDisplayStr(a, str_format(scratch, STR("\"%s\""), (prop->data->str))); }
+                            else if(prop->type == net_propType_BOOL) {
+                                blu_areaAddDisplayStr(a, str_format(scratch, STR("%b"), (prop->data->boo)));
+                                a->style.backgroundColor = prop->data->boo? col_green : col_red;
+                            }
                         }
                     }
                 }
@@ -257,7 +548,7 @@ void draw_network(float dt, BumpAlloc* scratch) {
         } // end of clip
 
         blu_Area* spacer = nullptr;
-        if(globs.clipMax > globs.clipSize) {
+        if(info->clipMax > info->clipSize) {
             a = blu_areaMake(STR("scrollArea"), blu_areaFlags_DRAW_BACKGROUND);
             a->style.backgroundColor = col_darkGray;
             a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 10 };
@@ -272,22 +563,19 @@ void draw_network(float dt, BumpAlloc* scratch) {
                     blu_areaFlags_DRAW_BACKGROUND |
                     blu_areaFlags_CLICKABLE);
                 a->style.backgroundColor = col_lightGray;
-                a->style.sizes[blu_axis_Y] = { blu_sizeKind_PERCENT, globs.clipSize / globs.clipMax };
-                globs.clipPos += blu_interactionFromWidget(a).dragDelta.y / globs.clipSize * globs.clipMax;
+                a->style.sizes[blu_axis_Y] = { blu_sizeKind_PERCENT, info->clipSize / info->clipMax };
+                info->clipPos += blu_interactionFromWidget(a).dragDelta.y / info->clipSize * info->clipMax;
 
             }
 
-            globs.clipPos = max(globs.clipPos, 0);
-            globs.clipPos = min(globs.clipPos, globs.clipMax - (globs.clipSize));
-            spacer->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, (globs.clipPos / globs.clipMax) * globs.clipSize };
+            info->clipPos = max(info->clipPos, 0);
+            info->clipPos = min(info->clipPos, info->clipMax - (info->clipSize));
+            spacer->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, (info->clipPos / info->clipMax) * info->clipSize };
         } else {
-            globs.clipPos = 0;
+            info->clipPos = 0;
         }
 
-        clip->viewOffset = { 0, globs.clipPos };
-
-
-
+        clip->viewOffset = { 0, info->clipPos };
     } // end left
 }
 
@@ -300,6 +588,7 @@ void draw_network(float dt, BumpAlloc* scratch) {
 
 void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
 
+    blu_Area* a;
 
     blu_styleScope
     {
@@ -311,16 +600,59 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
     blu_style_add_animationStrength(0.1f);
 
 
-        blu_styleScope
-        {
-        blu_style_add_sizeX({blu_sizeKind_REMAINDER, 0 });
-            draw_field(dt, window);
-        }
+        a = blu_areaMake(STR("leftBarParent"), blu_areaFlags_DRAW_BACKGROUND);
+        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 100 };
+        a->style.childLayoutAxis = blu_axis_Y;
+
+        a = blu_areaMake(STR("leftBarSep"), blu_areaFlags_DRAW_BACKGROUND);
+        a->style.backgroundColor = col_black;
+        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 3 };
+
 
         blu_styleScope
         {
-        blu_style_add_sizeX({blu_sizeKind_PX, 400 });
-            draw_network(dt, scratch);
+        blu_style_add_sizeX({blu_sizeKind_REMAINDER, 0 });
+            draw_field(&globs.fieldInfo, dt, window);
+        }
+
+
+        a = blu_areaMake(STR("XresizeBar"), blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
+        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 3 };
+
+        blu_WidgetInteraction inter = blu_interactionFromWidget(a);
+        float t = inter.held? 1 : a->target_hoverAnim;
+        a->style.backgroundColor = v4f_lerp(col_black, col_white, t);
+        globs.rightSize += -inter.dragDelta.x;
+        a->cursor = blu_cursor_resizeH;
+
+
+
+        a = blu_areaMake(STR("rightParent"), 0);
+        a->style.sizes[blu_axis_X] = {blu_sizeKind_PX, globs.rightSize };
+        a->style.childLayoutAxis = blu_axis_Y;
+
+
+        blu_parentScope(a) {
+
+            blu_styleScope {
+            blu_style_add_sizeY({ blu_sizeKind_REMAINDER, 0 });
+                draw_swerveDrive(&globs.swerveInfo, dt);
+            }
+
+
+            a = blu_areaMake(STR("YresizeBar"), blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
+            a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, 3 };
+
+            blu_WidgetInteraction inter = blu_interactionFromWidget(a);
+            float t = inter.held? 1 : a->target_hoverAnim;
+            a->style.backgroundColor = v4f_lerp(col_black, col_white, t);
+            globs.botSize += -inter.dragDelta.y;
+            a->cursor = blu_cursor_resizeV;
+
+            blu_styleScope {
+            blu_style_add_sizeY({blu_sizeKind_PX, globs.botSize });
+                draw_network(&globs.netInfo, dt, scratch);
+            }
         }
     }
 }

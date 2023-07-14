@@ -33,16 +33,19 @@ THE CHECKLIST:
     [X] animations
     [X] scrolling
     [X] clipping
+    [X] cursor changes
     [ ] padding
-    [ ] cursor changes
     [ ] rounding
     [ ] borders
     [ ] drop shadows
     [ ] tooltips/dropdowns
     [ ] text input
+    [ ] text hotkeys
 
     [ ] cleanup
     [ ] batching
+
+    [ ] documentation and examples
 
 TESTING CHECKLIST:
 [ ] test hashmap collsions
@@ -80,6 +83,14 @@ enum blu_AreaFlags {
 struct blu_Size {
     blu_SizeKind kind = blu_sizeKind_NONE;
     F32 value = 0;
+};
+
+enum blu_Cursor {
+    blu_cursor_norm,
+    blu_cursor_hand,
+    blu_cursor_resizeH,
+    blu_cursor_resizeV,
+    blu_cursor_type,
 };
 
 
@@ -157,6 +168,8 @@ struct blu_Area {
     V2f offset = { 0, 0 };
     V2f viewOffset = { 0, 0 };
 
+    blu_Cursor cursor = blu_cursor_norm;
+
 
     // layout pass data
     F32 calculatedSizes[blu_axis_COUNT];
@@ -172,13 +185,11 @@ struct blu_Area {
 };
 
 
-// CLEANUP: name?
-struct blu_WidgetInputs {
+struct blu_WidgetInteraction {
     bool hovered = false;
     bool held = false;
     bool clicked = false;
 
-    bool dragged = false;
     V2f dragDelta = V2f();
 
     float scrollDelta = 0;
@@ -198,7 +209,7 @@ void blu_pushParent(blu_Area* parent);
 void blu_popParent();
 
 void blu_beginFrame(); // cull
-void blu_input(V2f npos, bool lmbState, float mouseDelta); // set current and update prev input // CLEANUP: merge with begin?
+void blu_input(V2f npos, bool lmbState, float scrollDelta, blu_Cursor* outCursor);  // set current and update prev input // CLEANUP: merge with begin?
 void blu_layout(V2f scSize); // calculate layout shit
 void blu_createPass(gfx_Pass* normalPass);
 
@@ -214,7 +225,7 @@ void blu_style_add_animationStrength(F32 s);
 void blu_pushStyle();
 void blu_popStyle();
 
-blu_WidgetInputs blu_interactionFromWidget(blu_Area* area);
+blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area);
 
 
 
@@ -261,7 +272,7 @@ struct blu_Glyph {
 
 struct blu_Globs {
 
-    blu_Area* currentParent = nullptr; // TODO: replace with currentArea
+    blu_Area* currentParent = nullptr; // CLEANUP: replace with currentArea
     blu_Area* ogParent = nullptr;
 
     blu_Area** hash = nullptr; // array of pointers to the actual area structs, for hash-based access
@@ -271,7 +282,7 @@ struct blu_Globs {
 
     BumpAlloc frameArena = { };
 
-    blu_StyleStackNode* currentStyle = nullptr; // TODO: (?) make it so current style doesn't have to be rebuilt per area
+    blu_StyleStackNode* currentStyle = nullptr;
     blu_StyleStackNode* ogStyle = nullptr;
 
     U64 frameIndex = 0;
@@ -296,7 +307,7 @@ struct blu_Globs {
     bool inputPrevLButton = false;
     blu_Area* dragged = nullptr;
     V2f dragDelta = V2f();
-    float mouseDelta = 0;
+    float scrollDelta = 0;
 };
 
 static blu_Globs globs = blu_Globs();
@@ -417,6 +428,7 @@ void _blu_areaReset(blu_Area* a) {
     a->displayString = { nullptr, 0 };
     a->texture = nullptr;
     a->offset = { 0, 0 };
+    a->cursor = blu_cursor_norm;
 }
 
 void _blu_areaUpdate(blu_Area* a) {
@@ -714,7 +726,7 @@ void blu_layout(V2f scSize) {
                 if(axis == blu_axis_Y) {
                     elem->calculatedSizes[axis] = globs.fontHeight + 2*elem->style.textPadding.y;
                     // CLEANUP: what about no text
-                    // TODO: text wrapping/cutoff
+                    // TODO: text wrapping/truncation
                 }
                 else if(axis == blu_axis_X) {
 
@@ -867,7 +879,6 @@ void _blu_genRenderCallsRecurse(blu_Area* area, Rect2f clip, gfx_Pass* pass) {
 // CLEANUP: rename
 void blu_createPass(gfx_Pass* normalPass) {
 
-    // CLEANUP: get a rect structure here
     V2f start = V2f(
         globs.ogParent->calculatedPosition[blu_axis_X],
         globs.ogParent->calculatedPosition[blu_axis_Y]
@@ -944,13 +955,13 @@ void blu_popStyle() {
 
 // return indicates if parent has been blocked
 // never touch this code again
-bool _blu_genInteractionsRecurse(blu_Area* area, bool covered) {
+bool _blu_genInteractionsRecurse(blu_Area* area, bool covered, blu_Cursor* outCursor) {
 
 
     blu_Area* elem = area->lastChild;
     while(elem) {
 
-        if(_blu_genInteractionsRecurse(elem, covered)) {
+        if(_blu_genInteractionsRecurse(elem, covered, outCursor)) {
             covered = true; }
 
         elem = elem->prevSibling;
@@ -977,6 +988,9 @@ bool _blu_genInteractionsRecurse(blu_Area* area, bool covered) {
 
         if(area->prevPressed) {
             globs.dragged = area; }
+
+        if(containsMouse) {
+            *outCursor = area->cursor; }
     }
     else {
         area->prevHovered = false;
@@ -986,7 +1000,7 @@ bool _blu_genInteractionsRecurse(blu_Area* area, bool covered) {
     return (clickable && containsMouse) || covered;
 }
 
-void blu_input(V2f npos, bool lmbState, float mouseDelta) {
+void blu_input(V2f npos, bool lmbState, float scrollDelta, blu_Cursor* outCursor) {
 
     if(!globs.inputCurLButton && globs.inputPrevLButton) {
         globs.dragged = nullptr;
@@ -998,17 +1012,20 @@ void blu_input(V2f npos, bool lmbState, float mouseDelta) {
     globs.inputPrevLButton = globs.inputCurLButton;
     globs.inputCurLButton = lmbState;
 
-    globs.mouseDelta = mouseDelta;
+    globs.scrollDelta = scrollDelta;
 
-    bool x;
-    _blu_genInteractionsRecurse(globs.ogParent, globs.dragged != nullptr);
+    *outCursor = blu_cursor_norm;
+    if(globs.dragged) { *outCursor = globs.dragged->cursor; }
+
+    _blu_genInteractionsRecurse(globs.ogParent, globs.dragged != nullptr, outCursor);
 }
 
 
-blu_WidgetInputs blu_interactionFromWidget(blu_Area* area) {
+
+blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
     ASSERT(area->flags & blu_areaFlags_CLICKABLE);
 
-    blu_WidgetInputs out;
+    blu_WidgetInteraction out;
 
     if(globs.dragged && globs.dragged != area) {
         return out; }
@@ -1016,7 +1033,7 @@ blu_WidgetInputs blu_interactionFromWidget(blu_Area* area) {
 
     out.hovered = area->prevHovered;
     if(out.hovered) {
-        out.scrollDelta = globs.mouseDelta; }
+        out.scrollDelta = globs.scrollDelta; }
 
     if(globs.dragged == area) {
         out.held = true;

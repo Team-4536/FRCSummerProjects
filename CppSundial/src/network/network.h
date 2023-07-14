@@ -20,7 +20,8 @@ enum net_SockErr {
 enum net_PropType {
     net_propType_S32,
     net_propType_F64,
-    net_propType_STR
+    net_propType_STR,
+    net_propType_BOOL
 };
 
 enum net_MsgKind {
@@ -28,9 +29,16 @@ enum net_MsgKind {
     net_msgKind_EVENT
 };
 
+// NOTE: contains space to fit string chars
 union net_PropData {
     S32 s32;
     F64 f64;
+    U8 boo;
+
+    struct {
+        str str;
+        U8 chars[256];
+    };
 };
 
 struct net_Prop {
@@ -46,10 +54,8 @@ struct net_Prop {
 
 
 
-
-
 void net_init();
-void net_update(BumpAlloc* scratch);
+void net_update(BumpAlloc* scratch, float curTime);
 void net_cleanup();
 
 void net_resetTracked();
@@ -62,6 +68,13 @@ net_Prop* net_getEvents();
 net_Prop* net_hashGet(str string);
 
 
+void net_putMessage(str name, F64 data, BumpAlloc* scratch);
+void net_putMessage(str name, S32 data, BumpAlloc* scratch);
+void net_putMessage(str name, bool data, BumpAlloc* scratch);
+void net_putMessage(str name, str data, BumpAlloc* scratch);
+void net_putEvent(str name, BumpAlloc* scratch);
+
+
 #ifdef NET_IMPL
 
 #include <stdio.h>
@@ -72,15 +85,19 @@ net_Prop* net_hashGet(str string);
 
 #include "base/hashtable.h"
 #include "base/arr.h"
+#include "base/utils.h"
 
 
 #define NET_HASH_COUNT 10000
 #define NET_MAX_PROP_COUNT 10000
 #define NET_RES_SIZE 10000
-#define NET_RECV_SIZE 1024
+
+#define NET_PACKET_SIZE 1024
 #define NET_RECV_BUFFER_SIZE 2048
+#define NET_SEND_BUFFER_SIZE 2048
 
-
+#define NET_SEND_INTERVAL (1/50.0f)
+// #define NET_SEND_INTERVAL (1/50.0f)
 
 
 
@@ -108,7 +125,6 @@ bool _net_sockCreateConnect(const char* hostname, const char* port, net_Sock* so
         hints.ai_protocol = IPPROTO_TCP;
 
         addrinfo* resInfo;
-        // CLEANUP: perma allocations here
         err = getaddrinfo(hostname, port, &hints, &resInfo);
         if(err != 0) {
             *outError = net_sockErr_failedAddrInfo;
@@ -157,8 +173,6 @@ void _net_sockCloseFree(net_Sock* s) {
 
 
 
-
-
 struct net_Globs {
 
     WSADATA wsaData;
@@ -174,10 +188,15 @@ struct net_Globs {
     net_Prop* eventStart = nullptr;
     net_Prop* eventEnd = nullptr;
 
-    FILE* logFile;
 
     U32 recvBufStartOffset = 0;
-    U8* recvBuffer;
+    U8* recvBuffer = nullptr;
+    float lastSendTime = 0;
+    BumpAlloc sendArena;
+
+
+
+    FILE* logFile;
 };
 
 static net_Globs globs = net_Globs();
@@ -193,6 +212,8 @@ void net_init() {
         (sizeof(net_Prop*) * NET_MAX_PROP_COUNT) + // tracked
         (sizeof(net_Prop*) * NET_HASH_COUNT) // hash
         );
+
+    bump_allocate(&globs.sendArena, NET_SEND_BUFFER_SIZE);
 
     net_resetTracked();
 
@@ -269,25 +290,7 @@ net_Prop* net_hashGet(str string) {
 
 
 
-
-
-void _net_log(str s) {
-    fwrite(s.chars, 1, s.length, globs.logFile);
-}
-
-
-/*
-TODO: expand data types
-    [ ] strings
-    [ ] v2s?
-    [ ] matricies
-    [ ] arrays
-*/
-
-// TODO: document/improve log spec
-// TODO: msg begin markers
-
-// returns nullptr if failed, else ptr to data
+// returns nullptr if failed, else ptr to data & increments current
 U8* _net_getBytes(U8* buf, U32 bufSize, U8** current, U32 count) {
 
     ASSERT(*current >= buf);
@@ -301,33 +304,147 @@ U8* _net_getBytes(U8* buf, U32 bufSize, U8** current, U32 count) {
 //CLEANUP: includes
 
 
-
-
 /*
 Message layout:
 [U8 kind] [U8 length of name] [U8 data type] [U8 data size] [name] [data]
+info is always big endian
 */
+
+constexpr bool _net_isSystemBigEndian()
+{
+    union {
+        U32 i;
+        char c[4];
+    } x = {0x01020304};
+    return x.c[0] == 1;
+}
+
+
+// NOTE: unsafe to use with overlapping src and dst
+U8* _net_reverseBytes(U8* data, U32 size, U8* dest) {
+    for(int i = 0; i < size; i++) {
+        dest[i] = data[size - 1 - i]; }
+    return dest;
+}
+
+
+
+
+
+struct net_Message {
+    net_MsgKind kind;
+    str name;
+    net_PropType dataType;
+    net_PropData data;
+};
+
+void _net_putMessage(net_Message message, BumpAlloc* scratch) {
+
+    U32 bufSize = 4; // header
+    bufSize += message.name.length;
+
+    U32 dataLen = 0;
+    if(message.dataType == net_propType_S32) { dataLen = sizeof(S32); }
+    else if(message.dataType == net_propType_F64) { dataLen = sizeof(F64); }
+    else if(message.dataType == net_propType_BOOL) { dataLen = sizeof(U8); }
+    else if(message.dataType == net_propType_STR) { dataLen = message.data.str.length; }
+    else { ASSERT(false); }
+    bufSize += dataLen;
+
+
+    U8* buffer = BUMP_PUSH_ARR(&globs.sendArena, bufSize, U8);
+    buffer[0] = message.kind;
+    ASSERT(message.name.length < 256);
+    buffer[1] = message.name.length;
+    buffer[2] = message.dataType;
+    buffer[3] = dataLen;
+    str_copy(message.name, &(buffer[4]));
+
+    U8* dataLoc = &(buffer[4 + message.name.length]);
+    if(message.dataType == net_propType_S32) { *(S32*)(dataLoc) = message.data.s32; }
+    else if(message.dataType == net_propType_F64) { *(F64*)(dataLoc) = message.data.f64; }
+    else if(message.dataType == net_propType_BOOL) { *dataLoc = message.data.boo; }
+    else if(message.dataType == net_propType_STR) { str_copy(message.data.str, dataLoc); }
+    else { ASSERT(false); }
+
+
+    // NOTE: IF ADDING TYPES THAT HAVE DYNAMIC SIZING/IGNORE BYTE ORDER FROM SYSTEM CHANGE THIS
+    // VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
+    if(message.dataType != net_propType_STR) {
+        if(!_net_isSystemBigEndian()) {
+            U8* n = _net_reverseBytes(dataLoc, dataLen, BUMP_PUSH_ARR(scratch, dataLen, U8));
+            memcpy(dataLoc, n, dataLen);
+        }
+    }
+}
+
+
+void net_putMessage(str name, F64 data, BumpAlloc* scratch) {
+    net_Message m;
+    m.kind = net_msgKind_UPDATE;
+    m.name = name;
+    m.dataType = net_propType_F64;
+    m.data.f64 = data;
+    _net_putMessage(m, scratch);
+}
+void net_putMessage(str name, S32 data, BumpAlloc* scratch) {
+    net_Message m;
+    m.kind = net_msgKind_UPDATE;
+    m.name = name;
+    m.dataType = net_propType_S32;
+    m.data.s32 = data;
+    _net_putMessage(m, scratch);
+}
+void net_putMessage(str name, bool data, BumpAlloc* scratch) {
+    net_Message m;
+    m.kind = net_msgKind_UPDATE;
+    m.name = name;
+    m.dataType = net_propType_BOOL;
+    m.data.boo = data? 1 : 0;
+    _net_putMessage(m, scratch);
+}
+void net_putMessage(str name, str data, BumpAlloc* scratch) {
+    net_Message m;
+    m.kind = net_msgKind_UPDATE;
+    m.name = name;
+    m.dataType = net_propType_STR;
+    m.data.str = data;
+    _net_putMessage(m, scratch);
+}
+void net_putEvent(str name, BumpAlloc* scratch) {
+    net_Message m;
+    m.kind = net_msgKind_EVENT;
+    m.name = name;
+    m.dataType = net_propType_BOOL;
+    m.data.boo = 0;
+    _net_putMessage(m, scratch);
+}
+
+
+
+
 // returns log for given message
-StrList _net_processMessage(U8 kind, str name, void* data, U8 dataType, U32 dataSize, BumpAlloc* scratch) {
+StrList _net_processMessage(U8 kind, str name, U8* data, U8 dataType, U32 dataSize, BumpAlloc* scratch) {
 
     StrList log = StrList();
 
-    str_listAppend(&log, str_format(scratch, STR("%i\t"), (int)kind), scratch);
     if(kind != net_msgKind_UPDATE &&
        kind != net_msgKind_EVENT) {
-        str_listAppend(&log, STR("Invalid msg type\t"), scratch);
+        str_listAppend(&log, STR("[Invalid msg type]\t"), scratch);
+        str_listAppend(&log, str_format(scratch, STR("%i\t"), (int)kind), scratch);
         return log;
     }
 
-    str_listAppend(&log, str_format(scratch, STR("%i\t"), (int)dataType), scratch);
 
     if(dataType != net_propType_S32 &&
-       dataType != net_propType_F64) {
-        str_listAppend(&log, str_format(scratch, STR("Invalid data type\t"), dataType), scratch);
+       dataType != net_propType_F64 &&
+       dataType != net_propType_STR &&
+       dataType != net_propType_BOOL) {
+        str_listAppend(&log, str_format(scratch, STR("[Invalid data type]\t"), dataType), scratch);
+        str_listAppend(&log, str_format(scratch, STR("%i\t"), (int)dataType), scratch);
         return log;
     }
 
-    str_listAppend(&log, str_format(scratch, STR("%i\t"), (int)dataSize), scratch);
     str_listAppend(&log, str_format(scratch, STR("%s\t"), name), scratch);
 
 
@@ -348,15 +465,32 @@ StrList _net_processMessage(U8 kind, str name, void* data, U8 dataType, U32 data
 
 
         prop->type = (net_PropType)dataType;
+
         if(prop->type == net_propType_F64) {
+
             prop->data->f64 = *((F64*)data);
+            if(!_net_isSystemBigEndian()) {
+                U8* buf = BUMP_PUSH_ARR(scratch, sizeof(F64), U8);
+                prop->data->f64 = *((F64*)_net_reverseBytes(data, sizeof(F64), buf));
+            }
 
             str_listAppend(&log, str_format(scratch, STR("%f\t"), prop->data->f64), scratch);
         }
         else if (prop->type == net_propType_S32) {
-            // TODO: endianness
             prop->data->s32 = *((S32*)data);
+            if(!_net_isSystemBigEndian()) {
+                U8* buf = BUMP_PUSH_ARR(scratch, sizeof(S32), U8);
+                prop->data->s32 = *((S32*)_net_reverseBytes(data, sizeof(S32), buf));
+            }
             str_listAppend(&log, str_format(scratch, STR("%i\t"), prop->data->s32), scratch);
+        }
+        else if(prop->type == net_propType_STR) {
+            prop->data->str = str_copy({ (const U8*)data, dataSize }, prop->data->chars);
+            str_listAppend(&log, str_format(scratch, STR("%s\t"), prop->data->str), scratch);
+        }
+        else if(prop->type == net_propType_BOOL) {
+            prop->data->boo = *data;
+            str_listAppend(&log, str_format(scratch, STR("%b\t"), prop->data->boo), scratch);
         }
     }
     else if(kind == net_msgKind_EVENT) {
@@ -378,10 +512,9 @@ StrList _net_processMessage(U8 kind, str name, void* data, U8 dataType, U32 data
 }
 
 
+// NOTE: messages are expected to be formatted correctly, if one isn't this will not be able to read future messages
 // return value indicates how much of the buffer was processed
 U32 _net_processPackets(U8* buf, U32 bufSize, BumpAlloc* scratch) {
-
-    // _net_log(str_format(scratch, STR("[PACKET START] size: %i\n"), bufSize));
 
     U8* cur = buf;
     while(true) {
@@ -395,30 +528,25 @@ U32 _net_processPackets(U8* buf, U32 bufSize, BumpAlloc* scratch) {
         U8 valType = messageHeader[2];
         U8 valLen = messageHeader[3];
 
-        // CLEANUP: giving messages a lil too much control
         U8* nameBuf = _net_getBytes(buf, bufSize, &cCopy, nameLen);
         if(!nameBuf) { break; }
         U8* dataBuf = _net_getBytes(buf, bufSize, &cCopy, valLen);
         if(!dataBuf) { break; }
 
         StrList log = _net_processMessage(msgKind, {nameBuf, nameLen}, dataBuf, valType, valLen, scratch);
-        _net_log(str_listCollect(log, scratch));
-        _net_log(STR("\n"));
+        str_listAppend(&log, STR("\n"), scratch);
+        str collected = str_listCollect(log, scratch);
+        fwrite(collected.chars, 1, collected.length, globs.logFile);
 
         cur = cCopy;
     }
 
-    // _net_log(str_format(scratch, STR("[PACKET END] rem: %i\n"), cur - buf));
-
     return cur - buf;
 }
 
-
-
-
 // Event props are put in scratch, as well as misc things
 // Tracked props are stored in a resArena global.
-void net_update(BumpAlloc* scratch) {
+void net_update(BumpAlloc* scratch, float curTime) {
 
     globs.eventStart = nullptr;
     globs.eventEnd = nullptr;
@@ -433,53 +561,92 @@ void net_update(BumpAlloc* scratch) {
         else if(connected) {
             globs.connected = true;
             net_resetTracked();
-            _net_log(str_format(scratch, STR("[CONNECTED]\n")));
+
+            str s = STR("[CONNECTED]\n");
+            fwrite(s.chars, 1, s.length, globs.logFile);
         }
-        return;
+
     }
 
 
 
-    U8* buf = (globs.recvBuffer + globs.recvBufStartOffset);
-    int recvSize = recv(globs.simSocket.s, (char*)buf, NET_RECV_SIZE, 0);
+    // SEND LOOP ///////////////////////////////////////////////////////////////////////////
 
-    if (recvSize == SOCKET_ERROR) {
-        if(WSAGetLastError() != WSAEWOULDBLOCK) {
-            _net_log(str_format(scratch, STR("[ERR]\t%i\n"), WSAGetLastError()));
+    if(globs.lastSendTime + NET_SEND_INTERVAL < curTime) {
+        globs.lastSendTime = curTime;
+
+        U8* start = (U8*)globs.sendArena.start;
+        U8* end = (U8*)globs.sendArena.end;
+        while (start < end && globs.connected) {
+            // TODO: sent message logging
+            int res = send(globs.simSocket.s, (const char*)start, min(end - start, NET_PACKET_SIZE), 0);
+            if(res == SOCKET_ERROR) {
+                if(WSAGetLastError() != WSAEWOULDBLOCK) {
+
+                    // TODO: file write err handling
+                    str s = str_format(scratch, STR("[SEND ERR]\t%i\n"), WSAGetLastError());
+                    fwrite(s.chars, 1, s.length, globs.logFile);
+
+                    globs.connected = false;
+                    _net_sockCloseFree(&globs.simSocket);
+                }
+            }
+            else { start += res; }
+        }
+
+        bump_clear(&globs.sendArena);
+    }
+
+    // RECV LOOP ///////////////////////////////////////////////////////////////////////////
+
+    // NOTE: this is acting as an if, loop is normally broken when there is no more left to recieve
+    while(globs.connected) {
+
+        U8* buf = (globs.recvBuffer + globs.recvBufStartOffset);
+        int recvSize = recv(globs.simSocket.s, (char*)buf, NET_PACKET_SIZE, 0);
+
+        if (recvSize == SOCKET_ERROR) {
+            if(WSAGetLastError() != WSAEWOULDBLOCK) {
+                str s = str_format(scratch, STR("[RECV ERR]\t%i\n"), WSAGetLastError());
+                fwrite(s.chars, 1, s.length, globs.logFile);
+                globs.connected = false;
+                _net_sockCloseFree(&globs.simSocket);
+            }
+            break;
+        }
+        // size is 0, indicating shutdown
+        else if (recvSize == 0) {
             globs.connected = false;
             _net_sockCloseFree(&globs.simSocket);
         }
-    }
-    // size is 0, indicating shutdown
-    else if (recvSize == 0) {
-        globs.connected = false;
-        _net_sockCloseFree(&globs.simSocket);
-    }
-    // buffer received
-    else if (recvSize > 0) {
+        // buffer received
+        else if (recvSize > 0) {
 
-        U32 bufSize = globs.recvBufStartOffset + recvSize;
-        U32 endOfMessages = _net_processPackets(globs.recvBuffer, bufSize, scratch);
+            U32 bufSize = globs.recvBufStartOffset + recvSize;
+            U32 consumed = _net_processPackets(globs.recvBuffer, bufSize, scratch);
 
-        if(endOfMessages > 0) {
-            U8* remainder = globs.recvBuffer + endOfMessages;
-            U32 remSize = (bufSize - endOfMessages);
-            memmove(globs.recvBuffer, remainder, remSize);
-            globs.recvBufStartOffset = remSize;
+            if(consumed > 0) {
+                U8* remainder = globs.recvBuffer + consumed;
+                U32 remSize = (bufSize - consumed);
+                memmove(globs.recvBuffer, remainder, remSize);
+                globs.recvBufStartOffset = remSize;
+            }
+            else { break; }
         }
     }
 
 
-
-
     if(!globs.connected) {
-        _net_log(str_format(scratch, STR("[DISCONNECTED]\n")));
+        str s = STR("[DISCONNECTED]\n");
+        fwrite(s.chars, 1, s.length, globs.logFile);
     }
+
 }
 
 void net_cleanup() {
 
-    _net_log(STR("[QUIT]"));
+    str s = STR("[DISCONNECTED]\n");
+    fwrite(s.chars, 1, s.length, globs.logFile);
     fclose(globs.logFile);
 
     _net_sockCloseFree(&globs.simSocket);
