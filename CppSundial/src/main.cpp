@@ -216,7 +216,7 @@ int main() {
 
         gfx_drawPasses(w, h);
 
-        net_update(&frameArena);
+        net_update(&frameArena, (F32)time);
 
         bump_clear(&frameArena);
 
