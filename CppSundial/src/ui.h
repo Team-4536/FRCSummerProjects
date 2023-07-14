@@ -510,11 +510,16 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                 } // end connection parent
 
 
-                a = blu_areaMake(STR("send button"), blu_areaFlags_CLICKABLE | blu_areaFlags_CENTER_TEXT | blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM);
-                a->style.backgroundColor = v4f_lerp(col_darkGray, col_lightGray, a->target_hoverAnim);
+                a = blu_areaMake(STR("send button"), blu_areaFlags_CLICKABLE | blu_areaFlags_CENTER_TEXT | blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
                 blu_areaAddDisplayStr(a, STR("SEND"));
                 if(blu_interactionFromWidget(a).clicked) {
-                    net_putMessage(STR("Time"), (F64)dt, scratch);
+
+                    net_Message m;
+                    m.kind = net_msgKind_UPDATE;
+                    m.name = str_copy(STR("Time"), scratch);
+                    m.dataType = net_propType_F64;
+                    m.data.f64 = dt;
+                    net_putMessage(m, scratch);
                 }
 
                 net_Prop** tracked;

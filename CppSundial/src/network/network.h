@@ -79,11 +79,6 @@ net_Prop* net_getEvents();
 
 net_Prop* net_hashGet(str string);
 
-void net_putMessage(str name, S32 data, BumpAlloc* scratch);
-void net_putMessage(str name, F64 data, BumpAlloc* scratch);
-void net_putMessage(str name, bool data, BumpAlloc* scratch);
-void net_putMessage(str name, str data, BumpAlloc* scratch);
-void net_putEvent(str name, BumpAlloc* scratch);
 void net_putMessage(net_Message message, BumpAlloc* scratch);
 
 
@@ -340,46 +335,7 @@ U8* _net_reverseBytes(U8* data, U32 size, U8* dest) {
 
 
 
-void net_putMessage(str name, S32 data, BumpAlloc* scratch) {
-    net_Message m;
-    m.kind = net_msgKind_UPDATE;
-    m.name = name;
-    m.dataType = net_propType_S32;
-    m.data.s32 = data;
-    net_putMessage(m, scratch);
-}
-void net_putMessage(str name, bool data, BumpAlloc* scratch) {
-    net_Message m;
-    m.kind = net_msgKind_UPDATE;
-    m.name = name;
-    m.dataType = net_propType_BOOL;
-    m.data.boo = data? 1 : 0;
-    net_putMessage(m, scratch);
-}
-void net_putMessage(str name, F64 data, BumpAlloc* scratch) {
-    net_Message m;
-    m.kind = net_msgKind_UPDATE;
-    m.name = name;
-    m.dataType = net_propType_F64;
-    m.data.f64 = data;
-    net_putMessage(m, scratch);
-}
-void net_putMessage(str name, str data, BumpAlloc* scratch) {
-    net_Message m;
-    m.kind = net_msgKind_UPDATE;
-    m.name = name;
-    m.dataType = net_propType_F64;
-    m.data.str = data;
-    net_putMessage(m, scratch);
-}
-void net_putEvent(str name, BumpAlloc* scratch) {
-    net_Message m;
-    m.kind = net_msgKind_EVENT;
-    m.name = name;
-    m.dataType = net_propType_BOOL;
-    m.data.boo = 0;
-    net_putMessage(m, scratch);
-}
+// TODO:? ctor functions or no?
 void net_putMessage(net_Message message, BumpAlloc* scratch) {
 
     U32 bufSize = 4; // header
@@ -574,13 +530,12 @@ void net_update(BumpAlloc* scratch, float curTime) {
 
     // SEND LOOP ///////////////////////////////////////////////////////////////////////////
 
-    /*
     if(curTime > globs.lastSentTime + NET_SEND_INTERVAL) {
         globs.lastSentTime = curTime;
 
+
         U8* buf = (U8*)globs.sendArena.start;
         while (buf < (U8*)globs.sendArena.end) {
-            break;
 
             U32 overhead = (buf + NET_PACKET_SIZE) - (U8*)globs.sendArena.end;
             int res = send(globs.simSocket.s, (const char*)buf, NET_PACKET_SIZE - max(0, overhead), 0);
@@ -599,49 +554,42 @@ void net_update(BumpAlloc* scratch, float curTime) {
             else { buf += res; }
         }
 
+
         bump_clear(&globs.sendArena);
     }
-    */
 
     // RECV LOOP ///////////////////////////////////////////////////////////////////////////
 
-    while(true) {
+    // TODO: make loop
+    U8* buf = (globs.recvBuffer + globs.recvBufStartOffset);
+    int recvSize = recv(globs.simSocket.s, (char*)buf, NET_PACKET_SIZE, 0);
 
-        U8* buf = (globs.recvBuffer + globs.recvBufStartOffset);
-        int recvSize = recv(globs.simSocket.s, (char*)buf, NET_PACKET_SIZE, 0);
-        printf("recvd: %i\n", recvSize);
+    if (recvSize == SOCKET_ERROR) {
+        if(WSAGetLastError() != WSAEWOULDBLOCK) {
 
-        if (recvSize == SOCKET_ERROR) {
-            int err = WSAGetLastError();
-            if(err != WSAEWOULDBLOCK) {
+            str s = str_format(scratch, STR("[RECV ERR]\t%i\n"), WSAGetLastError());
+            fwrite(s.chars, 1, s.length, globs.logFile);
 
-                str s = str_format(scratch, STR("[RECV ERR]\t%i\n"), err);
-                fwrite(s.chars, 1, s.length, globs.logFile);
-
-                globs.connected = false;
-                _net_sockCloseFree(&globs.simSocket);
-            }
-            break;
-        }
-        // size is 0, indicating shutdown
-        else if (recvSize == 0) {
             globs.connected = false;
             _net_sockCloseFree(&globs.simSocket);
-            break;
         }
-        // buffer received
-        else if (recvSize > 0) {
+    }
+    // size is 0, indicating shutdown
+    else if (recvSize == 0) {
+        globs.connected = false;
+        _net_sockCloseFree(&globs.simSocket);
+    }
+    // buffer received
+    else if (recvSize > 0) {
 
-            U32 bufSize = globs.recvBufStartOffset + recvSize;
-            U32 endOfMessages = _net_processPackets(globs.recvBuffer, bufSize, scratch);
+        U32 bufSize = globs.recvBufStartOffset + recvSize;
+        U32 endOfMessages = _net_processPackets(globs.recvBuffer, bufSize, scratch);
 
-            if(endOfMessages > 0) {
-                U8* remainder = globs.recvBuffer + endOfMessages;
-                U32 remSize = (bufSize - endOfMessages);
-                memmove(globs.recvBuffer, remainder, remSize);
-                globs.recvBufStartOffset = remSize;
-            }
-            else { break; }
+        if(endOfMessages > 0) {
+            U8* remainder = globs.recvBuffer + endOfMessages;
+            U32 remSize = (bufSize - endOfMessages);
+            memmove(globs.recvBuffer, remainder, remSize);
+            globs.recvBufStartOffset = remSize;
         }
     }
 
