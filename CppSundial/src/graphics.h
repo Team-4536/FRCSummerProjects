@@ -702,8 +702,6 @@ void loadOBJMesh(const char* path, gfx_VertexArray* outVB, gfx_IndexBuffer* outI
 
 
 
-
-#define PARSE_FLOAT(idx) atof((char*)split[idx].chars)
 #define PROGRESS_CHECK(num, type, name) \
     do { \
     if(progress < num) { \
@@ -763,23 +761,23 @@ bool gfx_loadOBJMesh(const char* path, BumpAlloc* scratch, gfx_VertexArray** out
         str type = split[0];
         if(type.chars[0] == 'v' && type.length == 1) {
             PROGRESS_CHECK(0, float, vert);
-            U32* mem = BUMP_PUSH_ARR(scratch, 3, U32);
-            mem[0] = PARSE_FLOAT(1);
-            mem[1] = PARSE_FLOAT(2);
-            mem[2] = PARSE_FLOAT(3);
+            float* mem = BUMP_PUSH_ARR(scratch, 3, float);
+            mem[0] = atof((char*)((split[1]).chars));
+            mem[1] = atof((char*)((split[2]).chars));
+            mem[2] = atof((char*)((split[3]).chars));
         }
         else if(type.chars[0] == 'v' && type.chars[1] == 't' && type.length == 2) {
             PROGRESS_CHECK(1, float, uv);
-            U32* mem = BUMP_PUSH_ARR(scratch, 2, U32);
-            mem[0] = PARSE_FLOAT(1);
-            mem[1] = PARSE_FLOAT(2);
+            float* mem = BUMP_PUSH_ARR(scratch, 2, float);
+            mem[0] = atof((char*)((split[1]).chars));
+            mem[1] = atof((char*)((split[2]).chars));
         }
         else if(type.chars[0] == 'v' && type.chars[1] == 'n' && type.length == 2) {
             PROGRESS_CHECK(2, float, normal);
-            U32* mem = BUMP_PUSH_ARR(scratch, 3, U32);
-            mem[0] = PARSE_FLOAT(1);
-            mem[1] = PARSE_FLOAT(2);
-            mem[2] = PARSE_FLOAT(3);
+            float* mem = BUMP_PUSH_ARR(scratch, 3, float);
+            mem[0] = atof((char*)((split[1]).chars));
+            mem[1] = atof((char*)((split[2]).chars));
+            mem[2] = atof((char*)((split[3]).chars));
         }
         else if(type.chars[0] == 'f' && type.length == 1) {
             PROGRESS_CHECK(3, U32, face);
@@ -789,8 +787,8 @@ bool gfx_loadOBJMesh(const char* path, BumpAlloc* scratch, gfx_VertexArray** out
                 U32 subSplitCount;
                 str_split(split[i+1], '/', splitArena, &subSplitCount, &subSplit);
                 mem[3*i + 0] = atoi((char*)subSplit[0].chars);
-                mem[3*i + 1] = atoi((char*)subSplit[0].chars);
-                mem[3*i + 2] = atoi((char*)subSplit[0].chars);
+                mem[3*i + 1] = atoi((char*)subSplit[1].chars);
+                mem[3*i + 2] = atoi((char*)subSplit[2].chars);
             }
         }
 
@@ -799,13 +797,28 @@ bool gfx_loadOBJMesh(const char* path, BumpAlloc* scratch, gfx_VertexArray** out
     }
 
 
-    for(int i = 0; i < faceCount; i++) {
-        U32* face = &faceStart[i * 3];
+    float* vaBuf = BUMP_PUSH_ARR(scratch, 5*3*faceCount, float);
+    U32* ibBuf = BUMP_PUSH_ARR(scratch, 3*faceCount, U32);
+
+    for(int i = 0; i < faceCount*3; i++) {
+        U32* idxs = &(faceStart[i*3]);
+        float* vert = &(vaBuf[i*5]);
+
+        float* posData = &(vertStart[(idxs[0]-1) * 3]);
+        vert[0] = posData[0];
+        vert[1] = posData[1];
+        vert[2] = posData[2];
+
+        float* uvData = &(uvStart[(idxs[1]-1) * 2]);
+        vert[3] = uvData[0];
+        vert[4] = uvData[1];
+
+        ibBuf[i] = i;
     }
 
 
-    // *outVA = gfx_registerVertexArray();
-    // *outIB = gfx_registerVertexArray();
+    *outVA = gfx_registerVertexArray(gfx_vtype_POS3F_UV, vaBuf, 5*3*faceCount*sizeof(float), false);
+    *outIB = gfx_registerIndexBuffer(ibBuf, 3*faceCount*sizeof(U32));
     return true;
 }
 

@@ -18,8 +18,10 @@
 struct FieldInfo {
     gfx_Framebuffer* fb = nullptr;
 
-    gfx_VertexArray* va = nullptr;
-    gfx_IndexBuffer* ib = nullptr;
+    gfx_VertexArray* robotVA = nullptr;
+    gfx_IndexBuffer* robotIB = nullptr;
+    gfx_VertexArray* fieldVA = nullptr;
+    gfx_IndexBuffer* fieldIB = nullptr;
 
     gfx_Texture* fieldTex = nullptr;
 
@@ -93,23 +95,17 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
 
 
 
-    bool res = gfx_loadOBJMesh("res/models/Chassis2.obj", frameArena, nullptr, nullptr);
-    ASSERT(res);
 
     globs.fieldInfo.fb = gfx_registerFramebuffer();
 
-    float vaData[] = {
-        -.5, -.5, 0,        0, 0,
-        -.5, 0.5, 0,        0, 1,
-        0.5, 0.5, 0,        1, 1,
-        0.5, -.5, 0,        1, 0
-    };
-    globs.fieldInfo.va = gfx_registerVertexArray(gfx_vtype_POS3F_UV, vaData, sizeof(vaData), false);
+    bool res = gfx_loadOBJMesh("res/models/Chassis2.obj", frameArena, &globs.fieldInfo.robotVA, &globs.fieldInfo.robotIB);
+    ASSERT(res);
+    bump_clear(frameArena);
 
-    U32 ibData[] = {
-        0, 1, 2,
-        2, 3, 0 };
-    globs.fieldInfo.ib = gfx_registerIndexBuffer(ibData, sizeof(ibData) / sizeof(U32));
+    res = gfx_loadOBJMesh("res/models/plane.obj", frameArena, &globs.fieldInfo.fieldVA, &globs.fieldInfo.fieldIB);
+    ASSERT(res);
+    bump_clear(frameArena);
+
 
     data = stbi_load("res/textures/field.png", &w, &h, &bpp, 4);
     ASSERT(data);
@@ -345,9 +341,6 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
     net_Prop* estY = net_hashGet(STR("estY"));
 
     Transform robotTransform = Transform();
-    robotTransform.rx = -90; // CLEANUP/TODO: temp constants, until a model is made
-    robotTransform.sx = 0.711f;
-    robotTransform.sy = 0.711f;
     if(posX && posY && yaw) {
         robotTransform.x = (F32)posX->data->f64;
         robotTransform.z = -(F32)posY->data->f64;
@@ -355,9 +348,6 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
     }
 
     Transform estimateTransform = Transform();
-    estimateTransform.rx = -90;
-    estimateTransform.sx = 0.711f;
-    estimateTransform.sy = 0.711f;
     if(estX && estY && yaw) {
 
         Transform t = Transform();
@@ -435,29 +425,27 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
     b = gfx_registerCall(p);
     b->color = V4f(1, 1, 1, 1);
-    b->ib = info->ib;
-    b->va = info->va;
+    b->ib = info->fieldIB;
+    b->va = info->fieldVA;
     b->texture = info->fieldTex;
 
-    Transform field = Transform(); // TODO/CLEANUP: get a field model
-    field.rx = -90;
-    field.y = -0.2f;
-    field.sx = 16.4846;
-    field.sy = 8.1026;
+    Transform field = Transform(); // TODO: get a field model
+    field.sx = 16.4846 / 2;
+    field.sz = 8.1026 / 2;
     b->model = matrixTransform(field);
 
 
     b = gfx_registerCall(p);
     b->color = V4f(1, 0, 0, 1);
-    b->ib = info->ib;
-    b->va = info->va;
+    b->ib = info->robotIB;
+    b->va = info->robotVA;
     b->model = matrixTransform(robotTransform);
     b->texture = globs.solidTex;
 
     b = gfx_registerCall(p);
     b->color = V4f(1, 0, 0, 0.5);
-    b->ib = info->ib;
-    b->va = info->va;
+    b->ib = info->robotIB;
+    b->va = info->robotVA;
     b->model = matrixTransform(estimateTransform);
     b->texture = globs.solidTex;
 
