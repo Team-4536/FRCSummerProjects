@@ -13,7 +13,13 @@
 
 
 
+#define GRAPH2D_VCOUNT 200
+struct Graph2dInfo {
 
+    float vals[GRAPH2D_VCOUNT] = { 0 };
+
+    gfx_Framebuffer* target = nullptr;
+};
 
 struct FieldInfo {
     gfx_Framebuffer* fb = nullptr;
@@ -58,6 +64,7 @@ static struct UIGlobs {
     FieldInfo fieldInfo = FieldInfo();
     NetInfo netInfo = NetInfo();
     SwerveDriveInfo swerveInfo = SwerveDriveInfo();
+    Graph2dInfo graph2dInfo = Graph2dInfo();
 } globs;
 
 
@@ -131,6 +138,7 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
 
 
 
+    globs.graph2dInfo.target = gfx_registerFramebuffer();
 
 
 
@@ -269,13 +277,6 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
 
 
 
-#define GRAPH2D_VCOUNT 200
-struct Graph2dInfo {
-
-    float vals[GRAPH2D_VCOUNT] = { 0 };
-
-    gfx_Framebuffer* target = nullptr;
-};
 
 void draw_graph2d(Graph2dInfo* info, float dt, float nval) {
 
@@ -297,7 +298,6 @@ void draw_graph2d(Graph2dInfo* info, float dt, float nval) {
             p->target = info->target;
             p->shader = globs.sceneShader2d;
             p->passUniforms.vp = Mat4f(1);
-
 
 
 
@@ -436,13 +436,6 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
 
     b = gfx_registerCall(p);
-    b->color = V4f(1, 0, 0, 1);
-    b->ib = info->robotIB;
-    b->va = info->robotVA;
-    b->model = matrixTransform(robotTransform);
-    b->texture = globs.solidTex;
-
-    b = gfx_registerCall(p);
     b->color = V4f(1, 0, 0, 0.5);
     b->ib = info->robotIB;
     b->va = info->robotVA;
@@ -450,7 +443,12 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
     b->texture = globs.solidTex;
 
 
-
+    b = gfx_registerCall(p);
+    b->color = V4f(1, 0, 0, 1);
+    b->ib = info->robotIB;
+    b->va = info->robotVA;
+    b->model = matrixTransform(robotTransform);
+    b->texture = globs.solidTex;
 }
 
 
@@ -628,7 +626,8 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
 
             blu_styleScope {
             blu_style_add_sizeY({ blu_sizeKind_REMAINDER, 0 });
-                draw_swerveDrive(&globs.swerveInfo, dt);
+                draw_graph2d(&globs.graph2dInfo, dt, 0);
+                // draw_swerveDrive(&globs.swerveInfo, dt);
             }
 
 
