@@ -88,7 +88,7 @@ struct gfx_UniformBlock {
 
     gfx_Texture* texture = nullptr;
     gfx_Texture* fontTexture = nullptr;
-    V4f color = V4f(0, 0, 0, 1);
+    V4f color = V4f(1, 1, 1, 1);
 
     Mat4f model = Mat4f(1);
 
@@ -214,10 +214,10 @@ void gfx_init() {
     globs.quadIb = gfx_registerIndexBuffer(ibData, sizeof(ibData) / sizeof(U32));
 
     F32 vbData[] = {
-        -1, -1,    0, 0, // BL
-        -1,  1,    0, 1, // UL
+        0, 0,    0, 0, // BL
+        0,  1,    0, 1, // UL
         1,  1,    1, 1, // UR
-        1, -1,    1, 0  // BR
+        1, 0,    1, 0  // BR
     };
     globs.quadVa = gfx_registerVertexArray(gfx_vtype_POS2F_UV, vbData, sizeof(vbData), false);
 }

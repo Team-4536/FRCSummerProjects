@@ -33,6 +33,9 @@
 
 F32 lerp(F32 a, F32 b, F32 t);
 
+constexpr F32 radians(F32 d);
+constexpr F32 degrees(F32 r);
+
 
 
 // returns nullptr on failed file open, else pointer to buffer
@@ -167,7 +170,7 @@ inline V4f operator/(F32 b, const V4f& a) {
 
 
 
-
+F32 v2fAngle(const V2f& a);
 F32 v2fDot(const V2f& a, const V2f& b);
 V2f v2fNormalized(const V2f& a); // NOTE: is it good practice to const ref a small struct like vectors?
 
@@ -315,6 +318,13 @@ U8* loadFileToBuffer(const char* path, bool asText, U64* outSize, BumpAlloc* are
 }
 
 
+constexpr F32 radians(F32 d) {
+    return d * M_PI/180;
+}
+constexpr F32 degrees(F32 r) {
+    return r * 180/M_PI;
+}
+
 
 
 F32 lerp(F32 a, F32 b, F32 t) {
@@ -330,6 +340,13 @@ V4f v4f_lerp(V4f a, V4f b, F32 t) {
         lerp(a.w, b.w, t)
     );
 }
+
+
+
+F32 v2fAngle(const V2f& a) {
+    return degrees(-atan2f(a.y, a.x));
+}
+
 
 
 F32 v2fDot(const V2f& a, const V2f& b) {

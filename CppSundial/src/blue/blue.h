@@ -192,6 +192,7 @@ struct blu_WidgetInteraction {
     bool clicked = false;
 
     V2f dragDelta = V2f();
+    V2f mousePos = V2f();
 
     float scrollDelta = 0;
 };
@@ -1034,7 +1035,8 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
 
     out.hovered = area->prevHovered;
     if(out.hovered) {
-        out.scrollDelta = globs.scrollDelta; }
+        out.scrollDelta = globs.scrollDelta;
+    }
 
     if(globs.dragged == area) {
         out.held = true;
@@ -1042,6 +1044,10 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
 
         if(!globs.inputCurLButton && globs.inputPrevLButton) {
             out.clicked = true; }
+    }
+
+    if(out.hovered || globs.dragged == area) {
+        out.mousePos = globs.inputMousePos - area->rect.start;
     }
 
     return out;

@@ -13,12 +13,13 @@
 
 
 
-#define GRAPH2D_VCOUNT 200
+#define GRAPH2D_VCOUNT 800
 struct Graph2dInfo {
 
     float vals[GRAPH2D_VCOUNT] = { 0 };
 
     gfx_Framebuffer* target = nullptr;
+
 };
 
 struct FieldInfo {
@@ -161,6 +162,9 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
         loc = glGetUniformLocation(pass->shader->id, "uSrcEnd");
         glUniform2f(loc, uniforms->srcEnd.x, uniforms->srcEnd.y);
 
+        loc = glGetUniformLocation(pass->shader->id, "uColor");
+        glUniform4f(loc, uniforms->color.x, uniforms->color.y, uniforms->color.z, uniforms->color.w);
+
         loc = glGetUniformLocation(pass->shader->id, "uTexture");
         glUniform1i(loc, 0);
         glActiveTexture(GL_TEXTURE0 + 0);
@@ -278,10 +282,33 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
 
 
 
-void draw_graph2d(Graph2dInfo* info, float dt, float nval) {
+void draw_line(gfx_Pass* p, float thickness, V4f color, V2f start, V2f end) {
+    gfx_UniformBlock* b = gfx_registerCall(p);
+    b->texture = globs.solidTex;
+    b->color = color;
 
-    memmove(info->vals, info->vals+1, GRAPH2D_VCOUNT - 1);
+    Transform t;
+
+    V2f center = (start+end) / 2;
+    t.x = center.x;
+    t.y = center.y;
+    t.sx = (end-start).length();
+    t.sy = 2;
+    t.rz = -v2fAngle(end-start);
+    b->model = matrixTransform(t);
+}
+
+void draw_graph2d(Graph2dInfo* info, float dt) {
+
+    // APPEND NEW VALUE
+    net_Prop* prop = net_hashGet(STR("FLDriveSpeed"));
+    float nval = 0;
+    if(prop) { nval = (F32)prop->data->f64; }
+
+    memmove(info->vals, &(info->vals[1]), (GRAPH2D_VCOUNT-1)*sizeof(float));
     info->vals[GRAPH2D_VCOUNT - 1] = nval;
+
+
 
     blu_Area* a = blu_areaMake(STR("graph2d"), blu_areaFlags_DRAW_BACKGROUND);
     a->style.childLayoutAxis = blu_axis_Y;
@@ -290,18 +317,43 @@ void draw_graph2d(Graph2dInfo* info, float dt, float nval) {
         blu_styleScope {
         blu_style_add_sizeY({blu_sizeKind_REMAINDER});
 
-            a = blu_areaMake(STR("upperBit"), blu_areaFlags_DRAW_TEXTURE);
+            a = blu_areaMake(STR("upperBit"), blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE);
             areaAddFB(a, info->target);
+            float width = info->target->texture->width;
+            float height = info->target->texture->height;
+
             gfx_registerClearPass(col_darkBlue, info->target);
 
             gfx_Pass* p = gfx_registerPass();
             p->target = info->target;
             p->shader = globs.sceneShader2d;
-            p->passUniforms.vp = Mat4f(1);
+            matrixOrtho(0, width, height, 0, 0, 100, p->passUniforms.vp);
 
 
 
-            a = blu_areaMake(STR("lowerBit"), 0);
+            float scaleY = -(height / 2.0f)*0.85f;
+            float offsetY = height / 2.0f;
+            float pointGap = width / (float)GRAPH2D_VCOUNT;
+
+
+            draw_line(p, 1, col_darkGray, { 0, offsetY }, { width, offsetY });
+            draw_line(p, 1, col_darkGray, { 0, offsetY + 1*scaleY}, { width, offsetY + 1*scaleY });
+            draw_line(p, 1, col_darkGray, { 0, offsetY - 1*scaleY}, { width, offsetY - 1*scaleY });
+
+
+            V2f lastPoint = V2f(0, info->vals[0] * scaleY + offsetY);
+            for(int i = 1; i < GRAPH2D_VCOUNT; i++) {
+
+                V4f color = col_lightGray;
+                if(net_getConnected()) { color = col_green; }
+
+                V2f point = { i*pointGap, info->vals[i] * scaleY + offsetY };
+                draw_line(p, 2, color, lastPoint, point);
+
+                lastPoint = point;
+            }
+
+            // a = blu_areaMake(STR("lowerBit"), 0);
         }
 
     }
@@ -386,9 +438,9 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
             blu_areaAddDisplayStr(a, STR("H"));
 
             if(blu_interactionFromWidget(a).clicked) {
-                // HOME TARGET (above the field)
+                // HOME TARGET
                 info->camTarget = {
-                    0, 10, 0,
+                    0, 6, 0,
                     -90, 0, 0,
                     1, 1, 1
                     };
@@ -626,7 +678,10 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
 
             blu_styleScope {
             blu_style_add_sizeY({ blu_sizeKind_REMAINDER, 0 });
-                draw_graph2d(&globs.graph2dInfo, dt, 0);
+
+                draw_graph2d(&globs.graph2dInfo, dt);
+
+
                 // draw_swerveDrive(&globs.swerveInfo, dt);
             }
 
