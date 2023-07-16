@@ -37,6 +37,7 @@ void str_print(str s);
 void str_println(str s);
 void str_printf(str fmt, ...);
 
+
 str str_format(BumpAlloc* arena, str fmt, ...);
 
 
@@ -47,6 +48,16 @@ void str_listAppend(StrList* list, str string, BumpAlloc* arena);
 // copies all strings in s into arena, returns one str that goes over all
 str str_listCollect(StrList s, BumpAlloc* arena);
 // str str_listCollect(StrList s, str sep, BumpAlloc* arena);
+
+
+
+// sets outcount = to an array of substrings in s, with count = outCount
+void str_split(str s, char delim, BumpAlloc* arena, U32* outCount, str** outArr);
+
+
+
+
+
 
 #ifdef BASE_IMPL
 
@@ -310,5 +321,35 @@ str str_listCollect(StrList s, str sep, BumpAlloc* arena) {
     return out;
 }
 */
+
+void str_split(str s, char delim, BumpAlloc* arena, U32* outCount, str** outArr) {
+
+    *outCount = 0;
+    *outArr = (str*)arena->end;
+
+    char* chars = (char*)s.chars;
+    U64 len = 0;
+    char* subStart = chars;
+
+    char* c = chars;
+    for(; c-chars < s.length; c++) {
+        if(*c != delim) { len++; continue; }
+
+        if(len != 0) {
+            str* s = BUMP_PUSH_NEW(arena, str);
+            *s = str { (const U8*)subStart, len };
+            (*outCount)++;
+        }
+
+        len = 0;
+        subStart = c+1;
+    }
+
+    if(*(c-1) != delim) {
+        str* s = BUMP_PUSH_NEW(arena, str);
+        *s = str { (const U8*)subStart, len };
+        (*outCount)++;
+    }
+}
 
 #endif

@@ -1,5 +1,4 @@
 #pragma once
-
 #include "base/utils.h"
 #include "base/config.h"
 #include "base/str.h"
@@ -34,9 +33,9 @@ THE CHECKLIST:
     [X] scrolling
     [X] clipping
     [X] cursor changes
+    [X] rounding
+    [X] borders
     [ ] padding
-    [ ] rounding
-    [ ] borders
     [ ] drop shadows
     [ ] tooltips/dropdowns
     [ ] text input
@@ -114,6 +113,9 @@ enum blu_StyleFlags {
     blu_styleFlags_textColor        = (1 << 5),
     blu_styleFlags_textPadding      = (1 << 6),
     blu_styleFlags_animationStrength= (1 << 7),
+    blu_styleFlags_cornerRadius     = (1 << 8),
+    blu_styleFlags_borderSize       = (1 << 9),
+    blu_styleFlags_borderColor      = (1 << 10),
 };
 
 struct blu_Style {
@@ -125,6 +127,9 @@ struct blu_Style {
     V4f textColor = V4f();
     V2f textPadding = V2f();
     F32 animationStrength = 0;
+    F32 cornerRadius = 0;
+    V4f borderColor = V4f();
+    F32 borderSize = 0;
 };
 struct blu_StyleStackNode {
     blu_Style data = blu_Style();
@@ -191,6 +196,7 @@ struct blu_WidgetInteraction {
     bool clicked = false;
 
     V2f dragDelta = V2f();
+    V2f mousePos = V2f();
 
     float scrollDelta = 0;
 };
@@ -202,8 +208,11 @@ void blu_init(gfx_Texture* solidTex);
 void blu_loadFont(const char* path);
 
 
-blu_Area* blu_areaMake(str string, U32 flags);
+blu_Area* blu_areaMake(str s, U32 flags);
+blu_Area* blu_areaMake(const char* string, U32 flags);
+// TODO: format version
 void blu_areaAddDisplayStr(blu_Area* area, str s);
+void blu_areaAddDisplayStr(blu_Area* area, const char* s);
 
 void blu_pushParent(blu_Area* parent);
 void blu_popParent();
@@ -221,6 +230,9 @@ void blu_style_add_backgroundColor(V4f color);
 void blu_style_add_textColor(V4f color);
 void blu_style_add_textPadding(V2f padding);
 void blu_style_add_animationStrength(F32 s);
+void blu_style_add_cornerRadius(F32 radius);
+void blu_style_add_borderSize(F32 size);
+void blu_style_add_borderColor(V4f color);
 
 void blu_pushStyle();
 void blu_popStyle();
@@ -440,6 +452,11 @@ void _blu_areaUpdate(blu_Area* a) {
 }
 
 
+
+blu_Area* blu_areaMake(const char* string, U32 flags) {
+    return blu_areaMake(str_make(string), flags);
+}
+
 blu_Area* blu_areaMake(str string, U32 flags) {
 
     U64 hashKey = hash_hashStr(string);
@@ -512,6 +529,15 @@ blu_Area* blu_areaMake(str string, U32 flags) {
         if(st->data.overrideFlags & blu_styleFlags_animationStrength) {
             area->style.animationStrength = st->data.animationStrength; }
 
+        if(st->data.overrideFlags & blu_styleFlags_cornerRadius) {
+            area->style.cornerRadius = st->data.cornerRadius; }
+
+        if(st->data.overrideFlags & blu_styleFlags_borderColor) {
+            area->style.borderColor = st->data.borderColor; }
+
+        if(st->data.overrideFlags & blu_styleFlags_borderSize) {
+            area->style.borderSize = st->data.borderSize; }
+
         st = st->next;
     }
 
@@ -536,6 +562,9 @@ blu_Area* blu_areaMake(str string, U32 flags) {
     return area;
 }
 
+void blu_areaAddDisplayStr(blu_Area* area, const char* s) {
+    blu_areaAddDisplayStr(area, str_make(s));
+}
 void blu_areaAddDisplayStr(blu_Area* area, str s) {
     str nstr = str_copy(s, &globs.frameArena);
     area->displayString = nstr;
@@ -840,6 +869,9 @@ void _blu_genRenderCallsRecurse(blu_Area* area, Rect2f clip, gfx_Pass* pass) {
             block->texture = globs.solidTex;
             block->clipStart = clip.start;
             block->clipEnd = clip.end;
+            block->cornerRadius = area->style.cornerRadius;
+            block->borderSize = area->style.borderSize;
+            block->borderColor = area->style.borderColor;
         }
         if (area->flags & blu_areaFlags_DRAW_TEXT) {
 
@@ -869,6 +901,9 @@ void _blu_genRenderCallsRecurse(blu_Area* area, Rect2f clip, gfx_Pass* pass) {
             block->fontTexture = globs.solidTex;
             block->clipStart = clip.start;
             block->clipEnd = clip.end;
+            block->cornerRadius = area->style.cornerRadius;
+            block->borderSize = area->style.borderSize;
+            block->borderColor = area->style.borderColor;
         }
 
 
@@ -921,6 +956,9 @@ _BLU_DEFINE_STYLE_ADD(backgroundColor, V4f)
 _BLU_DEFINE_STYLE_ADD(textColor, V4f)
 _BLU_DEFINE_STYLE_ADD(textPadding, V2f)
 _BLU_DEFINE_STYLE_ADD(animationStrength, F32)
+_BLU_DEFINE_STYLE_ADD(cornerRadius, F32)
+_BLU_DEFINE_STYLE_ADD(borderColor, V4f)
+_BLU_DEFINE_STYLE_ADD(borderSize, F32)
 
 
 
@@ -1032,8 +1070,11 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
 
 
     out.hovered = area->prevHovered;
-    if(out.hovered) {
-        out.scrollDelta = globs.scrollDelta; }
+
+    if(out.hovered || globs.dragged == area) {
+        out.mousePos = globs.inputMousePos - area->rect.start;
+        out.scrollDelta = globs.scrollDelta;
+    }
 
     if(globs.dragged == area) {
         out.held = true;
@@ -1042,6 +1083,7 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
         if(!globs.inputCurLButton && globs.inputPrevLButton) {
             out.clicked = true; }
     }
+
 
     return out;
 }

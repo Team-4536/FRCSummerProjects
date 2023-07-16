@@ -77,6 +77,11 @@ struct gfx_UniformBlock {
 
     // CALL UNIS =========================
 
+    float borderSize = 0;
+    V4f borderColor = V4f();
+
+    float cornerRadius = 0;
+
     V2f dstStart = V2f();
     V2f dstEnd = V2f();
 
@@ -88,7 +93,7 @@ struct gfx_UniformBlock {
 
     gfx_Texture* texture = nullptr;
     gfx_Texture* fontTexture = nullptr;
-    V4f color = V4f(0, 0, 0, 1);
+    V4f color = V4f(1, 1, 1, 1);
 
     Mat4f model = Mat4f(1);
 
@@ -114,7 +119,6 @@ struct gfx_Pass {
 
     gfx_VertexArray* curVa;
     gfx_IndexBuffer* curIb;
-
 
     bool isClearPass = false; // TODO: assert fail on adding calls to clear passes / refactor
 
@@ -162,6 +166,10 @@ gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass);
 
 // draws all passes, clears passes and calls after.
 void gfx_drawPasses(U32 scWidth, U32 scHeight);
+
+bool gfx_loadOBJMesh(const char* path, BumpAlloc* scratch, gfx_VertexArray** outVA, gfx_IndexBuffer** outIB);
+
+
 
 
 #ifdef GFX_IMPL
@@ -211,10 +219,10 @@ void gfx_init() {
     globs.quadIb = gfx_registerIndexBuffer(ibData, sizeof(ibData) / sizeof(U32));
 
     F32 vbData[] = {
-        -1, -1,    0, 0, // BL
-        -1,  1,    0, 1, // UL
+        0, 0,    0, 0, // BL
+        0,  1,    0, 1, // UL
         1,  1,    1, 1, // UR
-        1, -1,    1, 0  // BR
+        1, 0,    1, 0  // BR
     };
     globs.quadVa = gfx_registerVertexArray(gfx_vtype_POS2F_UV, vbData, sizeof(vbData), false);
 }
@@ -544,4 +552,144 @@ void gfx_drawPasses(U32 scWidth, U32 scHeight) {
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+#define PROGRESS_CHECK(num, type, name) \
+    do { \
+    if(progress < num) { \
+        name##Start = (type*)scratch->end; \
+        progress = num; \
+    } \
+    ASSERT(progress == num); \
+    name##Count++; \
+    } while(0) \
+
+
+
+
+// ignores materials and object groupings
+// will probably shit the bed if given a file containing more than one object
+// return indicates success
+bool gfx_loadOBJMesh(const char* path, BumpAlloc* scratch, gfx_VertexArray** outVA, gfx_IndexBuffer** outIB) {
+
+    U64 textSize = 0;
+    U8* text = loadFileToBuffer(path, false, &textSize, scratch);
+    if(!text) { return false; }
+
+
+    // represents which thing you are parsing, triggers an assert fail if out of order
+    // loads need to be in order to ensure contiguity in scratch arena
+    int progress = -1;
+
+    float* vertStart = nullptr;
+    U32 vertCount = 0;
+    float* uvStart = nullptr;
+    U32 uvCount = 0;
+    float* normalStart = nullptr;
+    U32 normalCount = 0;
+    U32* faceStart = nullptr;
+    U32 faceCount = 0;
+
+    U8* lineStart = text;
+    U8* c = text;
+    while(c - text < textSize) {
+        if(*c != '\n') { c++; continue; }
+
+        str splitArr[20] = { 0 };
+        BumpAlloc splitAr = BumpAlloc();
+        BumpAlloc* splitArena = bump_init(&splitAr, sizeof(splitArr), splitArr);
+
+        str* split;
+        U32 splitCount;
+        str_split(str { lineStart, (U32)(c-lineStart) }, ' ', splitArena, &splitCount, &split);
+
+        if(lineStart[0] != 'v' && lineStart[0] != 'f') {
+            lineStart = c+1;
+            c++;
+            continue;
+        }
+
+
+        str type = split[0];
+        if(type.chars[0] == 'v' && type.length == 1) {
+            PROGRESS_CHECK(0, float, vert);
+            float* mem = BUMP_PUSH_ARR(scratch, 3, float);
+            mem[0] = atof((char*)((split[1]).chars));
+            mem[1] = atof((char*)((split[2]).chars));
+            mem[2] = atof((char*)((split[3]).chars));
+        }
+        else if(type.chars[0] == 'v' && type.chars[1] == 't' && type.length == 2) {
+            PROGRESS_CHECK(1, float, uv);
+            float* mem = BUMP_PUSH_ARR(scratch, 2, float);
+            mem[0] = atof((char*)((split[1]).chars));
+            mem[1] = atof((char*)((split[2]).chars));
+        }
+        else if(type.chars[0] == 'v' && type.chars[1] == 'n' && type.length == 2) {
+            PROGRESS_CHECK(2, float, normal);
+            float* mem = BUMP_PUSH_ARR(scratch, 3, float);
+            mem[0] = atof((char*)((split[1]).chars));
+            mem[1] = atof((char*)((split[2]).chars));
+            mem[2] = atof((char*)((split[3]).chars));
+        }
+        else if(type.chars[0] == 'f' && type.length == 1) {
+            PROGRESS_CHECK(3, U32, face);
+            U32* mem = BUMP_PUSH_ARR(scratch, 9, U32);
+            for(int i = 0; i < 3; i++) {
+                str* subSplit;
+                U32 subSplitCount;
+                str_split(split[i+1], '/', splitArena, &subSplitCount, &subSplit);
+                mem[3*i + 0] = atoi((char*)subSplit[0].chars);
+                mem[3*i + 1] = atoi((char*)subSplit[1].chars);
+                mem[3*i + 2] = atoi((char*)subSplit[2].chars);
+            }
+        }
+
+        lineStart = c+1;
+        c++;
+    }
+
+
+    float* vaBuf = BUMP_PUSH_ARR(scratch, 5*3*faceCount, float);
+    U32* ibBuf = BUMP_PUSH_ARR(scratch, 3*faceCount, U32);
+
+    for(int i = 0; i < faceCount*3; i++) {
+        U32* idxs = &(faceStart[i*3]);
+        float* vert = &(vaBuf[i*5]);
+
+        float* posData = &(vertStart[(idxs[0]-1) * 3]);
+        vert[0] = posData[0];
+        vert[1] = posData[1];
+        vert[2] = posData[2];
+
+        float* uvData = &(uvStart[(idxs[1]-1) * 2]);
+        vert[3] = uvData[0];
+        vert[4] = uvData[1];
+
+        ibBuf[i] = i;
+    }
+
+
+    *outVA = gfx_registerVertexArray(gfx_vtype_POS3F_UV, vaBuf, 5*3*faceCount*sizeof(float), false);
+    *outIB = gfx_registerIndexBuffer(ibBuf, 3*faceCount*sizeof(U32));
+    return true;
+}
+
+
+// TODO: binary format and transfer func
+
+#undef PARSE_FLOAT
+#undef PROGRESS_CHECK
+
 #endif
+
+

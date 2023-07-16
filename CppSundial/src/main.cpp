@@ -43,7 +43,7 @@ int main() {
     BumpAlloc lifetimeArena;
     BumpAlloc frameArena;
     bump_allocate(&lifetimeArena, 1000000);
-    bump_allocate(&frameArena, 1000000);
+    bump_allocate(&frameArena, 10000000);
 
 
     GLFWwindow* window = nullptr;
@@ -129,6 +129,15 @@ int main() {
 
         blueShader->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
             int loc;
+
+            loc = glGetUniformLocation(pass->shader->id, "uBorderColor");
+            glUniform4f(loc, uniforms->borderColor.x, uniforms->borderColor.y, uniforms->borderColor.z, uniforms->borderColor.w);
+
+            loc = glGetUniformLocation(pass->shader->id, "uBorderSize");
+            glUniform1f(loc, uniforms->borderSize);
+
+            loc = glGetUniformLocation(pass->shader->id, "uCornerRadius");
+            glUniform1f(loc, uniforms->cornerRadius);
 
             loc = glGetUniformLocation(pass->shader->id, "uDstStart");
             glUniform2f(loc, uniforms->dstStart.x, uniforms->dstStart.y);
