@@ -19,7 +19,8 @@ struct Graph2dInfo {
     float vals[GRAPH2D_VCOUNT] = { 0 };
 
     gfx_Framebuffer* target = nullptr;
-
+    float yScale = 1;
+    float yOffset = 0;
 };
 
 struct FieldInfo {
@@ -139,6 +140,7 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
 
 
 
+    globs.graph2dInfo = Graph2dInfo();
     globs.graph2dInfo.target = gfx_registerFramebuffer();
 
 
@@ -206,7 +208,7 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
 
 void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
 
-    blu_Area* a = blu_areaMake(STR("swerveDisplay"), blu_areaFlags_DRAW_TEXTURE);
+    blu_Area* a = blu_areaMake("swerveDisplay", blu_areaFlags_DRAW_TEXTURE);
     a->texture = info->target->texture;
 
     areaAddFB(a, info->target);
@@ -310,14 +312,14 @@ void draw_graph2d(Graph2dInfo* info, float dt) {
 
 
 
-    blu_Area* a = blu_areaMake(STR("graph2d"), blu_areaFlags_DRAW_BACKGROUND);
+    blu_Area* a = blu_areaMake("graph2d", blu_areaFlags_DRAW_BACKGROUND);
     a->style.childLayoutAxis = blu_axis_Y;
 
     blu_parentScope(a) {
         blu_styleScope {
         blu_style_add_sizeY({blu_sizeKind_REMAINDER});
 
-            a = blu_areaMake(STR("upperBit"), blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE);
+            a = blu_areaMake("upperBit", blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE);
             areaAddFB(a, info->target);
             float width = info->target->texture->width;
             float height = info->target->texture->height;
@@ -331,23 +333,27 @@ void draw_graph2d(Graph2dInfo* info, float dt) {
 
 
 
-            float scaleY = -(height / 2.0f)*0.85f;
-            float offsetY = height / 2.0f;
+
+            info->yScale += -blu_interactionFromWidget(a).scrollDelta * 10;
+            info->yScale = max(0, info->yScale);
+            info->yOffset += blu_interactionFromWidget(a).dragDelta.y;
+
+            float scale = -info->yScale;
+            float offset = info->yOffset + height/2;
             float pointGap = width / (float)GRAPH2D_VCOUNT;
 
+            draw_line(p, 1, col_darkGray, { 0, offset }, { width, offset });
+            draw_line(p, 1, col_darkGray, { 0, offset + 1*scale}, { width, offset + 1*scale });
+            draw_line(p, 1, col_darkGray, { 0, offset - 1*scale}, { width, offset - 1*scale });
 
-            draw_line(p, 1, col_darkGray, { 0, offsetY }, { width, offsetY });
-            draw_line(p, 1, col_darkGray, { 0, offsetY + 1*scaleY}, { width, offsetY + 1*scaleY });
-            draw_line(p, 1, col_darkGray, { 0, offsetY - 1*scaleY}, { width, offsetY - 1*scaleY });
 
-
-            V2f lastPoint = V2f(0, info->vals[0] * scaleY + offsetY);
+            V2f lastPoint = V2f(0, info->vals[0] * scale + offset);
             for(int i = 1; i < GRAPH2D_VCOUNT; i++) {
 
                 V4f color = col_lightGray;
                 if(net_getConnected()) { color = col_green; }
 
-                V2f point = { i*pointGap, info->vals[i] * scaleY + offsetY };
+                V2f point = { i*pointGap, info->vals[i] * scale + offset };
                 draw_line(p, 2, color, lastPoint, point);
 
                 lastPoint = point;
@@ -411,7 +417,7 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
 
 
-    blu_Area* a = blu_areaMake(STR("fieldDisplay"), blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE);
+    blu_Area* a = blu_areaMake("fieldDisplay", blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE);
     a->texture = info->fb->texture;
 
     V2f delta = blu_interactionFromWidget(a).dragDelta;
@@ -426,16 +432,16 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
     blu_parentScope(a) {
         blu_styleScope {
-        blu_style_add_sizeX({ blu_sizeKind_PX, 50 });
-        blu_style_add_sizeY({ blu_sizeKind_PX, 50 });
+        blu_style_add_sizeX({ blu_sizeKind_TEXT, 50 });
+        blu_style_add_sizeY({ blu_sizeKind_TEXT, 50 });
 
             // TODO: button textures
-            a = blu_areaMake(STR("homeButton"), blu_areaFlags_CLICKABLE | blu_areaFlags_CENTER_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_FLOATING | blu_areaFlags_HOVER_ANIM);
+            a = blu_areaMake("homeButton", blu_areaFlags_CLICKABLE | blu_areaFlags_CENTER_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_FLOATING | blu_areaFlags_HOVER_ANIM);
             a->offset = V2f(0, 0);
             a->cursor = blu_cursor_hand;
             V4f tra = V4f(1, 1, 1, 0.5f);
             a->style.backgroundColor = v4f_lerp(col_darkGray * tra, col_white * tra, a->target_hoverAnim);
-            blu_areaAddDisplayStr(a, STR("H"));
+            blu_areaAddDisplayStr(a, "Home");
 
             if(blu_interactionFromWidget(a).clicked) {
                 // HOME TARGET
@@ -638,7 +644,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
     blu_style_add_textColor(col_white);
     blu_style_add_sizeX({ blu_sizeKind_PERCENT, 1 });
     blu_style_add_sizeY({ blu_sizeKind_PERCENT, 1 });
-    blu_style_add_textPadding(V2f(3, 3));
+    blu_style_add_textPadding(V2f(4, 4));
     blu_style_add_animationStrength(0.1f);
 
 
@@ -658,7 +664,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
         }
 
 
-        a = blu_areaMake(STR("XresizeBar"), blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
+        a = blu_areaMake("XresizeBar", blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
         a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 3 };
 
         blu_WidgetInteraction inter = blu_interactionFromWidget(a);
@@ -669,7 +675,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
 
 
 
-        a = blu_areaMake(STR("rightParent"), 0);
+        a = blu_areaMake("rightParent", 0);
         a->style.sizes[blu_axis_X] = {blu_sizeKind_PX, globs.rightSize };
         a->style.childLayoutAxis = blu_axis_Y;
 
@@ -686,7 +692,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
             }
 
 
-            a = blu_areaMake(STR("YresizeBar"), blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
+            a = blu_areaMake("YresizeBar", blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
             a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, 3 };
 
             blu_WidgetInteraction inter = blu_interactionFromWidget(a);

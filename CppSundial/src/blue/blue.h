@@ -52,8 +52,6 @@ TESTING CHECKLIST:
 [ ] make a fuzzing thing
 */
 
-// TODO: get rid of str on outward functions
-
 
 enum blu_Axis{
     blu_axis_X,
@@ -204,8 +202,11 @@ void blu_init(gfx_Texture* solidTex);
 void blu_loadFont(const char* path);
 
 
-blu_Area* blu_areaMake(str string, U32 flags);
+blu_Area* blu_areaMake(str s, U32 flags);
+blu_Area* blu_areaMake(const char* string, U32 flags);
+// TODO: format version
 void blu_areaAddDisplayStr(blu_Area* area, str s);
+void blu_areaAddDisplayStr(blu_Area* area, const char* s);
 
 void blu_pushParent(blu_Area* parent);
 void blu_popParent();
@@ -442,6 +443,11 @@ void _blu_areaUpdate(blu_Area* a) {
 }
 
 
+
+blu_Area* blu_areaMake(const char* string, U32 flags) {
+    return blu_areaMake(str_make(string), flags);
+}
+
 blu_Area* blu_areaMake(str string, U32 flags) {
 
     U64 hashKey = hash_hashStr(string);
@@ -538,6 +544,9 @@ blu_Area* blu_areaMake(str string, U32 flags) {
     return area;
 }
 
+void blu_areaAddDisplayStr(blu_Area* area, const char* s) {
+    blu_areaAddDisplayStr(area, str_make(s));
+}
 void blu_areaAddDisplayStr(blu_Area* area, str s) {
     str nstr = str_copy(s, &globs.frameArena);
     area->displayString = nstr;
@@ -1034,7 +1043,9 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
 
 
     out.hovered = area->prevHovered;
-    if(out.hovered) {
+
+    if(out.hovered || globs.dragged == area) {
+        out.mousePos = globs.inputMousePos - area->rect.start;
         out.scrollDelta = globs.scrollDelta;
     }
 
@@ -1046,9 +1057,6 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
             out.clicked = true; }
     }
 
-    if(out.hovered || globs.dragged == area) {
-        out.mousePos = globs.inputMousePos - area->rect.start;
-    }
 
     return out;
 }
