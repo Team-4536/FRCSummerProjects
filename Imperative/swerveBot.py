@@ -5,7 +5,7 @@ import math
 import navx
 
 from inputs import FlymerInputs
-from real import V2f
+from real import V2f, angleWrap
 from swerveController import SwerveController
 from telemetryHelp import publishExpression
 from virtualGyro import VirtualGyro
@@ -159,7 +159,7 @@ class SwerveBot(wpilib.TimedRobot):
         move = diff * speed
 
         nextAngle = self.anglePath[self.pathIdx]
-        turn = (nextAngle - self.gyro.getYaw()) * 0.03
+        turn = angleWrap(nextAngle - self.gyro.getYaw()) * 0.03
 
         if((pose - nextPt).getLength() < 0.6): self.pathIdx += 1
 
