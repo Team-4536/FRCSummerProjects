@@ -437,7 +437,7 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
             // TODO: button textures
             a = blu_areaMake("homeButton", blu_areaFlags_CLICKABLE | blu_areaFlags_CENTER_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_FLOATING | blu_areaFlags_HOVER_ANIM);
-            a->offset = V2f(0, 0);
+            a->offset = V2f(5, 5);
             a->cursor = blu_cursor_hand;
             V4f tra = V4f(1, 1, 1, 0.5f);
             a->style.backgroundColor = v4f_lerp(col_darkGray * tra, col_white * tra, a->target_hoverAnim);
@@ -568,13 +568,14 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                 for(int i = 0; i < tCount; i++) {
                     net_Prop* prop = tracked[i];
 
-                    a = blu_areaMake(prop->name, 0);
+                    a = blu_areaMake(prop->name, blu_areaFlags_DRAW_BACKGROUND);
+                    a->style.backgroundColor = col_darkBlue;
+                    a->style.borderSize = 1;
+                    a->style.borderColor = col_black;
 
                     blu_parentScope(a) {
                         blu_styleScope {
                         blu_style_add_sizeX({ blu_sizeKind_PERCENT, 0.5 });
-                        blu_style_add_borderSize(1);
-                        blu_style_add_borderColor(col_black);
 
                             a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
 
