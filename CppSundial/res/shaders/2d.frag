@@ -6,9 +6,10 @@ out vec4 color;
 in vec2 vUv;
 
 uniform sampler2D uTexture;
+uniform vec4 uColor;
 
 void main()
 {
-    color = texture(uTexture, vUv);
+    color = uColor * texture(uTexture, vUv);
     if (color.a <= 0.01) { discard; }
 };

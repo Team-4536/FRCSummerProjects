@@ -13,13 +13,23 @@
 
 
 
+#define GRAPH2D_VCOUNT 800
+struct Graph2dInfo {
 
+    float vals[GRAPH2D_VCOUNT] = { 0 };
+
+    gfx_Framebuffer* target = nullptr;
+    float yScale = 1;
+    float yOffset = 0;
+};
 
 struct FieldInfo {
     gfx_Framebuffer* fb = nullptr;
 
-    gfx_VertexArray* va = nullptr;
-    gfx_IndexBuffer* ib = nullptr;
+    gfx_VertexArray* robotVA = nullptr;
+    gfx_IndexBuffer* robotIB = nullptr;
+    gfx_VertexArray* fieldVA = nullptr;
+    gfx_IndexBuffer* fieldIB = nullptr;
 
     gfx_Texture* fieldTex = nullptr;
 
@@ -56,10 +66,29 @@ static struct UIGlobs {
     FieldInfo fieldInfo = FieldInfo();
     NetInfo netInfo = NetInfo();
     SwerveDriveInfo swerveInfo = SwerveDriveInfo();
+    Graph2dInfo graph2dInfo = Graph2dInfo();
 } globs;
 
 
 
+
+// TEMP:
+// adds a framebuffer to an area, and resizes based on area size
+// doesnt rezise if area is <= 0 on either axis
+void areaAddFB(blu_Area* area, gfx_Framebuffer* target) {
+
+    area->flags |= blu_areaFlags_DRAW_TEXTURE;
+    area->texture = target->texture;
+
+    // CLEANUP: there are like 6 different instances of this exact piece of code
+    int w = (int)area->calculatedSizes[blu_axis_X];
+    int h = (int)area->calculatedSizes[blu_axis_Y];
+    if(w != target->texture->width || h != target->texture->height) {
+        if(w > 0 && h > 0) {
+            gfx_resizeFramebuffer(target, w, h);
+        }
+    }
+}
 
 
 
@@ -74,20 +103,18 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
 
 
 
+
+
     globs.fieldInfo.fb = gfx_registerFramebuffer();
 
-    float vaData[] = {
-        -.5, -.5, 0,        0, 0,
-        -.5, 0.5, 0,        0, 1,
-        0.5, 0.5, 0,        1, 1,
-        0.5, -.5, 0,        1, 0
-    };
-    globs.fieldInfo.va = gfx_registerVertexArray(gfx_vtype_POS3F_UV, vaData, sizeof(vaData), false);
+    bool res = gfx_loadOBJMesh("res/models/Chassis2.obj", frameArena, &globs.fieldInfo.robotVA, &globs.fieldInfo.robotIB);
+    ASSERT(res);
+    bump_clear(frameArena);
 
-    U32 ibData[] = {
-        0, 1, 2,
-        2, 3, 0 };
-    globs.fieldInfo.ib = gfx_registerIndexBuffer(ibData, sizeof(ibData) / sizeof(U32));
+    res = gfx_loadOBJMesh("res/models/plane.obj", frameArena, &globs.fieldInfo.fieldVA, &globs.fieldInfo.fieldIB);
+    ASSERT(res);
+    bump_clear(frameArena);
+
 
     data = stbi_load("res/textures/field.png", &w, &h, &bpp, 4);
     ASSERT(data);
@@ -113,6 +140,8 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
 
 
 
+    globs.graph2dInfo = Graph2dInfo();
+    globs.graph2dInfo.target = gfx_registerFramebuffer();
 
 
 
@@ -134,6 +163,9 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
         glUniform2f(loc, uniforms->srcStart.x, uniforms->srcStart.y);
         loc = glGetUniformLocation(pass->shader->id, "uSrcEnd");
         glUniform2f(loc, uniforms->srcEnd.x, uniforms->srcEnd.y);
+
+        loc = glGetUniformLocation(pass->shader->id, "uColor");
+        glUniform4f(loc, uniforms->color.x, uniforms->color.y, uniforms->color.z, uniforms->color.w);
 
         loc = glGetUniformLocation(pass->shader->id, "uTexture");
         glUniform1i(loc, 0);
@@ -174,39 +206,29 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
 
 
 
-
-
-
-
-// TODO: scale when to small horizontally
 void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
 
-    blu_Area* a = blu_areaMake(STR("swerveDisplay"), blu_areaFlags_DRAW_TEXTURE);
+    blu_Area* a = blu_areaMake("swerveDisplay", blu_areaFlags_DRAW_TEXTURE);
     a->texture = info->target->texture;
 
-    int w = (int)a->calculatedSizes[blu_axis_X];
-    int h = (int)a->calculatedSizes[blu_axis_Y];
+    areaAddFB(a, info->target);
 
-    if(w != info->target->texture->width || h != info->target->texture->height) {
-        if(w > 0 && h > 0) {
-            gfx_resizeFramebuffer(info->target, w, h);
-        }
-    }
-
-
-    gfx_Pass* p = gfx_registerPass();
-    p->isClearPass = true;
-    p->target = info->target;
-    p->passUniforms.color = col_darkBlue;
+    gfx_Pass* p = gfx_registerClearPass(col_darkBlue, info->target);
 
     p = gfx_registerPass();
     p->target = info->target;
     p->shader = globs.sceneShader2d;
-    p->passUniforms.vp = Mat4f(1);
-    float height = 4;
-    float width = height * ((float)w/h);
-    if(h != 0) { matrixOrtho(-width/2, width/2, -height/2, height/2, 0, 10000, p->passUniforms.vp); }
 
+    float aspect = ((float)info->target->texture->width/info->target->texture->height);
+    float size = 4;
+    float width = size * aspect;
+    float height = size;
+
+    if(aspect < 1) {
+        width = 4;
+        height = width * (1/aspect);
+    }
+    matrixOrtho(-width/2, width/2, -height/2, height/2, 0, 10000, p->passUniforms.vp);
 
 
     V2f translations[] = {
@@ -215,6 +237,8 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
         { -1, -1},
         { 1, -1 }
     };
+
+    // TODO: hash get is not typesafe
     net_Prop* props[] = {
         net_hashGet(STR("FLSteerPos")),
         net_hashGet(STR("FRSteerPos")),
@@ -222,7 +246,7 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
         net_hashGet(STR("BRSteerPos"))
     };
 
-    net_Prop* angle = net_hashGet(STR("Yaw"));
+    net_Prop* angle = net_hashGet(STR("yaw"));
 
     Mat4f temp;
 
@@ -259,28 +283,83 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
 
 
 
-#define GRAPH2D_VCOUNT 200
-struct Graph2dInfo {
 
-    float vals[GRAPH2D_VCOUNT] = { 0 };
-};
+void draw_line(gfx_Pass* p, float thickness, V4f color, V2f start, V2f end) {
+    gfx_UniformBlock* b = gfx_registerCall(p);
+    b->texture = globs.solidTex;
+    b->color = color;
 
-void draw_graph2d(Graph2dInfo* info, float dt, float nval) {
+    Transform t;
 
-    memmove(info->vals, info->vals+1, GRAPH2D_VCOUNT - 1);
+    V2f center = (start+end) / 2;
+    t.x = center.x;
+    t.y = center.y;
+    t.sx = (end-start).length();
+    t.sy = 2;
+    t.rz = -v2fAngle(end-start);
+    b->model = matrixTransform(t);
+}
+
+void draw_graph2d(Graph2dInfo* info, float dt) {
+
+    // APPEND NEW VALUE
+    net_Prop* prop = net_hashGet(STR("FLDriveSpeed"));
+    float nval = 0;
+    if(prop) { nval = (F32)prop->data->f64; }
+
+    memmove(info->vals, &(info->vals[1]), (GRAPH2D_VCOUNT-1)*sizeof(float));
     info->vals[GRAPH2D_VCOUNT - 1] = nval;
 
 
-    blu_Area* a = blu_areaMake(STR("graph2d"), blu_areaFlags_DRAW_BACKGROUND);
+
+    blu_Area* a = blu_areaMake("graph2d", blu_areaFlags_DRAW_BACKGROUND);
     a->style.childLayoutAxis = blu_axis_Y;
 
     blu_parentScope(a) {
         blu_styleScope {
         blu_style_add_sizeY({blu_sizeKind_REMAINDER});
 
-            a = blu_areaMake(STR("upperBit"), 0);
+            a = blu_areaMake("upperBit", blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE);
+            areaAddFB(a, info->target);
+            float width = info->target->texture->width;
+            float height = info->target->texture->height;
 
-            a = blu_areaMake(STR("lowerBit"), 0);
+            gfx_registerClearPass(col_darkBlue, info->target);
+
+            gfx_Pass* p = gfx_registerPass();
+            p->target = info->target;
+            p->shader = globs.sceneShader2d;
+            matrixOrtho(0, width, height, 0, 0, 100, p->passUniforms.vp);
+
+
+
+
+            info->yScale += -blu_interactionFromWidget(a).scrollDelta * 10;
+            info->yScale = max(0, info->yScale);
+            info->yOffset += blu_interactionFromWidget(a).dragDelta.y;
+
+            float scale = -info->yScale;
+            float offset = info->yOffset + height/2;
+            float pointGap = width / (float)GRAPH2D_VCOUNT;
+
+            draw_line(p, 1, col_darkGray, { 0, offset }, { width, offset });
+            draw_line(p, 1, col_darkGray, { 0, offset + 1*scale}, { width, offset + 1*scale });
+            draw_line(p, 1, col_darkGray, { 0, offset - 1*scale}, { width, offset - 1*scale });
+
+
+            V2f lastPoint = V2f(0, info->vals[0] * scale + offset);
+            for(int i = 1; i < GRAPH2D_VCOUNT; i++) {
+
+                V4f color = col_lightGray;
+                if(net_getConnected()) { color = col_green; }
+
+                V2f point = { i*pointGap, info->vals[i] * scale + offset };
+                draw_line(p, 2, color, lastPoint, point);
+
+                lastPoint = point;
+            }
+
+            // a = blu_areaMake(STR("lowerBit"), 0);
         }
 
     }
@@ -290,6 +369,14 @@ void draw_graph2d(Graph2dInfo* info, float dt, float nval) {
 
 // TODO: make controls not apply unless field is "selected"
 // TODO: robot follow mode
+
+blu_WidgetInteraction makeButton(str text, V4f hoverColor) {
+    // TODO: button textures
+    blu_Area* a = blu_areaMake(text, blu_areaFlags_CLICKABLE | blu_areaFlags_CENTER_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM);
+    a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, hoverColor, a->target_hoverAnim);
+    blu_areaAddDisplayStr(a, text);
+    return blu_interactionFromWidget(a);
+}
 
 void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
@@ -312,17 +399,14 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
 
 
-    net_Prop* posX = net_hashGet(STR("PosX"));
-    net_Prop* posY = net_hashGet(STR("PosY"));
-    net_Prop* yaw = net_hashGet(STR("Yaw"));
+    net_Prop* posX = net_hashGet(STR("posX"));
+    net_Prop* posY = net_hashGet(STR("posY"));
+    net_Prop* yaw = net_hashGet(STR("yaw"));
 
-    net_Prop* estX = net_hashGet(STR("EstX"));
-    net_Prop* estY = net_hashGet(STR("EstY"));
+    net_Prop* estX = net_hashGet(STR("estX"));
+    net_Prop* estY = net_hashGet(STR("estY"));
 
     Transform robotTransform = Transform();
-    robotTransform.rx = -90; // CLEANUP/TODO: temp constants, until a model is made
-    robotTransform.sx = 0.711f;
-    robotTransform.sy = 0.711f;
     if(posX && posY && yaw) {
         robotTransform.x = (F32)posX->data->f64;
         robotTransform.z = -(F32)posY->data->f64;
@@ -330,9 +414,6 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
     }
 
     Transform estimateTransform = Transform();
-    estimateTransform.rx = -90;
-    estimateTransform.sx = 0.711f;
-    estimateTransform.sy = 0.711f;
     if(estX && estY && yaw) {
 
         Transform t = Transform();
@@ -344,61 +425,63 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
 
 
-    blu_Area* a = blu_areaMake(STR("fieldDisplay"), blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE);
+    blu_Area* a = blu_areaMake("fieldDisplay", blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE);
     a->texture = info->fb->texture;
 
     V2f delta = blu_interactionFromWidget(a).dragDelta;
     info->camTarget.ry -= delta.x * 0.5f;
     info->camTarget.rx -= delta.y * 0.5f;
 
-    int w = (int)a->calculatedSizes[blu_axis_X];
-    int h = (int)a->calculatedSizes[blu_axis_Y];
+    areaAddFB(a, info->fb);
 
-    if(w != info->fb->texture->width || h != info->fb->texture->height) {
-        if(w > 0 && h > 0) {
-            gfx_resizeFramebuffer(info->fb, w, h);
-        }
-    }
-
+    Mat4f proj = Mat4f(1.0f);
+    matrixPerspective(90, (float)info->fb->texture->width / info->fb->texture->height, 0.01, 1000000, proj);
 
 
     blu_parentScope(a) {
         blu_styleScope {
-        blu_style_add_sizeX({ blu_sizeKind_PX, 50 });
-        blu_style_add_sizeY({ blu_sizeKind_PX, 50 });
+        blu_style_add_sizeX({ blu_sizeKind_TEXT, 50 });
+        blu_style_add_sizeY({ blu_sizeKind_TEXT, 50 });
+        blu_style_add_borderColor(col_black);
+        blu_style_add_borderSize(1);
+        blu_style_add_cornerRadius(2);
+        blu_style_add_backgroundColor(col_darkGray * V4f(1, 1, 1, 0.75f));
 
-            // TODO: button textures
-            a = blu_areaMake(STR("homeButton"), blu_areaFlags_CLICKABLE | blu_areaFlags_CENTER_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_FLOATING | blu_areaFlags_HOVER_ANIM);
-            a->offset = V2f(0, 0);
-            a->cursor = blu_cursor_hand;
-            V4f tra = V4f(1, 1, 1, 0.5f);
-            a->style.backgroundColor = v4f_lerp(col_darkGray * tra, col_white * tra, a->target_hoverAnim);
-            blu_areaAddDisplayStr(a, STR("H"));
+            a = blu_areaMake("buttonParent", blu_areaFlags_FLOATING);
+            a->style.sizes[blu_axis_X] = { blu_sizeKind_PERCENT, 1 };
+            a->offset = V2f(5, 5);
+            blu_parentScope(a) {
 
-            if(blu_interactionFromWidget(a).clicked) {
-                // HOME TARGET (above the field)
-                info->camTarget = {
-                    0, 10, 0,
-                    -90, 0, 0,
-                    1, 1, 1
-                    };
+                if(makeButton(STR("Home"), col_white).clicked) {
+                    info->camTarget = {
+                        0, 6, 0,
+                        -90, 0, 0,
+                        1, 1, 1
+                        };
+                }
+                if(makeButton(STR("Blue"), col_white).clicked) {
+                    info->camTarget = {
+                        -4, 7, 0,
+                        -75, -90, 0,
+                        1, 1, 1
+                        };
+                }
+                if(makeButton(STR("Red"), col_white).clicked) {
+                    info->camTarget = {
+                        4, 7, 0,
+                        -75, 90, 0,
+                        1, 1, 1
+                        };
+                }
             }
+
         }
     }
 
 
 
+    gfx_Pass* p = gfx_registerClearPass(col_darkBlue, info->fb);
 
-    gfx_Pass* p = gfx_registerPass();
-    p->isClearPass = true;
-    p->target = info->fb;
-    p->passUniforms.color = col_darkBlue;
-
-
-
-    Mat4f proj = Mat4f(1.0f);
-    if(h != 0) {
-        matrixPerspective(90, (float)w / h, 0.01, 1000000, proj); }
 
     // CLEANUP: transform lerp func, also quaternions would be cool
     float followStrength = 0.1f;
@@ -424,34 +507,30 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
     b = gfx_registerCall(p);
     b->color = V4f(1, 1, 1, 1);
-    b->ib = info->ib;
-    b->va = info->va;
+    b->ib = info->fieldIB;
+    b->va = info->fieldVA;
     b->texture = info->fieldTex;
 
-    Transform field = Transform(); // TODO/CLEANUP: get a field model
-    field.rx = -90;
-    field.y = -0.2f;
-    field.sx = 16.4846;
-    field.sy = 8.1026;
+    Transform field = Transform(); // TODO: get a field model
+    field.sx = 16.4846 / 2;
+    field.sz = 8.1026 / 2;
     b->model = matrixTransform(field);
 
 
     b = gfx_registerCall(p);
-    b->color = V4f(1, 0, 0, 1);
-    b->ib = info->ib;
-    b->va = info->va;
-    b->model = matrixTransform(robotTransform);
-    b->texture = globs.solidTex;
-
-    b = gfx_registerCall(p);
     b->color = V4f(1, 0, 0, 0.5);
-    b->ib = info->ib;
-    b->va = info->va;
+    b->ib = info->robotIB;
+    b->va = info->robotVA;
     b->model = matrixTransform(estimateTransform);
     b->texture = globs.solidTex;
 
 
-
+    b = gfx_registerCall(p);
+    b->color = V4f(1, 0, 0, 1);
+    b->ib = info->robotIB;
+    b->va = info->robotVA;
+    b->model = matrixTransform(robotTransform);
+    b->texture = globs.solidTex;
 }
 
 
@@ -465,10 +544,35 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
     blu_Area* a;
 
+    blu_styleScope {
+    blu_style_add_sizeY({ blu_sizeKind_TEXT, 0 });
+    blu_style_add_childLayoutAxis(blu_axis_X);
+    blu_style_add_backgroundColor(col_darkGray);
+        a = blu_areaMake(STR("FPS"), blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
+        str n = str_format(scratch, STR("FPS: %f"), 1/dt);
+        blu_areaAddDisplayStr(a, n);
+
+        a = blu_areaMake(STR("connectionStatus"), blu_areaFlags_DRAW_BACKGROUND);
+        blu_parentScope(a) {
+            a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
+            blu_areaAddDisplayStr(a, STR("Network status: "));
+            a->style.sizes[blu_axis_X] = { blu_sizeKind_TEXT, 0 };
+
+            a = blu_areaMake(STR("box"), blu_areaFlags_DRAW_BACKGROUND);
+            a->style.backgroundColor = col_red;
+            a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
+            a->style.cornerRadius = 2;
+            if(net_getConnected()) {
+                a->style.backgroundColor = col_green; }
+        } // end connection parent
+    }
+
+
     a = blu_areaMake(STR("left"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
     info->clipSize = a->calculatedSizes[blu_axis_Y];
     a->style.childLayoutAxis = blu_axis_X;
     blu_parentScope(a) {
+
 
         a = blu_areaMake(STR("clip"), blu_areaFlags_VIEW_OFFSET | blu_areaFlags_CLICKABLE);
         blu_Area* clip = a;
@@ -482,25 +586,6 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
             blu_style_add_childLayoutAxis(blu_axis_X);
             blu_style_add_backgroundColor(col_darkGray);
 
-                a = blu_areaMake(STR("FPS"), blu_areaFlags_DRAW_TEXT);
-                str n = str_format(scratch, STR("FPS: %f"), 1/dt);
-                blu_areaAddDisplayStr(a, n);
-
-                a = blu_areaMake(STR("connectionStatus"), blu_areaFlags_DRAW_BACKGROUND);
-                blu_parentScope(a) {
-                    a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
-                    blu_areaAddDisplayStr(a, STR("Network status: "));
-                    a->style.sizes[blu_axis_X] = { blu_sizeKind_TEXT, 0 };
-
-                    a = blu_areaMake(STR("spacer"), 0);
-                    a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
-
-                    a = blu_areaMake(STR("box"), blu_areaFlags_DRAW_BACKGROUND);
-                    a->style.backgroundColor = col_red;
-                    a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 100 };
-                    if(net_getConnected()) {
-                        a->style.backgroundColor = col_green; }
-                } // end connection parent
 
 
                 net_Prop** tracked;
@@ -509,22 +594,35 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                 for(int i = 0; i < tCount; i++) {
                     net_Prop* prop = tracked[i];
 
-                    a = blu_areaMake(prop->name, 0);
+                    a = blu_areaMake(prop->name, blu_areaFlags_DRAW_BACKGROUND);
+                    a->style.backgroundColor = col_darkBlue;
+                    a->style.borderSize = 1;
+                    a->style.borderColor = col_black;
 
                     blu_parentScope(a) {
                         blu_styleScope {
                         blu_style_add_sizeX({ blu_sizeKind_PERCENT, 0.5 });
+
                             a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
 
                             str n = str_format(scratch, STR("\"%s\""), prop->name);
                             blu_areaAddDisplayStr(a, n);
 
-                            a = blu_areaMake(STR("value"), blu_areaFlags_DRAW_TEXT);
+                            a = blu_areaMake(STR("value"), blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
                             a->style.backgroundColor = col_darkGray;
+
                             if(prop->type == net_propType_S32) {
                                 blu_areaAddDisplayStr(a, str_format(scratch, STR("%i"), (prop->data->s32))); }
                             else if(prop->type == net_propType_F64) {
                                 blu_areaAddDisplayStr(a, str_format(scratch, STR("%f"), (prop->data->f64))); }
+                            else if(prop->type == net_propType_STR) {
+                                blu_areaAddDisplayStr(a, str_format(scratch, STR("\"%s\""), (prop->data->str))); }
+                            else if(prop->type == net_propType_BOOL) {
+                                blu_areaAddDisplayStr(a, str_format(scratch, STR("%b"), (prop->data->boo)));
+                                a->style.backgroundColor = prop->data->boo? col_green : col_red;
+                                a->style.cornerRadius = 2;
+                                a->style.textColor = col_darkBlue;
+                            }
                         }
                     }
                 }
@@ -582,12 +680,12 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
     blu_style_add_textColor(col_white);
     blu_style_add_sizeX({ blu_sizeKind_PERCENT, 1 });
     blu_style_add_sizeY({ blu_sizeKind_PERCENT, 1 });
-    blu_style_add_textPadding(V2f(3, 3));
+    blu_style_add_textPadding(V2f(4, 4));
     blu_style_add_animationStrength(0.1f);
 
 
         a = blu_areaMake(STR("leftBarParent"), blu_areaFlags_DRAW_BACKGROUND);
-        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 100 };
+        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 50 };
         a->style.childLayoutAxis = blu_axis_Y;
 
         a = blu_areaMake(STR("leftBarSep"), blu_areaFlags_DRAW_BACKGROUND);
@@ -602,7 +700,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
         }
 
 
-        a = blu_areaMake(STR("XresizeBar"), blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
+        a = blu_areaMake("XresizeBar", blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
         a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 3 };
 
         blu_WidgetInteraction inter = blu_interactionFromWidget(a);
@@ -613,7 +711,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
 
 
 
-        a = blu_areaMake(STR("rightParent"), 0);
+        a = blu_areaMake("rightParent", 0);
         a->style.sizes[blu_axis_X] = {blu_sizeKind_PX, globs.rightSize };
         a->style.childLayoutAxis = blu_axis_Y;
 
@@ -622,11 +720,15 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
 
             blu_styleScope {
             blu_style_add_sizeY({ blu_sizeKind_REMAINDER, 0 });
-                draw_swerveDrive(&globs.swerveInfo, dt);
+
+                draw_graph2d(&globs.graph2dInfo, dt);
+
+
+                // draw_swerveDrive(&globs.swerveInfo, dt);
             }
 
 
-            a = blu_areaMake(STR("YresizeBar"), blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
+            a = blu_areaMake("YresizeBar", blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
             a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, 3 };
 
             blu_WidgetInteraction inter = blu_interactionFromWidget(a);

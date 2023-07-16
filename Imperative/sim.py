@@ -3,11 +3,14 @@ import wpimath.system.plant as plant
 import wpimath.system as sys
 import wpilib
 import navx
+import random
 
 from virtualGyro import VirtualGyro
 from real import V2f, angleWrap
 
 
+# TODO: get real measurements
+ENCODER_STD_DEV = 0.001
 
 class EncoderSim:
 
@@ -26,11 +29,13 @@ class EncoderSim:
 
         inputVec = [self.motor.get() * self.motorSpec.nominalVoltage] # TODO: check if this is correct
         self.state = self.linearSys.calculateX(self.state, inputVec, dt)
-        self.encoder.setPosition(self.state[0])
+
+        self.encoder.setPosition(random.normalvariate(self.state[0], ENCODER_STD_DEV))
 
 
 
 
+# NOTE: directly contains 8 encoder sims to manage hardware
 class SwerveSim:
 
     def __init__(self,

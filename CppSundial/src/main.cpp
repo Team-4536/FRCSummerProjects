@@ -39,10 +39,11 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 
 int main() {
 
+
     BumpAlloc lifetimeArena;
     BumpAlloc frameArena;
     bump_allocate(&lifetimeArena, 1000000);
-    bump_allocate(&frameArena, 1000000);
+    bump_allocate(&frameArena, 10000000);
 
 
     GLFWwindow* window = nullptr;
@@ -129,6 +130,15 @@ int main() {
         blueShader->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
             int loc;
 
+            loc = glGetUniformLocation(pass->shader->id, "uBorderColor");
+            glUniform4f(loc, uniforms->borderColor.x, uniforms->borderColor.y, uniforms->borderColor.z, uniforms->borderColor.w);
+
+            loc = glGetUniformLocation(pass->shader->id, "uBorderSize");
+            glUniform1f(loc, uniforms->borderSize);
+
+            loc = glGetUniformLocation(pass->shader->id, "uCornerRadius");
+            glUniform1f(loc, uniforms->cornerRadius);
+
             loc = glGetUniformLocation(pass->shader->id, "uDstStart");
             glUniform2f(loc, uniforms->dstStart.x, uniforms->dstStart.y);
             loc = glGetUniformLocation(pass->shader->id, "uDstEnd");
@@ -174,8 +184,6 @@ int main() {
         glfwGetCursorPos(window, &mx, &my);
         bool leftPressed = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)? true : false;
 
-        net_update(&frameArena);
-
         blu_beginFrame();
 
 
@@ -216,6 +224,8 @@ int main() {
         }
 
         gfx_drawPasses(w, h);
+
+        net_update(&frameArena, (F32)time);
 
         bump_clear(&frameArena);
 

@@ -23,7 +23,7 @@ WHEEL_CIRC = WHEEL_DIA * math.pi
 
 class SwerveBot(wpilib.TimedRobot):
 
-    # TODO: assert saftey on startup and run
+    # TODO: assert saftey
 
     def robotInit(self) -> None:
 
@@ -66,6 +66,8 @@ class SwerveBot(wpilib.TimedRobot):
     def robotPeriodic(self) -> None:
         self.time = timing.TimeData(self.time)
 
+        self.server.putUpdate("time", self.time.timeSinceInit)
+
         prefs = ["FL", "FR", "BL", "BR"]
         for i in range(0, 4):
             self.server.putUpdate(prefs[i] + "DriveSpeed", self.driveMotors[i].get())
@@ -73,22 +75,30 @@ class SwerveBot(wpilib.TimedRobot):
             self.server.putUpdate(prefs[i] + "SteerSpeed", self.steerMotors[i].get())
             self.server.putUpdate(prefs[i] + "SteerPos", self.steerEncoders[i].getPosition())
 
-        self.server.putUpdate("PosX", self.sim.position.x)
-        self.server.putUpdate("PosY", self.sim.position.y)
-        self.server.putUpdate("Yaw", self.gyro.getYaw())
+        self.server.putUpdate("posX", self.sim.position.x)
+        self.server.putUpdate("posY", self.sim.position.y)
+        self.server.putUpdate("yaw", self.gyro.getYaw())
 
-        self.server.putUpdate("Test", int(420))
+        self.server.putUpdate("test", int(420))
 
         estimatedPose = self.estimator.update(self.time.timeSinceInit, self.gyro.getYaw(),
             [self.driveEncoders[i].getPosition() * WHEEL_CIRC for i in range(0, 4)],
             [self.steerEncoders[i].getPosition() * 360 for i in range(0, 4)]
             )
 
-        self.server.putUpdate("EstX", estimatedPose.x)
-        self.server.putUpdate("EstY", estimatedPose.y)
+        self.server.putUpdate("estX", estimatedPose.x)
+        self.server.putUpdate("estY", estimatedPose.y)
 
 
         #TODO: debug expression in cpp sundial
+
+        if self.isDisabled(): opmode = "disabled"
+        elif self.isAutonomousEnabled(): opmode = "auto"
+        elif self.isTeleopEnabled(): opmode = "teleop"
+        else: opmode = "????????"
+        self.server.putUpdate("opmode", opmode)
+
+        self.server.putUpdate("enabled", self.isEnabled())
 
 
         self.server.update(self.time.timeSinceInit)

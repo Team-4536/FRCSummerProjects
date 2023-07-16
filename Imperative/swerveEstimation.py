@@ -74,7 +74,5 @@ class SwerveEstimator:
 # TODO: reset button from sundial
 
 
-# TODO: sensor noise
-
 
 

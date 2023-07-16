@@ -81,6 +81,7 @@ void bump_pop(BumpAlloc* a, U64 size) {
 
 void bump_clear(BumpAlloc* a) {
     a->end = a->start;
+    memset(a->start, 0, a->reserved);
 }
 
 #endif
