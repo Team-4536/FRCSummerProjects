@@ -126,32 +126,45 @@ class SwerveBot(wpilib.TimedRobot):
 
 
     def autonomousInit(self) -> None:
+
+        pointCount = 100
         self.path = getSpline2dPoints([
             (V2f(0, 0), V2f(1, 1), V2f(3, 1), V2f(4, 0)),
             (V2f(4, 0), V2f(3, -2), V2f(1, -1), V2f(0, 0))
-        ], 100)
+        ], pointCount)
 
         self.speedPath = getLinear2dPoints([
-            V2f(0, 0.6), V2f(0.6, 0.6), V2f(1, 0.4)
-        ], 100)
+            V2f(0, 0.8), V2f(0.6, 0.8), V2f(1, 0.4)
+        ], pointCount)
+
+        self.anglePath = getLinear2dPoints([
+            V2f(0, 0), V2f(0.5, 90), V2f(1, -90)
+        ], pointCount)
+
+
         self.pathIdx = 0
 
     def autonomousPeriodic(self) -> None:
 
+        self.server.putUpdate("idx", self.pathIdx)
         if(self.pathIdx >= len(self.path)):
-            move = V2f()
-        else:
-            pose = self.estimator.estimatedPose
+            self.pathIdx = 99
 
-            nextPt = self.path[self.pathIdx]
-            speed = self.speedPath[self.pathIdx]
-            self.server.putUpdate("trajSpeed", speed)
-            self.server.putUpdate("idx", self.pathIdx)
+        pose = self.estimator.estimatedPose
 
-            move = (nextPt - pose).getNormalized() * speed
-            if((pose - nextPt).getLength() < 0.6): self.pathIdx += 1
+        nextPt = self.path[self.pathIdx]
+        speed = self.speedPath[self.pathIdx]
+        diff = (nextPt - pose)
+        if(diff.getLength() > 1): diff = diff.getNormalized()
+        move = diff * speed
 
-        self.swerveController.tick(self.gyro.getYaw(), move.x, move.y, 0, self.time.dt, False)
+        nextAngle = self.anglePath[self.pathIdx]
+        turn = (nextAngle - self.gyro.getYaw()) * 0.03
+
+        if((pose - nextPt).getLength() < 0.6): self.pathIdx += 1
+
+
+        self.swerveController.tick(self.gyro.getYaw(), move.x, move.y, turn, self.time.dt, False)
 
 
 

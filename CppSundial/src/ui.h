@@ -717,10 +717,10 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
             blu_styleScope {
             blu_style_add_sizeY({ blu_sizeKind_REMAINDER, 0 });
 
-                draw_graph2d(&globs.graph2dInfo, dt);
+                // draw_graph2d(&globs.graph2dInfo, dt);
 
 
-                // draw_swerveDrive(&globs.swerveInfo, dt);
+                draw_swerveDrive(&globs.swerveInfo, dt);
             }
 
 
