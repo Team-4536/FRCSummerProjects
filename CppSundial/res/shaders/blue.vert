@@ -7,6 +7,8 @@ layout(location = 1) in vec2 uv; // CLEANUP: remove from vert defs bc it's gener
 in int gl_VertexID;
 
 out vec2 vUv;
+out vec2 vCenter;
+out vec2 vHalfSize;
 
 
 uniform mat4 uVP;
@@ -33,6 +35,9 @@ void main() {
     vUv = cornerTable[gl_VertexID];
     vUv *= uSrcEnd - uSrcStart;
     vUv += uSrcStart;
+
+    vCenter = (uDstEnd + uDstStart) / 2;
+    vHalfSize = (uDstEnd - uDstStart) / 2;
 
     gl_Position = uVP * vec4(corner, 0, 1);
 }

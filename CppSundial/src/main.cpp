@@ -130,6 +130,9 @@ int main() {
         blueShader->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
             int loc;
 
+            loc = glGetUniformLocation(pass->shader->id, "uCornerRadius");
+            glUniform1f(loc, uniforms->cornerRadius);
+
             loc = glGetUniformLocation(pass->shader->id, "uDstStart");
             glUniform2f(loc, uniforms->dstStart.x, uniforms->dstStart.y);
             loc = glGetUniformLocation(pass->shader->id, "uDstEnd");

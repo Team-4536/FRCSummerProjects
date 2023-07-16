@@ -33,9 +33,9 @@ THE CHECKLIST:
     [X] scrolling
     [X] clipping
     [X] cursor changes
-    [ ] padding
-    [ ] rounding
+    [X] rounding
     [ ] borders
+    [ ] padding
     [ ] drop shadows
     [ ] tooltips/dropdowns
     [ ] text input
@@ -113,6 +113,7 @@ enum blu_StyleFlags {
     blu_styleFlags_textColor        = (1 << 5),
     blu_styleFlags_textPadding      = (1 << 6),
     blu_styleFlags_animationStrength= (1 << 7),
+    blu_styleFlags_cornerRadius     = (1 << 8),
 };
 
 struct blu_Style {
@@ -124,6 +125,7 @@ struct blu_Style {
     V4f textColor = V4f();
     V2f textPadding = V2f();
     F32 animationStrength = 0;
+    F32 cornerRadius = 0;
 };
 struct blu_StyleStackNode {
     blu_Style data = blu_Style();
@@ -224,6 +226,7 @@ void blu_style_add_backgroundColor(V4f color);
 void blu_style_add_textColor(V4f color);
 void blu_style_add_textPadding(V2f padding);
 void blu_style_add_animationStrength(F32 s);
+void blu_style_add_cornerRadius(F32 s);
 
 void blu_pushStyle();
 void blu_popStyle();
@@ -519,6 +522,9 @@ blu_Area* blu_areaMake(str string, U32 flags) {
 
         if(st->data.overrideFlags & blu_styleFlags_animationStrength) {
             area->style.animationStrength = st->data.animationStrength; }
+
+        if(st->data.overrideFlags & blu_styleFlags_cornerRadius) {
+            area->style.cornerRadius = st->data.cornerRadius; }
 
         st = st->next;
     }
@@ -851,6 +857,7 @@ void _blu_genRenderCallsRecurse(blu_Area* area, Rect2f clip, gfx_Pass* pass) {
             block->texture = globs.solidTex;
             block->clipStart = clip.start;
             block->clipEnd = clip.end;
+            block->cornerRadius = area->style.cornerRadius;
         }
         if (area->flags & blu_areaFlags_DRAW_TEXT) {
 
@@ -880,6 +887,7 @@ void _blu_genRenderCallsRecurse(blu_Area* area, Rect2f clip, gfx_Pass* pass) {
             block->fontTexture = globs.solidTex;
             block->clipStart = clip.start;
             block->clipEnd = clip.end;
+            block->cornerRadius = area->style.cornerRadius;
         }
 
 
@@ -932,6 +940,7 @@ _BLU_DEFINE_STYLE_ADD(backgroundColor, V4f)
 _BLU_DEFINE_STYLE_ADD(textColor, V4f)
 _BLU_DEFINE_STYLE_ADD(textPadding, V2f)
 _BLU_DEFINE_STYLE_ADD(animationStrength, F32)
+_BLU_DEFINE_STYLE_ADD(cornerRadius, F32)
 
 
 

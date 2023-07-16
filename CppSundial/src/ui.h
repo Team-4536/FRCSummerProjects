@@ -646,6 +646,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
     blu_style_add_sizeY({ blu_sizeKind_PERCENT, 1 });
     blu_style_add_textPadding(V2f(4, 4));
     blu_style_add_animationStrength(0.1f);
+    blu_style_add_cornerRadius(4);
 
 
         a = blu_areaMake(STR("leftBarParent"), blu_areaFlags_DRAW_BACKGROUND);
