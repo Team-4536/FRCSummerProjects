@@ -370,6 +370,14 @@ void draw_graph2d(Graph2dInfo* info, float dt) {
 // TODO: make controls not apply unless field is "selected"
 // TODO: robot follow mode
 
+blu_WidgetInteraction makeButton(str text, V4f hoverColor) {
+    // TODO: button textures
+    blu_Area* a = blu_areaMake(text, blu_areaFlags_CLICKABLE | blu_areaFlags_CENTER_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM);
+    a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, hoverColor, a->target_hoverAnim);
+    blu_areaAddDisplayStr(a, text);
+    return blu_interactionFromWidget(a);
+}
+
 void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
     V4f mVec = { 0, 0, 0, 0 };
@@ -434,26 +442,39 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
         blu_styleScope {
         blu_style_add_sizeX({ blu_sizeKind_TEXT, 50 });
         blu_style_add_sizeY({ blu_sizeKind_TEXT, 50 });
+        blu_style_add_borderColor(col_black);
+        blu_style_add_borderSize(1);
+        blu_style_add_cornerRadius(2);
+        blu_style_add_backgroundColor(col_darkGray * V4f(1, 1, 1, 0.75f));
 
-            // TODO: button textures
-            a = blu_areaMake("homeButton", blu_areaFlags_CLICKABLE | blu_areaFlags_CENTER_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_FLOATING | blu_areaFlags_HOVER_ANIM);
+            a = blu_areaMake("buttonParent", blu_areaFlags_FLOATING);
+            a->style.sizes[blu_axis_X] = { blu_sizeKind_PERCENT, 1 };
             a->offset = V2f(5, 5);
-            a->cursor = blu_cursor_hand;
-            V4f tra = V4f(1, 1, 1, 0.5f);
-            a->style.backgroundColor = v4f_lerp(col_darkGray * tra, col_white * tra, a->target_hoverAnim);
-            a->style.cornerRadius = 2;
-            a->style.borderColor = col_black;
-            a->style.borderSize = 1;
-            blu_areaAddDisplayStr(a, "Home");
+            blu_parentScope(a) {
 
-            if(blu_interactionFromWidget(a).clicked) {
-                // HOME TARGET
-                info->camTarget = {
-                    0, 6, 0,
-                    -90, 0, 0,
-                    1, 1, 1
-                    };
+                if(makeButton(STR("Home"), col_white).clicked) {
+                    info->camTarget = {
+                        0, 6, 0,
+                        -90, 0, 0,
+                        1, 1, 1
+                        };
+                }
+                if(makeButton(STR("Blue"), col_white).clicked) {
+                    info->camTarget = {
+                        -4, 7, 0,
+                        -75, -90, 0,
+                        1, 1, 1
+                        };
+                }
+                if(makeButton(STR("Red"), col_white).clicked) {
+                    info->camTarget = {
+                        4, 7, 0,
+                        -75, 90, 0,
+                        1, 1, 1
+                        };
+                }
             }
+
         }
     }
 
@@ -523,10 +544,35 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
     blu_Area* a;
 
+    blu_styleScope {
+    blu_style_add_sizeY({ blu_sizeKind_TEXT, 0 });
+    blu_style_add_childLayoutAxis(blu_axis_X);
+    blu_style_add_backgroundColor(col_darkGray);
+        a = blu_areaMake(STR("FPS"), blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
+        str n = str_format(scratch, STR("FPS: %f"), 1/dt);
+        blu_areaAddDisplayStr(a, n);
+
+        a = blu_areaMake(STR("connectionStatus"), blu_areaFlags_DRAW_BACKGROUND);
+        blu_parentScope(a) {
+            a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
+            blu_areaAddDisplayStr(a, STR("Network status: "));
+            a->style.sizes[blu_axis_X] = { blu_sizeKind_TEXT, 0 };
+
+            a = blu_areaMake(STR("box"), blu_areaFlags_DRAW_BACKGROUND);
+            a->style.backgroundColor = col_red;
+            a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
+            a->style.cornerRadius = 2;
+            if(net_getConnected()) {
+                a->style.backgroundColor = col_green; }
+        } // end connection parent
+    }
+
+
     a = blu_areaMake(STR("left"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
     info->clipSize = a->calculatedSizes[blu_axis_Y];
     a->style.childLayoutAxis = blu_axis_X;
     blu_parentScope(a) {
+
 
         a = blu_areaMake(STR("clip"), blu_areaFlags_VIEW_OFFSET | blu_areaFlags_CLICKABLE);
         blu_Area* clip = a;
@@ -540,26 +586,6 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
             blu_style_add_childLayoutAxis(blu_axis_X);
             blu_style_add_backgroundColor(col_darkGray);
 
-                a = blu_areaMake(STR("FPS"), blu_areaFlags_DRAW_TEXT);
-                str n = str_format(scratch, STR("FPS: %f"), 1/dt);
-                blu_areaAddDisplayStr(a, n);
-
-                a = blu_areaMake(STR("connectionStatus"), blu_areaFlags_DRAW_BACKGROUND);
-                blu_parentScope(a) {
-                    a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
-                    blu_areaAddDisplayStr(a, STR("Network status: "));
-                    a->style.sizes[blu_axis_X] = { blu_sizeKind_TEXT, 0 };
-
-                    a = blu_areaMake(STR("spacer"), 0);
-                    a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
-
-                    a = blu_areaMake(STR("box"), blu_areaFlags_DRAW_BACKGROUND);
-                    a->style.backgroundColor = col_red;
-                    a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 100 };
-                    a->style.cornerRadius = 2;
-                    if(net_getConnected()) {
-                        a->style.backgroundColor = col_green; }
-                } // end connection parent
 
 
                 net_Prop** tracked;
@@ -595,6 +621,7 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                                 blu_areaAddDisplayStr(a, str_format(scratch, STR("%b"), (prop->data->boo)));
                                 a->style.backgroundColor = prop->data->boo? col_green : col_red;
                                 a->style.cornerRadius = 2;
+                                a->style.textColor = col_darkBlue;
                             }
                         }
                     }
@@ -658,7 +685,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
 
 
         a = blu_areaMake(STR("leftBarParent"), blu_areaFlags_DRAW_BACKGROUND);
-        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 100 };
+        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 50 };
         a->style.childLayoutAxis = blu_axis_Y;
 
         a = blu_areaMake(STR("leftBarSep"), blu_areaFlags_DRAW_BACKGROUND);
