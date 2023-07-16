@@ -15,8 +15,11 @@ uniform sampler2D uFontTexture;
 
 uniform vec2 uClipStart;
 uniform vec2 uClipEnd;
+
 uniform float uCornerRadius;
 
+uniform float uBorderSize;
+uniform vec4 uBorderColor;
 
 
 float roundedRectSDF(vec2 sample_pos,
@@ -44,14 +47,19 @@ void main()
     vec4 texColor = texture(uTexture, nUv);
     vec4 fontColor = vec4(1.0, 1.0, 1.0, texture(uFontTexture, vUv).r);
 
-    float sdfOut = (roundedRectSDF(gl_FragCoord.xy, vCenter, vHalfSize, uCornerRadius)<0)? 1 : 0;
-    vec4 sdf = vec4(1, 1, 1, sdfOut);
+    float sdfOut = roundedRectSDF(gl_FragCoord.xy, vCenter, vHalfSize, uCornerRadius);
+    vec4 sdf = vec4(1, 1, 1, sdfOut < 0? 1 : 0);
 
-    color = uColor * texColor * fontColor * sdf;
+
+    if(sdfOut > -uBorderSize && sdfOut < 0) {
+        color = uBorderColor; }
+    else {
+        color = uColor * texColor * fontColor * sdf; }
 
     if (color.a <= 0.01) { discard; }
 
-    // probably bad for performance
+
+    // TODO: sdf for clipping
     if     (gl_FragCoord.x > uClipEnd.x) { discard; }
     else if(gl_FragCoord.y > uClipEnd.y) { discard; }
     else if(gl_FragCoord.x <= uClipStart.x) { discard; }

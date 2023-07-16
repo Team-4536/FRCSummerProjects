@@ -441,6 +441,9 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
             a->cursor = blu_cursor_hand;
             V4f tra = V4f(1, 1, 1, 0.5f);
             a->style.backgroundColor = v4f_lerp(col_darkGray * tra, col_white * tra, a->target_hoverAnim);
+            a->style.cornerRadius = 2;
+            a->style.borderColor = col_black;
+            a->style.borderSize = 1;
             blu_areaAddDisplayStr(a, "Home");
 
             if(blu_interactionFromWidget(a).clicked) {
@@ -553,6 +556,7 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                     a = blu_areaMake(STR("box"), blu_areaFlags_DRAW_BACKGROUND);
                     a->style.backgroundColor = col_red;
                     a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 100 };
+                    a->style.cornerRadius = 2;
                     if(net_getConnected()) {
                         a->style.backgroundColor = col_green; }
                 } // end connection parent
@@ -569,6 +573,9 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                     blu_parentScope(a) {
                         blu_styleScope {
                         blu_style_add_sizeX({ blu_sizeKind_PERCENT, 0.5 });
+                        blu_style_add_borderSize(1);
+                        blu_style_add_borderColor(col_black);
+
                             a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
 
                             str n = str_format(scratch, STR("\"%s\""), prop->name);
@@ -586,6 +593,7 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                             else if(prop->type == net_propType_BOOL) {
                                 blu_areaAddDisplayStr(a, str_format(scratch, STR("%b"), (prop->data->boo)));
                                 a->style.backgroundColor = prop->data->boo? col_green : col_red;
+                                a->style.cornerRadius = 2;
                             }
                         }
                     }
@@ -646,7 +654,6 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
     blu_style_add_sizeY({ blu_sizeKind_PERCENT, 1 });
     blu_style_add_textPadding(V2f(4, 4));
     blu_style_add_animationStrength(0.1f);
-    blu_style_add_cornerRadius(4);
 
 
         a = blu_areaMake(STR("leftBarParent"), blu_areaFlags_DRAW_BACKGROUND);

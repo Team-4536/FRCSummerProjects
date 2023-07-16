@@ -77,6 +77,9 @@ struct gfx_UniformBlock {
 
     // CALL UNIS =========================
 
+    float borderSize = 0;
+    V4f borderColor = V4f();
+
     float cornerRadius = 0;
 
     V2f dstStart = V2f();

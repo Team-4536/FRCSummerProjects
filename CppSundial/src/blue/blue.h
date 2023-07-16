@@ -34,7 +34,7 @@ THE CHECKLIST:
     [X] clipping
     [X] cursor changes
     [X] rounding
-    [ ] borders
+    [X] borders
     [ ] padding
     [ ] drop shadows
     [ ] tooltips/dropdowns
@@ -114,6 +114,8 @@ enum blu_StyleFlags {
     blu_styleFlags_textPadding      = (1 << 6),
     blu_styleFlags_animationStrength= (1 << 7),
     blu_styleFlags_cornerRadius     = (1 << 8),
+    blu_styleFlags_borderSize       = (1 << 9),
+    blu_styleFlags_borderColor      = (1 << 10),
 };
 
 struct blu_Style {
@@ -126,6 +128,8 @@ struct blu_Style {
     V2f textPadding = V2f();
     F32 animationStrength = 0;
     F32 cornerRadius = 0;
+    V4f borderColor = V4f();
+    F32 borderSize = 0;
 };
 struct blu_StyleStackNode {
     blu_Style data = blu_Style();
@@ -226,7 +230,9 @@ void blu_style_add_backgroundColor(V4f color);
 void blu_style_add_textColor(V4f color);
 void blu_style_add_textPadding(V2f padding);
 void blu_style_add_animationStrength(F32 s);
-void blu_style_add_cornerRadius(F32 s);
+void blu_style_add_cornerRadius(F32 radius);
+void blu_style_add_borderSize(F32 size);
+void blu_style_add_borderColor(V4f color);
 
 void blu_pushStyle();
 void blu_popStyle();
@@ -525,6 +531,12 @@ blu_Area* blu_areaMake(str string, U32 flags) {
 
         if(st->data.overrideFlags & blu_styleFlags_cornerRadius) {
             area->style.cornerRadius = st->data.cornerRadius; }
+
+        if(st->data.overrideFlags & blu_styleFlags_borderColor) {
+            area->style.borderColor = st->data.borderColor; }
+
+        if(st->data.overrideFlags & blu_styleFlags_borderSize) {
+            area->style.borderSize = st->data.borderSize; }
 
         st = st->next;
     }
@@ -858,6 +870,8 @@ void _blu_genRenderCallsRecurse(blu_Area* area, Rect2f clip, gfx_Pass* pass) {
             block->clipStart = clip.start;
             block->clipEnd = clip.end;
             block->cornerRadius = area->style.cornerRadius;
+            block->borderSize = area->style.borderSize;
+            block->borderColor = area->style.borderColor;
         }
         if (area->flags & blu_areaFlags_DRAW_TEXT) {
 
@@ -888,6 +902,8 @@ void _blu_genRenderCallsRecurse(blu_Area* area, Rect2f clip, gfx_Pass* pass) {
             block->clipStart = clip.start;
             block->clipEnd = clip.end;
             block->cornerRadius = area->style.cornerRadius;
+            block->borderSize = area->style.borderSize;
+            block->borderColor = area->style.borderColor;
         }
 
 
@@ -941,6 +957,8 @@ _BLU_DEFINE_STYLE_ADD(textColor, V4f)
 _BLU_DEFINE_STYLE_ADD(textPadding, V2f)
 _BLU_DEFINE_STYLE_ADD(animationStrength, F32)
 _BLU_DEFINE_STYLE_ADD(cornerRadius, F32)
+_BLU_DEFINE_STYLE_ADD(borderColor, V4f)
+_BLU_DEFINE_STYLE_ADD(borderSize, F32)
 
 
 
