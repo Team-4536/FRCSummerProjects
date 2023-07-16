@@ -303,7 +303,7 @@ void draw_line(gfx_Pass* p, float thickness, V4f color, V2f start, V2f end) {
 void draw_graph2d(Graph2dInfo* info, float dt) {
 
     // APPEND NEW VALUE
-    net_Prop* prop = net_hashGet(STR("FLDriveSpeed"));
+    net_Prop* prop = net_hashGet(STR("trajSpeed"));
     float nval = 0;
     if(prop) { nval = (F32)prop->data->f64; }
 

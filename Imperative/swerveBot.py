@@ -13,7 +13,7 @@ from swerveEstimation import SwerveEstimator
 import socketing
 import sim
 import timing
-from swervePathFollower import Spline2d
+from paths import getSpline2dPoints, getLinear2dPoints
 
 
 WHEEL_DIA = 0.1016 # 4 in. in meters
@@ -126,23 +126,32 @@ class SwerveBot(wpilib.TimedRobot):
 
 
     def autonomousInit(self) -> None:
-        self.path = Spline2d(
-            [
-                (V2f(0, 0), V2f(1, 1), V2f(3, 1), V2f(4, 0)),
-                (V2f(4, 0), V2f(3, -2), V2f(1, -1), V2f(0, 0))
-            ]
-        ).getTrajectory(100)
+        self.path = getSpline2dPoints([
+            (V2f(0, 0), V2f(1, 1), V2f(3, 1), V2f(4, 0)),
+            (V2f(4, 0), V2f(3, -2), V2f(1, -1), V2f(0, 0))
+        ], 100)
+
+        self.speedPath = getLinear2dPoints([
+            V2f(0, 0.6), V2f(0.6, 0.6), V2f(1, 0.4)
+        ], 100)
         self.pathIdx = 0
 
     def autonomousPeriodic(self) -> None:
-        if(self.pathIdx >= len(self.path)): return
-        pose = self.estimator.estimatedPose
-        traj = self.path[self.pathIdx]
 
-        move = (traj.pt - pose).getNormalized() * traj.speed * 0.8
+        if(self.pathIdx >= len(self.path)):
+            move = V2f()
+        else:
+            pose = self.estimator.estimatedPose
+
+            nextPt = self.path[self.pathIdx]
+            speed = self.speedPath[self.pathIdx]
+            self.server.putUpdate("trajSpeed", speed)
+            self.server.putUpdate("idx", self.pathIdx)
+
+            move = (nextPt - pose).getNormalized() * speed
+            if((pose - nextPt).getLength() < 0.6): self.pathIdx += 1
+
         self.swerveController.tick(self.gyro.getYaw(), move.x, move.y, 0, self.time.dt, False)
-
-        if((pose - traj.pt).getLength() < 0.8): self.pathIdx += 1
 
 
 
