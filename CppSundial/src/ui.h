@@ -402,10 +402,6 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
     net_Prop* posX = net_hashGet(STR("posX"));
     net_Prop* posY = net_hashGet(STR("posY"));
     net_Prop* yaw = net_hashGet(STR("yaw"));
-
-    net_Prop* estX = net_hashGet(STR("estX"));
-    net_Prop* estY = net_hashGet(STR("estY"));
-
     Transform robotTransform = Transform();
     if(posX && posY && yaw) {
         robotTransform.x = (F32)posX->data->f64;
@@ -413,10 +409,10 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
         robotTransform.ry = -(F32)yaw->data->f64;
     }
 
+    net_Prop* estX = net_hashGet(STR("estX"));
+    net_Prop* estY = net_hashGet(STR("estY"));
     Transform estimateTransform = Transform();
     if(estX && estY && yaw) {
-
-        Transform t = Transform();
         estimateTransform.x = (F32)estX->data->f64;
         estimateTransform.z = -(F32)estY->data->f64;
         estimateTransform.ry = -(F32)yaw->data->f64;

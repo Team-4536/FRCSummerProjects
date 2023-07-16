@@ -1,70 +1,51 @@
 import wpilib
 import rev
+import math
 
 from PIDController import PIDController
 from real import V2f, angleWrap
 
 
+class TrajectoryPt2d:
+    def __init__(self, pt: V2f, speed: float) -> None:
+        self.pt = pt
+        self.speed = speed
 
 
+def lerp(a, b, t):
+    return a+((b-a)*t)
 
+class Spline2d():
+    def __init__(self, points: list[tuple[V2f, V2f, V2f, V2f]]) -> None:
+        self.points = points
 
-class SwervePathFollower:
+    def sample(self, t: float):
+        idx: int = math.floor(t * len(self.points))
+        pct = (t * len(self.points)) % 1
 
-    DISTANCE_CUTOFF = 0.5
-    ANGLE_CUTOFF = 30
+        pts = self.points[idx]
+        a = lerp(pts[0], pts[1], pct)
+        b = lerp(pts[2], pts[3], pct)
+        return lerp(a, b, pct)
 
-    def __init__(self, poses: list[tuple[V2f, float]]) -> None:
+    # Speed == 1 is the segment with the greatest distance
+    # others are proportional
+    def getTrajectory(self, count: int) -> list[TrajectoryPt2d]:
+        out: list[TrajectoryPt2d] = []
+        prevpt = self.sample(0)
+        out.append(TrajectoryPt2d(prevpt, 0))
+        maxLen = 0.0
+        for i in range(1, count):
+            pt = self.sample(i / count)
+            l = (pt - prevpt).getLength()
+            maxLen = max(l, maxLen)
+            out[-1].speed = l
+            out.append(TrajectoryPt2d(pt, 0))
+            prevpt = pt
 
-        self.poses = poses
-        self.index = 0
+        for t in out:
+            t.speed /= maxLen
 
-        kp = 0.2
-        ki = 0
-        kd = -0.3
-        self.xPID = PIDController(kp, ki, kd)
-        self.yPID = PIDController(kp, ki, kd)
-
-        self.tPID = PIDController(0.01, 0, 0)
-
-
-    # returns a tuple with drive speed and turning speed
-    def tick(self, position: V2f, angle: float, dt: float) -> tuple[V2f, float]:
-
-        if(self.index >= len(self.poses)):
-            return (V2f(0, 0), 0)
-
-        targetPose = self.poses[self.index]
-
-        # TODO: tighter cutoff for final poses?
-        if(abs((position - targetPose[0]).getLength()) < SwervePathFollower.DISTANCE_CUTOFF):
-            if(abs(angleWrap(targetPose[1] - angle)) < SwervePathFollower.ANGLE_CUTOFF):
-                self.index += 1
-
-        if(self.index >= len(self.poses)):
-            return (V2f(0, 0), 0)
-
-
-        x = self.xPID.tick(targetPose[0].x, position.x, dt)
-        y = self.xPID.tick(targetPose[0].y, position.y, dt)
-        t = self.tPID.tick(targetPose[1], angle, dt)
-
-        return V2f(x, y), t
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        return out
 
 

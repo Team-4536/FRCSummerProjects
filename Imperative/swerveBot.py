@@ -3,17 +3,17 @@ import rev
 import ntcore
 import math
 import navx
-from inputs import FlymerInputs
 
-import sim
+from inputs import FlymerInputs
 from real import V2f
-import timing
 from swerveController import SwerveController
 from telemetryHelp import publishExpression
 from virtualGyro import VirtualGyro
 from swerveEstimation import SwerveEstimator
 import socketing
-from swervePathFollower import SwervePathFollower
+import sim
+import timing
+from swervePathFollower import Spline2d
 
 
 WHEEL_DIA = 0.1016 # 4 in. in meters
@@ -126,18 +126,24 @@ class SwerveBot(wpilib.TimedRobot):
 
 
     def autonomousInit(self) -> None:
-        self.pathFollower = SwervePathFollower([
-            (V2f(0, 0), 0),
-            (V2f(4, 0), 90),
-            (V2f(4, 4), 180),
-            (V2f(-4, -4), 0),
-            (V2f(0, 0), 0)
-        ])
+        self.path = Spline2d(
+            [
+                (V2f(0, 0), V2f(1, 1), V2f(3, 1), V2f(4, 0)),
+                (V2f(4, 0), V2f(3, -2), V2f(1, -1), V2f(0, 0))
+            ]
+        ).getTrajectory(100)
+        self.pathIdx = 0
 
     def autonomousPeriodic(self) -> None:
+        if(self.pathIdx >= len(self.path)): return
         pose = self.estimator.estimatedPose
-        d, t = self.pathFollower.tick(pose, self.gyro.getYaw(), self.time.dt)
-        self.swerveController.tick(self.gyro.getYaw(), d.x, d.y, t, self.time.dt, False)
+        traj = self.path[self.pathIdx]
+
+        move = (traj.pt - pose).getNormalized() * traj.speed * 0.8
+        self.swerveController.tick(self.gyro.getYaw(), move.x, move.y, 0, self.time.dt, False)
+
+        if((pose - traj.pt).getLength() < 0.8): self.pathIdx += 1
+
 
 
 
