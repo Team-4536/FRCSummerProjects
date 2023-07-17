@@ -108,7 +108,7 @@ int main() {
     blu_init(solidTex);
     blu_loadFont("C:/windows/fonts/consola.ttf");
 
-    ui_init(&frameArena, solidTex);
+    ui_init(&frameArena, &lifetimeArena, solidTex);
     net_init();
 
 
