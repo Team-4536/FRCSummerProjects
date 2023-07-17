@@ -18,6 +18,7 @@
 struct Graph2dInfo {
 
     float vals[GRAPH2D_LINECOUNT][GRAPH2D_VCOUNT] = { 0 };
+    U8 connectionVals[GRAPH2D_LINECOUNT][GRAPH2D_VCOUNT] = { 0 };
     str keys[GRAPH2D_LINECOUNT] = { 0 };
     V4f colors[GRAPH2D_LINECOUNT];
 
@@ -316,11 +317,18 @@ void draw_graph2d(Graph2dInfo* info, float dt) {
         if(!info->keys[i].chars) { continue; }
 
         net_Prop* prop = net_hashGet(info->keys[i]);
+
+        bool nConn = net_getConnected();
         float nval = 0;
         if(prop) { nval = (F32)prop->data->f64; }
+        else{ nConn = false; }
 
+        // CLEANUP: profiling
         memmove(info->vals[i], &(info->vals[i][1]), (GRAPH2D_VCOUNT-1)*sizeof(float));
         info->vals[i][GRAPH2D_VCOUNT - 1] = nval;
+
+        memmove(info->connectionVals[i], &(info->connectionVals[i][1]), (GRAPH2D_VCOUNT-1)*sizeof(U8));
+        info->connectionVals[i][GRAPH2D_VCOUNT - 1] = nConn;
     }
 
 
@@ -329,57 +337,52 @@ void draw_graph2d(Graph2dInfo* info, float dt) {
     a->style.childLayoutAxis = blu_axis_Y;
 
     blu_parentScope(a) {
-        blu_styleScope {
-        blu_style_add_sizeY({blu_sizeKind_REMAINDER});
 
-            a = blu_areaMake("upperBit", blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE);
-            areaAddFB(a, info->target);
-            float width = info->target->texture->width;
-            float height = info->target->texture->height;
+        a = blu_areaMake("upperBit", blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE);
+        a->style.sizes[blu_axis_Y] = { blu_sizeKind_REMAINDER, 0 };
+        areaAddFB(a, info->target);
+        float width = info->target->texture->width;
+        float height = info->target->texture->height;
 
-            gfx_registerClearPass(col_darkBlue, info->target);
+        gfx_registerClearPass(col_darkBlue, info->target);
 
-            gfx_Pass* p = gfx_registerPass();
-            p->target = info->target;
-            p->shader = globs.sceneShader2d;
-            matrixOrtho(0, width, height, 0, 0, 100, p->passUniforms.vp);
-
+        gfx_Pass* p = gfx_registerPass();
+        p->target = info->target;
+        p->shader = globs.sceneShader2d;
+        matrixOrtho(0, width, height, 0, 0, 100, p->passUniforms.vp);
 
 
 
-            info->yScale += -blu_interactionFromWidget(a).scrollDelta * 10;
-            info->yScale = max(0, info->yScale);
-            info->yOffset += blu_interactionFromWidget(a).dragDelta.y;
 
-            float scale = -info->yScale;
-            float offset = info->yOffset + height/2;
-            float pointGap = width / (float)GRAPH2D_VCOUNT;
+        info->yScale += -blu_interactionFromWidget(a).scrollDelta * 10;
+        info->yScale = max(0, info->yScale);
+        info->yOffset += blu_interactionFromWidget(a).dragDelta.y;
 
-            // TODO: batch line calls
-            draw_line(p, 1, col_darkGray, { 0, offset }, { width, offset });
-            draw_line(p, 1, col_darkGray, { 0, offset + 1*scale}, { width, offset + 1*scale });
-            draw_line(p, 1, col_darkGray, { 0, offset - 1*scale}, { width, offset - 1*scale });
+        float scale = -info->yScale;
+        float offset = info->yOffset + height/2;
+        float pointGap = width / (float)GRAPH2D_VCOUNT;
+
+        // TODO: batch line calls
+        draw_line(p, 1, col_darkGray, { 0, offset }, { width, offset });
+        draw_line(p, 1, col_darkGray, { 0, offset + 1*scale}, { width, offset + 1*scale });
+        draw_line(p, 1, col_darkGray, { 0, offset - 1*scale}, { width, offset - 1*scale });
 
 
 
-            for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
-                if(!info->keys[i].chars) { continue; }
+        for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
+            if(!info->keys[i].chars) { continue; }
 
-                V2f lastPoint = V2f(0, info->vals[i][0] * scale + offset);
-                for(int j = 1; j < GRAPH2D_VCOUNT; j++) {
+            V2f lastPoint = V2f(0, info->vals[i][0] * scale + offset);
+            for(int j = 1; j < GRAPH2D_VCOUNT; j++) {
 
-                    V4f color = col_lightGray;
-                    if(net_getConnected()) { color = info->colors[i]; }
+                V4f color = info->colors[i];
+                if(!(info->connectionVals[i][j])) { color *= col_disconnect; }
 
-                    V2f point = { j*pointGap, info->vals[i][j] * scale + offset };
-                    draw_line(p, 2, color, lastPoint, point);
-                    lastPoint = point;
-                }
+                V2f point = { j*pointGap, info->vals[i][j] * scale + offset };
+                draw_line(p, 2, color, lastPoint, point);
+                lastPoint = point;
             }
-
-            // a = blu_areaMake(STR("lowerBit"), 0);
         }
-
     }
 };
 
