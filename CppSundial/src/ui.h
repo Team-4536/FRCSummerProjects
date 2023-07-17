@@ -632,6 +632,7 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                             a = blu_areaMake(STR("value"), blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
                             a->style.backgroundColor = col_darkGray;
 
+
                             if(prop->type == net_propType_S32) {
                                 blu_areaAddDisplayStr(a, str_format(scratch, STR("%i"), (prop->data->s32))); }
                             else if(prop->type == net_propType_F64) {
@@ -643,6 +644,11 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                                 a->style.backgroundColor = prop->data->boo? col_green : col_red;
                                 a->style.cornerRadius = 2;
                                 a->style.textColor = col_darkBlue;
+                            }
+
+                            if(!net_getConnected()) {
+                                a->style.backgroundColor *= col_disconnect;
+                                a->style.textColor *= col_disconnect;
                             }
                         }
                     }
