@@ -4,6 +4,8 @@ import wpimath.system as sys
 import wpilib
 import navx
 import random
+from math import degrees, radians
+import math
 
 from virtualGyro import VirtualGyro
 from real import V2f, angleWrap
@@ -69,9 +71,7 @@ class SwerveSim:
 
         self.posDeltas: list[V2f] = [] # DEBUG
 
-    # TODO: add friction to wheel sims
-    # TODO: get measurements for wheel friction
-    # TODO: vary the "inertia" of each mechanism with speed/rotation speed of drive // add extra resistance when braking and going against current speed somehow
+    # TODO: add real friction to wheel sims
 
     def update(self, dt: float):
 

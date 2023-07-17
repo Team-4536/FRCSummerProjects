@@ -7,6 +7,10 @@ from real import V2f, angleWrap
 
 
 
+# this file has functions for generating paths
+
+
+
 
 def lerp(a, b, t):
     return a+((b-a)*t)
@@ -15,6 +19,7 @@ def invLerp(a, b, pt):
     return (pt-a)/(b-a)
 
 
+# samples taken with uniform t values, meaning that points may not be eveny distributed
 def getSpline2dPoints(points: list[tuple[V2f, V2f, V2f, V2f]], count: int) -> list[V2f]:
     out: list[V2f] = []
 
