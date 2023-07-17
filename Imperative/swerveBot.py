@@ -64,19 +64,11 @@ class SwerveBot(wpilib.TimedRobot):
             self.driveEncoders)
 
         m = rev.CANSparkMax(10, driveType)
-        self.s = sim.EncoderSim(m, plant.DCMotor.NEO(), m.getEncoder(), 0.000001, 1)
 
 
     def robotPeriodic(self) -> None:
 
         self.time = timing.TimeData(self.time)
-
-        self.s.motor.set(1)
-        self.s.update(self.time.dt)
-        print(f"{self.s.state[1]}")
-
-
-
 
 
         self.server.putUpdate("time", self.time.timeSinceInit)
@@ -147,7 +139,7 @@ class SwerveBot(wpilib.TimedRobot):
         ], pointCount)
 
         self.speedPath = getLinear2dPoints([
-            V2f(0.8, 0.8), V2f(1, 0.2)
+            V2f(0.9, 1), V2f(1, 0.3)
         ], pointCount)
 
         self.anglePath = getLinear2dPoints([

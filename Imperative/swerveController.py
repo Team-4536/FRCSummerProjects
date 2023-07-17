@@ -1,6 +1,6 @@
 import wpilib
 import math
-from real import V2f
+from real import V2f, angleWrap
 from typing import Any
 from PIDController import PIDController
 
@@ -18,9 +18,9 @@ class SwerveController:
         #choose between brake or hold position when no input is given (if false brake will be a toggle on button "A")
         self.brakeDefault = False
 
-        kp = 5
+        kp = 2
         ki = 0
-        kd = -20
+        kd = 4
         self.FLPID = PIDController(kp, ki, kd)
         self.FRPID = PIDController(kp, ki, kd)
         self.BLPID = PIDController(kp, ki, kd)
@@ -153,10 +153,10 @@ class SwerveController:
                 BRSteeringError = 0
 
         #assign motor powers
-        FLSteeringPower = self.FLPID.tickErr(FLSteeringError / 360, dt)
-        FRSteeringPower = self.FRPID.tickErr(FRSteeringError / 360, dt)
-        BLSteeringPower = self.BLPID.tickErr(BLSteeringError / 360, dt)
-        BRSteeringPower = self.BRPID.tickErr(BRSteeringError / 360, dt)
+        FLSteeringPower = self.FLPID.tickErr(angleWrap(FLSteeringError / 360), dt)
+        FRSteeringPower = self.FRPID.tickErr(angleWrap(FRSteeringError / 360), dt)
+        BLSteeringPower = self.BLPID.tickErr(angleWrap(BLSteeringError / 360), dt)
+        BRSteeringPower = self.BRPID.tickErr(angleWrap(BRSteeringError / 360), dt)
 
         """--------------------------------------------------"""
 
