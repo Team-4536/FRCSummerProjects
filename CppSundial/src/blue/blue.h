@@ -35,9 +35,11 @@ THE CHECKLIST:
     [X] cursor changes
     [X] rounding
     [X] borders
+    [ ] drag drop
+    [ ] tooltips
+    [ ] dropdowns
     [ ] padding
     [ ] drop shadows
-    [ ] tooltips/dropdowns
     [ ] text input
     [ ] text hotkeys
 
@@ -104,6 +106,18 @@ enum blu_Cursor {
 //  - style build code in areaMake
 // gad damn this language
 
+struct blu_Style {
+    blu_Axis childLayoutAxis = blu_axis_X;
+    blu_Size sizes[blu_axis_COUNT] = { { blu_sizeKind_NONE, 0 }, { blu_sizeKind_NONE, 0 } };
+    V4f backgroundColor = V4f();
+    V4f textColor = V4f();
+    V2f textPadding = V2f();
+    F32 animationStrength = 0;
+    F32 cornerRadius = 0;
+    V4f borderColor = V4f();
+    F32 borderSize = 0;
+};
+
 enum blu_StyleFlags {
     blu_styleFlags_none             = (0 << 0),
     blu_styleFlags_childLayoutAxis  = (1 << 1),
@@ -118,25 +132,12 @@ enum blu_StyleFlags {
     blu_styleFlags_borderColor      = (1 << 10),
 };
 
-struct blu_Style {
-    U32 overrideFlags = 0; // NOTE: override flags don't do shit inside the areas, they are only used to construct the final styles
-
-    blu_Axis childLayoutAxis = blu_axis_X;
-    blu_Size sizes[blu_axis_COUNT] = { { blu_sizeKind_NONE, 0 }, { blu_sizeKind_NONE, 0 } };
-    V4f backgroundColor = V4f();
-    V4f textColor = V4f();
-    V2f textPadding = V2f();
-    F32 animationStrength = 0;
-    F32 cornerRadius = 0;
-    V4f borderColor = V4f();
-    F32 borderSize = 0;
-};
 struct blu_StyleStackNode {
     blu_Style data = blu_Style();
     blu_StyleStackNode* next;
     blu_StyleStackNode* prev;
+    U32 overrideFlags = 0;
 };
-
 
 
 
@@ -154,15 +155,13 @@ struct blu_Area {
     blu_Area* nextSibling[2] = { 0 };
     blu_Area* prevSibling = nullptr;
 
-
-    // hashing
+    // hashing //////////////////////////////////////
     blu_Area* hashNext;
     U64 hashKey;
 
     U64 lastTouchedIdx = 0;
 
-
-    // builder provided
+    // builder provided /////////////////////////////
     U32 flags = 0;
     str displayString = { nullptr, 0 };
 
@@ -175,16 +174,12 @@ struct blu_Area {
 
     blu_Cursor cursor = blu_cursor_norm;
 
-
-    // layout pass data
+    // layout pass data //////////////////////////////
     F32 calculatedSizes[blu_axis_COUNT];
-    F32 calculatedPosition[blu_axis_COUNT];
     Rect2f rect;
 
-
-    // persistant shit for input / anim
+    // persistant shit for input / anim //////////////
     F32 target_hoverAnim = 1;
-
     bool prevHovered = false;
     bool prevPressed = false;
 };
@@ -206,23 +201,22 @@ struct blu_WidgetInteraction {
 
 void blu_init(gfx_Texture* solidTex);
 void blu_loadFont(const char* path);
-
+void blu_beginFrame(); // cull, reset globals
+// build code goes here
+void blu_input(V2f npos, bool lmbState, float scrollDelta, blu_Cursor* outCursor);  // set current and update prev input // CLEANUP: merge with begin?
+void blu_layout(V2f scSize); // calculate layout shit
+void blu_makeDrawCalls(gfx_Pass* normalPass);
 
 blu_Area* blu_areaMake(str s, U32 flags);
 blu_Area* blu_areaMake(const char* string, U32 flags);
-// TODO: format version
-void blu_areaAddDisplayStr(blu_Area* area, str s);
-void blu_areaAddDisplayStr(blu_Area* area, const char* s);
-
 void blu_pushParent(blu_Area* parent);
 void blu_popParent();
 
-void blu_beginFrame(); // cull
-void blu_input(V2f npos, bool lmbState, float scrollDelta, blu_Cursor* outCursor);  // set current and update prev input // CLEANUP: merge with begin?
-void blu_layout(V2f scSize); // calculate layout shit
-void blu_createPass(gfx_Pass* normalPass);
+void blu_areaAddDisplayStr(blu_Area* area, str s); // CLEANUP: inconsistent, ctor functions or no
+void blu_areaAddDisplayStr(blu_Area* area, const char* s);
 
-
+void blu_pushStyle();
+void blu_popStyle();
 void blu_style_add_childLayoutAxis(blu_Axis axis);
 void blu_style_add_sizeX(blu_Size size);
 void blu_style_add_sizeY(blu_Size size);
@@ -234,11 +228,7 @@ void blu_style_add_cornerRadius(F32 radius);
 void blu_style_add_borderSize(F32 size);
 void blu_style_add_borderColor(V4f color);
 
-void blu_pushStyle();
-void blu_popStyle();
-
 blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area);
-
 
 
 #define blu_deferLoop(begin, end) for(int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
@@ -287,6 +277,7 @@ struct blu_Globs {
     blu_Area* currentParent = nullptr; // CLEANUP: replace with currentArea
     blu_Area* ogParent = nullptr;
 
+
     blu_Area** hash = nullptr; // array of pointers to the actual area structs, for hash-based access
 
     BumpAlloc areaArena = { };
@@ -302,6 +293,7 @@ struct blu_Globs {
 
 
     gfx_Texture* solidTex = 0;
+
 
 
     gfx_Texture* fontTex = 0;
@@ -382,15 +374,14 @@ void blu_loadFont(const char* path) {
 
 
 
-// NOTE: does nothing if element at key already exists
-void blu_hashInsert(U64 key, blu_Area* a) {
-
+// NOTE: asserts if element already exists
+void _blu_hashInsert(U64 key, blu_Area* a) {
     U64 idx = key % BLU_AREA_HASH_COUNT;
     blu_Area* elem = globs.hash[idx];
 
     if(elem) { // remember the shit about a default ptr so no segfualt
         while(elem->hashNext) {
-            if(elem->hashKey == key) { return; }
+            if(elem->hashKey == key) { ASSERT(false); return; }
             elem = elem->hashNext;
         }
         elem->hashNext = a;
@@ -399,8 +390,7 @@ void blu_hashInsert(U64 key, blu_Area* a) {
         globs.hash[idx] = a; }
 }
 
-blu_Area* blu_hashGet(U64 key) {
-
+blu_Area* _blu_hashGet(U64 key) {
     blu_Area* elem = globs.hash[key % BLU_AREA_HASH_COUNT];
     while(true) {
         if(elem == nullptr) { return nullptr; }
@@ -408,27 +398,23 @@ blu_Area* blu_hashGet(U64 key) {
 
         elem = elem->hashNext;
     }
-
 }
 
-void blu_hashRemove(U64 key) {
-
+void _blu_hashRemove(U64 key) {
     blu_Area** nextPtr = &globs.hash[key % BLU_AREA_HASH_COUNT];
-
     while(*nextPtr) {
-
         if((*nextPtr)->hashKey == key) {
             *nextPtr = nullptr;
             return;
         }
-
         nextPtr = &(*nextPtr)->hashNext;
     }
 }
 
 
 
-// CLEANUP: update and reset happen post-construction because it was easy, change please
+
+
 void _blu_areaReset(blu_Area* a) {
     a->firstChild[globs.linkSide] = nullptr;
     a->lastChild = nullptr;
@@ -443,6 +429,7 @@ void _blu_areaReset(blu_Area* a) {
     a->cursor = blu_cursor_norm;
 }
 
+// persistant value updates
 void _blu_areaUpdate(blu_Area* a) {
     bool hover = a->prevHovered;
 
@@ -456,27 +443,17 @@ void _blu_areaUpdate(blu_Area* a) {
 blu_Area* blu_areaMake(const char* string, U32 flags) {
     return blu_areaMake(str_make(string), flags);
 }
-
 blu_Area* blu_areaMake(str string, U32 flags) {
 
     U64 hashKey = hash_hashStr(string);
     if(globs.currentParent) {
         hashKey += globs.currentParent->hashKey; }
 
-
-    blu_Area* area = blu_hashGet(hashKey);
-
-
-    if(area) { // assert to check a component hasn't been created twice per frame
-        if(area->lastTouchedIdx == globs.frameIndex) {
-            ASSERT(false); }
-    }
+    blu_Area* area = _blu_hashGet(hashKey);
 
 
-    // CONSTRUCTION //////////////////
+    // CONSTRUCTION /////////////////////////////////////////////////////////////
     if(!area) {
-
-        // GET NEW AREA STRUCT ////////////////////
         area = globs.firstFree;
         if(!area) { // push new to arena if free list is empty
             area = BUMP_PUSH_NEW(&globs.areaArena, blu_Area); }
@@ -484,66 +461,47 @@ blu_Area* blu_areaMake(str string, U32 flags) {
             globs.firstFree = area->nextFree;
             *area = blu_Area();
         }
-        ///////////////////////////////////////////
 
-        blu_hashInsert(hashKey, area);
-
+        _blu_hashInsert(hashKey, area);
         area->hashKey = hashKey;
     }
-    // IF OLD, RESET CURRENT TREE LINKS //////////////////
     else {
+        ASSERT(area->lastTouchedIdx != globs.frameIndex);
         _blu_areaReset(area);
     }
 
-    area->flags = flags;
-
-    area->lastTouchedIdx = globs.frameIndex;
-
-
 
     // APPLY CURRENTLY BUILT STYLE ////////////////////////////////////////////////
-    // TODO: make recalculation happen less
+    // CLEANUP: could optimize?
     area->style = blu_Style();
-
     blu_StyleStackNode* st = globs.ogStyle;
     while(st) {
 
-        if(st->data.overrideFlags & blu_styleFlags_childLayoutAxis) {
+        if(st->overrideFlags & blu_styleFlags_childLayoutAxis) {
             area->style.childLayoutAxis = st->data.childLayoutAxis; }
-
-        if(st->data.overrideFlags & blu_styleFlags_sizeX) {
+        if(st->overrideFlags & blu_styleFlags_sizeX) {
             area->style.sizes[blu_axis_X] = st->data.sizes[blu_axis_X]; }
-
-        if(st->data.overrideFlags & blu_styleFlags_sizeY) {
+        if(st->overrideFlags & blu_styleFlags_sizeY) {
             area->style.sizes[blu_axis_Y] = st->data.sizes[blu_axis_Y]; }
-
-        if(st->data.overrideFlags & blu_styleFlags_backgroundColor) {
+        if(st->overrideFlags & blu_styleFlags_backgroundColor) {
             area->style.backgroundColor = st->data.backgroundColor; }
-
-        if(st->data.overrideFlags & blu_styleFlags_textColor) {
+        if(st->overrideFlags & blu_styleFlags_textColor) {
             area->style.textColor = st->data.textColor; }
-
-        if(st->data.overrideFlags & blu_styleFlags_textPadding) {
+        if(st->overrideFlags & blu_styleFlags_textPadding) {
             area->style.textPadding = st->data.textPadding; }
-
-        if(st->data.overrideFlags & blu_styleFlags_animationStrength) {
+        if(st->overrideFlags & blu_styleFlags_animationStrength) {
             area->style.animationStrength = st->data.animationStrength; }
-
-        if(st->data.overrideFlags & blu_styleFlags_cornerRadius) {
+        if(st->overrideFlags & blu_styleFlags_cornerRadius) {
             area->style.cornerRadius = st->data.cornerRadius; }
-
-        if(st->data.overrideFlags & blu_styleFlags_borderColor) {
+        if(st->overrideFlags & blu_styleFlags_borderColor) {
             area->style.borderColor = st->data.borderColor; }
-
-        if(st->data.overrideFlags & blu_styleFlags_borderSize) {
+        if(st->overrideFlags & blu_styleFlags_borderSize) {
             area->style.borderSize = st->data.borderSize; }
 
         st = st->next;
     }
 
-
     // SET TREE LINKS ///////////////////////////////////////////////////////////
-
     blu_Area* parent = globs.currentParent;
     if(parent != nullptr) {
         if(parent->firstChild[globs.linkSide] == nullptr) { parent->firstChild[globs.linkSide] = area; }
@@ -551,12 +509,13 @@ blu_Area* blu_areaMake(str string, U32 flags) {
         area->prevSibling = parent->lastChild;
         parent->lastChild = area;
     }
-    area->parent = parent;
 
-    // SET TREE LINKS ///////////////////////////////////////////////////////////
+
+    area->parent = parent;
+    area->flags = flags;
+    area->lastTouchedIdx = globs.frameIndex;
 
     _blu_areaUpdate(area);
-
     // blu_areaAddDisplayStr(area, string);
 
     return area;
@@ -570,12 +529,11 @@ void blu_areaAddDisplayStr(blu_Area* area, str s) {
     area->displayString = nstr;
 }
 
-// CLEANUP: are wo going with opaque or no
+
 
 void blu_pushParent(blu_Area* parent) {
     globs.currentParent = parent;
 }
-
 void blu_popParent() {
     ASSERT(globs.currentParent->parent != nullptr);
     globs.currentParent = globs.currentParent->parent;
@@ -585,42 +543,40 @@ void blu_popParent() {
 
 
 
-void blu_areaRelease(blu_Area* area) {
-    area->nextFree = globs.firstFree;
-    globs.firstFree = area;
-}
-
-void _blu_cullRecursive(blu_Area* area) {
-
-    if(!area) { return; }
-
-    for(blu_Area* elem = area->firstChild[!globs.linkSide]; elem; elem = elem->nextSibling[!globs.linkSide]){
-        _blu_cullRecursive(elem);
-    }
-
-    if(area->lastTouchedIdx < globs.frameIndex) {
-        blu_areaRelease(area);
-        blu_hashRemove(area->hashKey);
+// walk previous frames tree to remove old areas
+void _blu_cullRecurse(blu_Area* elem) {
+    while(elem){
+        if(elem->lastTouchedIdx < globs.frameIndex) {
+            // push to free list
+            elem->nextFree = globs.firstFree;
+            globs.firstFree = elem;
+            _blu_hashRemove(elem->hashKey);
+        }
+        _blu_cullRecurse(elem->firstChild[!globs.linkSide]);
+        elem = elem->nextSibling[!globs.linkSide];
     }
 }
 
+// reset globals, cull old areas, free memory
 void blu_beginFrame() {
-
     // U64 byteCount = (U64)(globs.frameArena.offset) - (U64)(globs.frameArena.start);
     // printf("%llu / %llu\n", byteCount, globs.frameArena.reserved);
     bump_clear(&globs.frameArena);
-    _blu_cullRecursive(globs.ogParent);
+
+    _blu_cullRecurse(globs.ogParent);
+
 
     globs.frameIndex++;
     globs.linkSide = globs.frameIndex%2;
 
+
     globs.ogStyle = nullptr;
     globs.currentStyle = nullptr;
-
     globs.currentParent = nullptr;
-    blu_Area* np = blu_areaMake(str_make("HELP ME PLEASE GOD PLEASE"), 0);
-    blu_pushParent(np);
+
+    blu_Area* np = blu_areaMake("HELP ME PLEASE GOD PLEASE", 0);
     globs.ogParent = np;
+    globs.currentParent = np;
 }
 
 
@@ -628,20 +584,66 @@ void blu_beginFrame() {
 
 
 
-float _blu_sizeOfString(str s) {
+
+
+
+
+
+float _blu_sizeOfString(str s, int axis) {
+    if(axis == blu_axis_Y) { return globs.fontHeight; }
+
     float size = 0;
     for(int i = 0; i < s.length; i++) {
-        size += globs.fontGlyphs[s.chars[i] - BLU_FONT_FIRST].advance; // CLEANUP: char oob assertion
+        size += globs.fontGlyphs[s.chars[i] - BLU_FONT_FIRST].advance; // CLEANUP: out of bounds char rendering
     }
-
     return size;
 }
 
 
+// double underscore indicates only being used in one place
+// would have just inlined it but this language doesn't have nested function defs
 
-void _blu_solveRemainders(blu_Area* parent, int axis) {
+// NOTE: noop on parent
+// fills in PX and TEXT based sizes
+void __blu_calculateStandaloneSizesRecurse(blu_Area* parent, int axis) {
+
+    blu_Area* elem = parent->firstChild[globs.linkSide];
+    while(elem) {
+        if(elem->style.sizes[axis].kind == blu_sizeKind_PX) {
+            elem->calculatedSizes[axis] = elem->style.sizes[axis].value;
+        }
+        else if(elem->style.sizes[axis].kind == blu_sizeKind_TEXT) {
+
+            // CLEANUP: what about no text
+            // TODO: text wrapping/truncation
+
+            float pad = elem->style.textPadding.x * 2;
+            if(axis == blu_axis_Y) { pad = elem->style.textPadding.y * 2; }
+            elem->calculatedSizes[axis] = _blu_sizeOfString(elem->displayString, axis) + pad;
+        }
+
+        __blu_calculateStandaloneSizesRecurse(elem, axis);
+        elem = elem->nextSibling[globs.linkSide];
+    }
+}
+
+// NOTE: does operate on parent
+// fills in pct based sizes
+void __blu_calculateUpwardsSizesRecurse(blu_Area* elem, int axis) {
+    while(elem) {
+
+        if(elem->style.sizes[axis].kind == blu_sizeKind_PERCENT) {
+            elem->calculatedSizes[axis] = elem->parent->calculatedSizes[axis] * elem->style.sizes[axis].value; }
+
+        __blu_calculateUpwardsSizesRecurse(elem->firstChild[globs.linkSide], axis);
+        elem = elem->nextSibling[globs.linkSide];
+    }
+}
 
 
+// NOTE: does not operate on parent
+// fills in remainder sizes
+void __blu_solveChildRemaindersRecurse(blu_Area* parent, int axis) {
 
     float wantedSize = parent->calculatedSizes[axis];
     float totalSize = 0;
@@ -679,13 +681,12 @@ void _blu_solveRemainders(blu_Area* parent, int axis) {
 
     elem = parent->firstChild[globs.linkSide];
     for(; elem; elem = elem->nextSibling[globs.linkSide]) {
-        _blu_solveRemainders(elem, axis);
+        __blu_solveChildRemaindersRecurse(elem, axis);
     }
 }
 
-
-// CLEANUP: make recursive functions consistent
-void _blu_calculateOffsetsAndRect(blu_Area* parent) {
+// NOTE: does not operate on parent object
+void __blu_calculateChildRectsRecurse(blu_Area* parent) {
 
     bool x = parent->style.childLayoutAxis == blu_axis_X;
     V2f off = { 0, 0 };
@@ -696,29 +697,27 @@ void _blu_calculateOffsetsAndRect(blu_Area* parent) {
     blu_Area* elem = parent->firstChild[globs.linkSide];
     while(elem) {
 
-        if((elem->flags & blu_areaFlags_FLOATING)) {
-            elem->calculatedPosition[blu_axis_X] = parent->calculatedPosition[blu_axis_X] + elem->offset.x;
-            elem->calculatedPosition[blu_axis_Y] = parent->calculatedPosition[blu_axis_Y] + elem->offset.y;
-        }
-        else {
-            elem->calculatedPosition[blu_axis_X] = parent->calculatedPosition[blu_axis_X] + off.x;
-            elem->calculatedPosition[blu_axis_Y] = parent->calculatedPosition[blu_axis_Y] + off.y;
+        V2f elemOffset = off;
 
+        if(elem->flags & blu_areaFlags_FLOATING) {
+            elemOffset = elem->offset; }
+        else {
             off += {
                 (elem->calculatedSizes[blu_axis_X] * x),
                 (elem->calculatedSizes[blu_axis_Y] * (!x))
             };
         }
 
+        V2f calcdPos = parent->rect.start + elemOffset;
         elem->rect = Rect2f {
-            { elem->calculatedPosition[blu_axis_X], elem->calculatedPosition[blu_axis_Y] },
+            { calcdPos },
             {
-                elem->calculatedPosition[blu_axis_X] + elem->calculatedSizes[blu_axis_X],
-                elem->calculatedPosition[blu_axis_Y] + elem->calculatedSizes[blu_axis_Y]
+                calcdPos.x + elem->calculatedSizes[blu_axis_X],
+                calcdPos.y + elem->calculatedSizes[blu_axis_Y]
             }
         };
 
-        _blu_calculateOffsetsAndRect(elem);
+        __blu_calculateChildRectsRecurse(elem);
         elem = elem->nextSibling[globs.linkSide];
     }
 }
@@ -736,73 +735,22 @@ void blu_layout(V2f scSize) {
     };
 
 
-    U64 visitSize = BLU_MAX_AREA_COUNT * sizeof(blu_Area*);
-    blu_Area** visitStack = BUMP_PUSH_ARR(&globs.frameArena, BLU_MAX_AREA_COUNT, blu_Area*);
-    U32 visitStackDepth = 0;
-
     for(int axis = 0; axis < blu_axis_COUNT; axis++) {
+        // sorry :p
+        __blu_calculateStandaloneSizesRecurse(globs.ogParent, axis);
+        __blu_calculateUpwardsSizesRecurse(globs.ogParent, axis);
+        __blu_solveChildRemaindersRecurse(globs.ogParent, axis);
+    }
 
-        // STANDALONE SIZES ==================================================================
-
-        ARR_APPEND(visitStack, visitStackDepth, globs.ogParent);
-        while(visitStackDepth > 0) {
-            blu_Area* elem = ARR_POP(visitStack, visitStackDepth);
-
-            if(elem->style.sizes[axis].kind == blu_sizeKind_PX) {
-                elem->calculatedSizes[axis] = elem->style.sizes[axis].value; }
-
-            else if(elem->style.sizes[axis].kind == blu_sizeKind_TEXT) {
-                if(axis == blu_axis_Y) {
-                    elem->calculatedSizes[axis] = globs.fontHeight + 2*elem->style.textPadding.y;
-                    // CLEANUP: what about no text
-                    // TODO: text wrapping/truncation
-                }
-                else if(axis == blu_axis_X) {
-
-                    float s = elem->style.textPadding.x * 2;
-                    s += _blu_sizeOfString(elem->displayString);
-
-                    elem->calculatedSizes[axis] = s;
-                }
-            }
+    __blu_calculateChildRectsRecurse(globs.ogParent);
+}
 
 
-            blu_Area* child = elem->firstChild[globs.linkSide];
-            while(child) {
-                ASSERT(visitStackDepth < BLU_MAX_AREA_COUNT);
-                ARR_APPEND(visitStack, visitStackDepth, child);
-                child = child->nextSibling[globs.linkSide];
-            }
-        }
-
-        // UPWARD DEPENDANT SIZES ===========================================================
-
-        visitStackDepth = 0;
-        ARR_APPEND(visitStack, visitStackDepth, globs.ogParent);
-        while(visitStackDepth > 0) {
-            blu_Area* elem = ARR_POP(visitStack, visitStackDepth);
 
 
-            if(elem->style.sizes[axis].kind == blu_sizeKind_PERCENT) {
-                elem->calculatedSizes[axis] = elem->parent->calculatedSizes[axis] * elem->style.sizes[axis].value; }
 
 
-            blu_Area* child = elem->firstChild[globs.linkSide];
-            while(child) {
-                ASSERT(visitStackDepth < BLU_MAX_AREA_COUNT);
-                ARR_APPEND(visitStack, visitStackDepth, child);
-                child = child->nextSibling[globs.linkSide];
-            }
-        }
 
-
-        _blu_solveRemainders(globs.ogParent, axis);
-    } // end axis loop
-
-    _blu_calculateOffsetsAndRect(globs.ogParent);
-
-    bump_pop(&globs.frameArena, visitSize);
-} // end layout
 
 
 
@@ -879,7 +827,7 @@ void _blu_genRenderCallsRecurse(blu_Area* area, Rect2f clip, gfx_Pass* pass) {
 
             if(area->flags & blu_areaFlags_CENTER_TEXT) {
                 float size = area->calculatedSizes[blu_axis_X];
-                float strSize = _blu_sizeOfString(area->displayString);
+                float strSize = _blu_sizeOfString(area->displayString, blu_axis_X);
                 off.x = (size - strSize) / 2;
             }
 
@@ -911,21 +859,9 @@ void _blu_genRenderCallsRecurse(blu_Area* area, Rect2f clip, gfx_Pass* pass) {
         area = area->nextSibling[globs.linkSide];
     }
 }
-// CLEANUP: rename
-void blu_createPass(gfx_Pass* normalPass) {
-
-    V2f start = V2f(
-        globs.ogParent->calculatedPosition[blu_axis_X],
-        globs.ogParent->calculatedPosition[blu_axis_Y]
-        );
-    V2f end = start + V2f(
-        globs.ogParent->calculatedSizes[blu_axis_X],
-        globs.ogParent->calculatedSizes[blu_axis_Y]);
-
-    _blu_genRenderCallsRecurse(globs.ogParent, { start, end }, normalPass);
+void blu_makeDrawCalls(gfx_Pass* normalPass) {
+    _blu_genRenderCallsRecurse(globs.ogParent, globs.ogParent->rect, normalPass);
 }
-
-
 
 
 
@@ -938,16 +874,16 @@ void blu_createPass(gfx_Pass* normalPass) {
 
 #define _BLU_DEFINE_STYLE_ADD(varName, type) \
     void blu_style_add_##varName(type varName) { \
-        globs.currentStyle->data.overrideFlags |= blu_styleFlags_##varName; \
+        globs.currentStyle->overrideFlags |= blu_styleFlags_##varName; \
         globs.currentStyle->data.varName = varName; \
     } \
 
 void blu_style_add_sizeX(blu_Size size) {
-    globs.currentStyle->data.overrideFlags |= blu_styleFlags_sizeX;
+    globs.currentStyle->overrideFlags |= blu_styleFlags_sizeX;
     globs.currentStyle->data.sizes[blu_axis_X] = size;
 }
 void blu_style_add_sizeY(blu_Size size) {
-    globs.currentStyle->data.overrideFlags |= blu_styleFlags_sizeY;
+    globs.currentStyle->overrideFlags |= blu_styleFlags_sizeY;
     globs.currentStyle->data.sizes[blu_axis_Y] = size;
 }
 
@@ -991,6 +927,8 @@ void blu_popStyle() {
 
 
 
+
+
 // return indicates if parent has been blocked
 // never touch this code again
 bool _blu_genInteractionsRecurse(blu_Area* area, bool covered, blu_Cursor* outCursor) {
@@ -1008,16 +946,12 @@ bool _blu_genInteractionsRecurse(blu_Area* area, bool covered, blu_Cursor* outCu
     bool containsMouse = false;
     if(!covered) {
         V2f pos = globs.inputMousePos;
-        if(area->calculatedPosition[blu_axis_X] <= pos.x &&
-            area->calculatedPosition[blu_axis_X] + area->calculatedSizes[blu_axis_X] > pos.x) {
-            if(area->calculatedPosition[blu_axis_Y] <= pos.y &&
-                area->calculatedPosition[blu_axis_Y] + area->calculatedSizes[blu_axis_Y] > pos.y) {
-
+        if(area->rect.start.x <= pos.x && area->rect.end.x > pos.x) {
+            if(area->rect.start.y <= pos.y && area->rect.end.y > pos.y) {
                 containsMouse = true;
             }
         }
     }
-
 
     bool clickable = area->flags & blu_areaFlags_CLICKABLE;
     if(clickable) {
@@ -1087,7 +1021,6 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
 
     return out;
 }
-
 
 
 

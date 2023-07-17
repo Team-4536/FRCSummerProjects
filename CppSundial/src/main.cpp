@@ -188,8 +188,6 @@ int main() {
 
 
 
-
-
         ui_update(&frameArena, window, dt);
 
 
@@ -220,7 +218,7 @@ int main() {
             p->passUniforms = gfx_UniformBlock();
             p->passUniforms.vp = vp;
 
-            blu_createPass(p);
+            blu_makeDrawCalls(p);
         }
 
         gfx_drawPasses(w, h);
