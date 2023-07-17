@@ -179,7 +179,7 @@ bool gfx_loadOBJMesh(const char* path, BumpAlloc* scratch, gfx_VertexArray** out
 #include "stb_image/stb_image.h"
 #include <stdio.h>
 
-#define MAX_DRAW_CALL_COUNT 2048
+#define MAX_DRAW_CALL_COUNT 4000
 #define MAX_PASS_COUNT 16
 #define RES_SIZE 1000000
 

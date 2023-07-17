@@ -13,10 +13,13 @@
 
 
 
-#define GRAPH2D_VCOUNT 800
+#define GRAPH2D_VCOUNT 700
+#define GRAPH2D_LINECOUNT 6
 struct Graph2dInfo {
 
-    float vals[GRAPH2D_VCOUNT] = { 0 };
+    float vals[GRAPH2D_LINECOUNT][GRAPH2D_VCOUNT] = { 0 };
+    str keys[GRAPH2D_LINECOUNT] = { 0 };
+    V4f colors[GRAPH2D_LINECOUNT];
 
     gfx_Framebuffer* target = nullptr;
     float yScale = 1;
@@ -92,7 +95,7 @@ void areaAddFB(blu_Area* area, gfx_Framebuffer* target) {
 
 
 
-void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
+void ui_init(BumpAlloc* frameArena, BumpAlloc* resArena, gfx_Texture* solidTex) {
     globs = UIGlobs();
 
     globs.solidTex = solidTex;
@@ -142,6 +145,12 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
 
     globs.graph2dInfo = Graph2dInfo();
     globs.graph2dInfo.target = gfx_registerFramebuffer();
+
+    globs.graph2dInfo.colors[0] = col_green;
+    globs.graph2dInfo.keys[0] = str_copy(STR("FLSteerSpeed"), resArena); // TODO: access by hash key instead of str
+
+    globs.graph2dInfo.colors[1] = col_red;
+    globs.graph2dInfo.keys[1] = str_copy(STR("FLSteerPos"), resArena);
 
 
 
@@ -302,13 +311,17 @@ void draw_line(gfx_Pass* p, float thickness, V4f color, V2f start, V2f end) {
 
 void draw_graph2d(Graph2dInfo* info, float dt) {
 
-    // APPEND NEW VALUE
-    net_Prop* prop = net_hashGet(STR("trajSpeed"));
-    float nval = 0;
-    if(prop) { nval = (F32)prop->data->f64; }
+    // APPEND NEW VALUES
+    for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
+        if(!info->keys[i].chars) { continue; }
 
-    memmove(info->vals, &(info->vals[1]), (GRAPH2D_VCOUNT-1)*sizeof(float));
-    info->vals[GRAPH2D_VCOUNT - 1] = nval;
+        net_Prop* prop = net_hashGet(info->keys[i]);
+        float nval = 0;
+        if(prop) { nval = (F32)prop->data->f64; }
+
+        memmove(info->vals[i], &(info->vals[i][1]), (GRAPH2D_VCOUNT-1)*sizeof(float));
+        info->vals[i][GRAPH2D_VCOUNT - 1] = nval;
+    }
 
 
 
@@ -342,21 +355,26 @@ void draw_graph2d(Graph2dInfo* info, float dt) {
             float offset = info->yOffset + height/2;
             float pointGap = width / (float)GRAPH2D_VCOUNT;
 
+            // TODO: batch line calls
             draw_line(p, 1, col_darkGray, { 0, offset }, { width, offset });
             draw_line(p, 1, col_darkGray, { 0, offset + 1*scale}, { width, offset + 1*scale });
             draw_line(p, 1, col_darkGray, { 0, offset - 1*scale}, { width, offset - 1*scale });
 
 
-            V2f lastPoint = V2f(0, info->vals[0] * scale + offset);
-            for(int i = 1; i < GRAPH2D_VCOUNT; i++) {
 
-                V4f color = col_lightGray;
-                if(net_getConnected()) { color = col_green; }
+            for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
+                if(!info->keys[i].chars) { continue; }
 
-                V2f point = { i*pointGap, info->vals[i] * scale + offset };
-                draw_line(p, 2, color, lastPoint, point);
+                V2f lastPoint = V2f(0, info->vals[i][0] * scale + offset);
+                for(int j = 1; j < GRAPH2D_VCOUNT; j++) {
 
-                lastPoint = point;
+                    V4f color = col_lightGray;
+                    if(net_getConnected()) { color = info->colors[i]; }
+
+                    V2f point = { j*pointGap, info->vals[i][j] * scale + offset };
+                    draw_line(p, 2, color, lastPoint, point);
+                    lastPoint = point;
+                }
             }
 
             // a = blu_areaMake(STR("lowerBit"), 0);
