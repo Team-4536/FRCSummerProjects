@@ -139,7 +139,7 @@ class SwerveBot(wpilib.TimedRobot):
         ], pointCount)
 
         self.speedPath = getLinear2dPoints([
-            V2f(0.9, 1), V2f(1, 0.3)
+            V2f(0.8, 1), V2f(1, 0.4)
         ], pointCount)
 
         self.anglePath = getLinear2dPoints([
@@ -164,7 +164,7 @@ class SwerveBot(wpilib.TimedRobot):
         move = diff * speed
 
         nextAngle = self.anglePath[self.pathIdx]
-        turn = angleWrap(nextAngle - self.gyro.getYaw()) * 0.03
+        turn = angleWrap(nextAngle - self.gyro.getYaw()) * 0.07
 
         if((pose - nextPt).getLength() < 0.6): self.pathIdx += 1
 

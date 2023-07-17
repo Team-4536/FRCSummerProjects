@@ -52,7 +52,7 @@ class SwerveSim:
 
         self.driveSims: list[EncoderSim] = [ ]
         for i in range(4):
-           sim = EncoderSim(driveMotors[i], plant.DCMotor.NEO(1), driveEncoders[i], 0.01, 6.12)
+           sim = EncoderSim(driveMotors[i], plant.DCMotor.NEO(1), driveEncoders[i], 0.005, 6.12)
            self.driveSims.append(sim)
 
         self.steerSims: list[EncoderSim] = [ ]

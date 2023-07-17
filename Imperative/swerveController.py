@@ -20,7 +20,7 @@ class SwerveController:
 
         kp = 2
         ki = 0
-        kd = 4
+        kd = 12
         self.FLPID = PIDController(kp, ki, kd)
         self.FRPID = PIDController(kp, ki, kd)
         self.BLPID = PIDController(kp, ki, kd)
