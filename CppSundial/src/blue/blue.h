@@ -532,16 +532,9 @@ void blu_popParent() {
 
 
 blu_Area* blu_getCursorParent() {
-    ASSERT(globs.cursorParent == nullptr);
-    blu_Area* temp = globs.currentParent;
-
-    globs.currentParent = nullptr;
-    blu_Area* p = blu_areaMake("WOAHHHH CURSOR PARENT HOLY SHIT", 0);
-    globs.currentParent = temp;
-
-    p->ctorParent = temp;
-    globs.cursorParent = p;
-    return p;
+    ASSERT(globs.cursorParent->firstChild[globs.linkSide] == nullptr);
+    globs.cursorParent->ctorParent = globs.currentParent;
+    return globs.cursorParent;
 }
 
 
@@ -576,10 +569,13 @@ void blu_beginFrame() {
     globs.ogStyle = nullptr;
     globs.currentStyle = nullptr;
     globs.currentParent = nullptr;
+    globs.cursorParent = nullptr;
 
-    blu_Area* np = blu_areaMake("HELP ME PLEASE GOD PLEASE", 0);
-    globs.ogParent = np;
-    globs.currentParent = np;
+
+    globs.ogParent = blu_areaMake("HELP ME PLEASE GOD PLEASE", 0);
+    globs.cursorParent = blu_areaMake("WOAHHHH CURSOR PARENT HOLY SHIT", 0);
+
+    globs.currentParent = globs.ogParent;
 }
 
 
@@ -731,10 +727,14 @@ void blu_layout(V2f scSize) {
     globs.ogParent->calculatedSizes[blu_axis_Y] = scSize.y;
     globs.ogParent->rect = {
         { 0, 0 },
-        {
-            globs.ogParent->calculatedSizes[blu_axis_X] = scSize.x,
-            globs.ogParent->calculatedSizes[blu_axis_Y] = scSize.y
-        }
+        { scSize.x, scSize.y }
+    };
+
+    globs.cursorParent->calculatedSizes[blu_axis_X] = 300;
+    globs.cursorParent->calculatedSizes[blu_axis_Y] = 300;
+    globs.cursorParent->rect = {
+        globs.inputMousePos,
+        globs.inputMousePos + scSize
     };
 
 
@@ -743,9 +743,14 @@ void blu_layout(V2f scSize) {
         __blu_calculateStandaloneSizesRecurse(globs.ogParent, axis);
         __blu_calculateUpwardsSizesRecurse(globs.ogParent, axis);
         __blu_solveChildRemaindersRecurse(globs.ogParent, axis);
+
+        __blu_calculateStandaloneSizesRecurse(globs.cursorParent, axis);
+        __blu_calculateUpwardsSizesRecurse(globs.cursorParent, axis);
+        __blu_solveChildRemaindersRecurse(globs.cursorParent, axis);
     }
 
     __blu_calculateChildRectsRecurse(globs.ogParent);
+    __blu_calculateChildRectsRecurse(globs.cursorParent);
 }
 
 
@@ -864,6 +869,7 @@ void _blu_genRenderCallsRecurse(blu_Area* area, Rect2f clip, gfx_Pass* pass) {
 }
 void blu_makeDrawCalls(gfx_Pass* normalPass) {
     _blu_genRenderCallsRecurse(globs.ogParent, globs.ogParent->rect, normalPass);
+    _blu_genRenderCallsRecurse(globs.cursorParent, globs.cursorParent->rect, normalPass);
 }
 
 

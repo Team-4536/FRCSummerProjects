@@ -399,10 +399,12 @@ void draw_graph2d(Graph2dInfo* info, float dt) {
 
         a = blu_getCursorParent();
         blu_parentScope(a) {
-        blu_style_sizeX({ blu_sizeKind_PX, 50, });
-        blu_style_sizeY({ blu_sizeKind_PX, 50, });
+        blu_style_sizeX({ blu_sizeKind_TEXT, 0 });
+        blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
+        blu_style_style(&borderStyle);
 
-            blu_areaMake("HELP", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT);
+            a = blu_areaMake("HELP", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT);
+            blu_areaAddDisplayStr(a, "HELP");
         }
     }
 };
