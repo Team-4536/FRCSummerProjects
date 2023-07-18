@@ -76,6 +76,7 @@ static struct UIGlobs {
 
 
 
+
 // TEMP:
 // adds a framebuffer to an area, and resizes based on area size
 // doesnt rezise if area is <= 0 on either axis
@@ -95,6 +96,8 @@ void areaAddFB(blu_Area* area, gfx_Framebuffer* target) {
 }
 
 
+blu_Style borderStyle;
+
 
 void ui_init(BumpAlloc* frameArena, BumpAlloc* resArena, gfx_Texture* solidTex) {
     globs = UIGlobs();
@@ -106,6 +109,8 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* resArena, gfx_Texture* solidTex) 
     U8* data;
 
 
+    blu_style_borderColor(col_black, &borderStyle);
+    blu_style_borderSize(1, &borderStyle);
 
 
 
@@ -334,12 +339,12 @@ void draw_graph2d(Graph2dInfo* info, float dt) {
 
 
     blu_Area* a = blu_areaMake("graph2d", blu_areaFlags_DRAW_BACKGROUND);
-    a->style.childLayoutAxis = blu_axis_Y;
+    blu_style_childLayoutAxis(blu_axis_Y, &a->style);
 
     blu_parentScope(a) {
 
         a = blu_areaMake("upperBit", blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE);
-        a->style.sizes[blu_axis_Y] = { blu_sizeKind_REMAINDER, 0 };
+        blu_style_sizeY({blu_sizeKind_REMAINDER, 0}, &a->style);
         areaAddFB(a, info->target);
         float width = info->target->texture->width;
         float height = info->target->texture->height;
@@ -460,16 +465,14 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
 
     blu_parentScope(a) {
-        blu_styleScope {
-        blu_style_add_sizeX({ blu_sizeKind_TEXT, 50 });
-        blu_style_add_sizeY({ blu_sizeKind_TEXT, 50 });
-        blu_style_add_borderColor(col_black);
-        blu_style_add_borderSize(1);
-        blu_style_add_cornerRadius(2);
-        blu_style_add_backgroundColor(col_darkGray * V4f(1, 1, 1, 0.75f));
+        blu_styleScope(blu_Style()) {
+        blu_style_sizeX({ blu_sizeKind_TEXT, 0 });
+        blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
+        blu_style_backgroundColor(col_darkGray * V4f(1, 1, 1, 0.75f));
+        blu_style_style(&borderStyle);
 
             a = blu_areaMake("buttonParent", blu_areaFlags_FLOATING);
-            a->style.sizes[blu_axis_X] = { blu_sizeKind_PERCENT, 1 };
+            blu_style_sizeX({ blu_sizeKind_PERCENT, 1 }, &a->style);
             a->offset = V2f(5, 5);
             blu_parentScope(a) {
 
@@ -565,10 +568,11 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
     blu_Area* a;
 
-    blu_styleScope {
-    blu_style_add_sizeY({ blu_sizeKind_TEXT, 0 });
-    blu_style_add_childLayoutAxis(blu_axis_X);
-    blu_style_add_backgroundColor(col_darkGray);
+    blu_styleScope(blu_Style()) {
+    blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
+    blu_style_childLayoutAxis(blu_axis_X);
+    blu_style_backgroundColor(col_darkGray);
+
         a = blu_areaMake(STR("FPS"), blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
         str n = str_format(scratch, STR("FPS: %f"), 1/dt);
         blu_areaAddDisplayStr(a, n);
@@ -577,7 +581,7 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
         blu_parentScope(a) {
             a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
             blu_areaAddDisplayStr(a, STR("Network status: "));
-            a->style.sizes[blu_axis_X] = { blu_sizeKind_TEXT, 0 };
+            blu_style_sizeX({ blu_sizeKind_TEXT, 0 }, &a->style);
 
             a = blu_areaMake(STR("box"), blu_areaFlags_DRAW_BACKGROUND);
             a->style.backgroundColor = col_red;
@@ -602,10 +606,10 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
         info->clipPos += blu_interactionFromWidget(a).scrollDelta * 40;
         blu_parentScope(a) {
 
-            blu_styleScope {
-            blu_style_add_sizeY({ blu_sizeKind_TEXT, 0 });
-            blu_style_add_childLayoutAxis(blu_axis_X);
-            blu_style_add_backgroundColor(col_darkGray);
+            blu_styleScope(blu_Style()) {
+            blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
+            blu_style_childLayoutAxis(blu_axis_X);
+            blu_style_backgroundColor(col_darkGray);
 
 
 
@@ -616,13 +620,12 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                     net_Prop* prop = tracked[i];
 
                     a = blu_areaMake(prop->name, blu_areaFlags_DRAW_BACKGROUND);
+                    blu_style_style(&borderStyle, &a->style);
                     a->style.backgroundColor = col_darkBlue;
-                    a->style.borderSize = 1;
-                    a->style.borderColor = col_black;
 
                     blu_parentScope(a) {
-                        blu_styleScope {
-                        blu_style_add_sizeX({ blu_sizeKind_PERCENT, 0.5 });
+                        blu_styleScope(blu_Style()) {
+                        blu_style_sizeX({ blu_sizeKind_PERCENT, 0.5 });
 
                             a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
 
@@ -701,14 +704,13 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
 
     blu_Area* a;
 
-    blu_styleScope
-    {
-    blu_style_add_backgroundColor(col_darkBlue);
-    blu_style_add_textColor(col_white);
-    blu_style_add_sizeX({ blu_sizeKind_PERCENT, 1 });
-    blu_style_add_sizeY({ blu_sizeKind_PERCENT, 1 });
-    blu_style_add_textPadding(V2f(4, 4));
-    blu_style_add_animationStrength(0.1f);
+    blu_styleScope(blu_Style()) {
+    blu_style_backgroundColor(col_darkBlue);
+    blu_style_textColor(col_white);
+    blu_style_sizeX({ blu_sizeKind_PERCENT, 1 });
+    blu_style_sizeY({ blu_sizeKind_PERCENT, 1 });
+    blu_style_textPadding(V2f(4, 4));
+    blu_style_animationStrength(0.1f);
 
 
         a = blu_areaMake(STR("leftBarParent"), blu_areaFlags_DRAW_BACKGROUND);
@@ -720,9 +722,9 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
         a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 3 };
 
 
-        blu_styleScope
+        blu_styleScope(blu_Style())
         {
-        blu_style_add_sizeX({blu_sizeKind_REMAINDER, 0 });
+        blu_style_sizeX({blu_sizeKind_REMAINDER, 0 });
             draw_field(&globs.fieldInfo, dt, window);
         }
 
@@ -745,12 +747,10 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
 
         blu_parentScope(a) {
 
-            blu_styleScope {
-            blu_style_add_sizeY({ blu_sizeKind_REMAINDER, 0 });
+            blu_styleScope(blu_Style()) {
+            blu_style_sizeY({ blu_sizeKind_REMAINDER, 0 });
 
                 draw_graph2d(&globs.graph2dInfo, dt);
-
-
                 // draw_swerveDrive(&globs.swerveInfo, dt);
             }
 
@@ -764,8 +764,8 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
             globs.botSize += -inter.dragDelta.y;
             a->cursor = blu_cursor_resizeV;
 
-            blu_styleScope {
-            blu_style_add_sizeY({blu_sizeKind_PX, globs.botSize });
+            blu_styleScope(blu_Style()) {
+            blu_style_sizeY({blu_sizeKind_PX, globs.botSize });
                 draw_network(&globs.netInfo, dt, scratch);
             }
         }

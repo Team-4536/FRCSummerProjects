@@ -107,6 +107,8 @@ enum blu_Cursor {
 // gad damn this language
 
 struct blu_Style {
+    U32 overrideFlags = 0;
+
     blu_Axis childLayoutAxis = blu_axis_X;
     blu_Size sizes[blu_axis_COUNT] = { { blu_sizeKind_NONE, 0 }, { blu_sizeKind_NONE, 0 } };
     V4f backgroundColor = V4f();
@@ -136,7 +138,6 @@ struct blu_StyleStackNode {
     blu_Style data = blu_Style();
     blu_StyleStackNode* next;
     blu_StyleStackNode* prev;
-    U32 overrideFlags = 0;
 };
 
 
@@ -215,24 +216,26 @@ void blu_popParent();
 void blu_areaAddDisplayStr(blu_Area* area, str s); // CLEANUP: inconsistent, ctor functions or no
 void blu_areaAddDisplayStr(blu_Area* area, const char* s);
 
-void blu_pushStyle();
+void blu_pushStyle(blu_Style s);
 void blu_popStyle();
-void blu_style_add_childLayoutAxis(blu_Axis axis);
-void blu_style_add_sizeX(blu_Size size);
-void blu_style_add_sizeY(blu_Size size);
-void blu_style_add_backgroundColor(V4f color);
-void blu_style_add_textColor(V4f color);
-void blu_style_add_textPadding(V2f padding);
-void blu_style_add_animationStrength(F32 s);
-void blu_style_add_cornerRadius(F32 radius);
-void blu_style_add_borderSize(F32 size);
-void blu_style_add_borderColor(V4f color);
+void blu_style_style(blu_Style* style, blu_Style* target = nullptr);
+
+void blu_style_sizeX(blu_Size size, blu_Style* target = nullptr);
+void blu_style_sizeY(blu_Size size, blu_Style* target = nullptr);
+void blu_style_childLayoutAxis(blu_Axis axis, blu_Style* target = nullptr);
+void blu_style_backgroundColor(V4f color, blu_Style* target = nullptr);
+void blu_style_textColor(V4f color, blu_Style* target = nullptr);
+void blu_style_textPadding(V2f padding, blu_Style* target = nullptr);
+void blu_style_animationStrength(F32 s, blu_Style* target = nullptr);
+void blu_style_cornerRadius(F32 radius, blu_Style* target = nullptr);
+void blu_style_borderSize(F32 size, blu_Style* target = nullptr);
+void blu_style_borderColor(V4f color, blu_Style* target = nullptr);
 
 blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area);
 
 
 #define blu_deferLoop(begin, end) for(int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
-#define blu_styleScope blu_deferLoop(blu_pushStyle(), blu_popStyle())
+#define blu_styleScope(style) blu_deferLoop(blu_pushStyle(style), blu_popStyle())
 #define blu_parentScope(parent) blu_deferLoop(blu_pushParent(parent), blu_popParent())
 
 
@@ -476,28 +479,7 @@ blu_Area* blu_areaMake(str string, U32 flags) {
     area->style = blu_Style();
     blu_StyleStackNode* st = globs.ogStyle;
     while(st) {
-
-        if(st->overrideFlags & blu_styleFlags_childLayoutAxis) {
-            area->style.childLayoutAxis = st->data.childLayoutAxis; }
-        if(st->overrideFlags & blu_styleFlags_sizeX) {
-            area->style.sizes[blu_axis_X] = st->data.sizes[blu_axis_X]; }
-        if(st->overrideFlags & blu_styleFlags_sizeY) {
-            area->style.sizes[blu_axis_Y] = st->data.sizes[blu_axis_Y]; }
-        if(st->overrideFlags & blu_styleFlags_backgroundColor) {
-            area->style.backgroundColor = st->data.backgroundColor; }
-        if(st->overrideFlags & blu_styleFlags_textColor) {
-            area->style.textColor = st->data.textColor; }
-        if(st->overrideFlags & blu_styleFlags_textPadding) {
-            area->style.textPadding = st->data.textPadding; }
-        if(st->overrideFlags & blu_styleFlags_animationStrength) {
-            area->style.animationStrength = st->data.animationStrength; }
-        if(st->overrideFlags & blu_styleFlags_cornerRadius) {
-            area->style.cornerRadius = st->data.cornerRadius; }
-        if(st->overrideFlags & blu_styleFlags_borderColor) {
-            area->style.borderColor = st->data.borderColor; }
-        if(st->overrideFlags & blu_styleFlags_borderSize) {
-            area->style.borderSize = st->data.borderSize; }
-
+        blu_style_style(&st->data, &area->style);
         st = st->next;
     }
 
@@ -873,18 +855,21 @@ void blu_makeDrawCalls(gfx_Pass* normalPass) {
 
 
 #define _BLU_DEFINE_STYLE_ADD(varName, type) \
-    void blu_style_add_##varName(type varName) { \
-        globs.currentStyle->overrideFlags |= blu_styleFlags_##varName; \
-        globs.currentStyle->data.varName = varName; \
+    void blu_style_##varName(type varName, blu_Style* target) { \
+        if(target == nullptr) { target = &globs.currentStyle->data; } \
+        target->overrideFlags |= blu_styleFlags_##varName; \
+        target->varName = varName; \
     } \
 
-void blu_style_add_sizeX(blu_Size size) {
-    globs.currentStyle->overrideFlags |= blu_styleFlags_sizeX;
-    globs.currentStyle->data.sizes[blu_axis_X] = size;
+void blu_style_sizeX(blu_Size size, blu_Style* target) {
+    if(target == nullptr) { target = &globs.currentStyle->data; }
+    target->overrideFlags |= blu_styleFlags_sizeX;
+    target->sizes[blu_axis_X] = size;
 }
-void blu_style_add_sizeY(blu_Size size) {
-    globs.currentStyle->overrideFlags |= blu_styleFlags_sizeY;
-    globs.currentStyle->data.sizes[blu_axis_Y] = size;
+void blu_style_sizeY(blu_Size size, blu_Style* target) {
+    if(target == nullptr) { target = &globs.currentStyle->data; }
+    target->overrideFlags |= blu_styleFlags_sizeY;
+    target->sizes[blu_axis_Y] = size;
 }
 
 _BLU_DEFINE_STYLE_ADD(childLayoutAxis, blu_Axis)
@@ -896,12 +881,14 @@ _BLU_DEFINE_STYLE_ADD(cornerRadius, F32)
 _BLU_DEFINE_STYLE_ADD(borderColor, V4f)
 _BLU_DEFINE_STYLE_ADD(borderSize, F32)
 
+#undef _BLU_DEFINE_STYLE_ADD
 
 
 
-void blu_pushStyle() {
+void blu_pushStyle(blu_Style style) {
 
     blu_StyleStackNode* s = BUMP_PUSH_NEW(&globs.frameArena, blu_StyleStackNode);
+    s->data = style;
 
     if(!globs.ogStyle) {
         globs.currentStyle = s;
@@ -922,6 +909,33 @@ void blu_popStyle() {
     globs.currentStyle = globs.currentStyle->prev;
 }
 
+
+void blu_style_style(blu_Style* style, blu_Style* target) {
+    if(target == nullptr) { target = &globs.currentStyle->data; }
+
+    if(style->overrideFlags & blu_styleFlags_childLayoutAxis) {
+        target->childLayoutAxis = style->childLayoutAxis; }
+    if(style->overrideFlags & blu_styleFlags_sizeX) {
+        target->sizes[blu_axis_X] = style->sizes[blu_axis_X]; }
+    if(style->overrideFlags & blu_styleFlags_sizeY) {
+        target->sizes[blu_axis_Y] = style->sizes[blu_axis_Y]; }
+    if(style->overrideFlags & blu_styleFlags_backgroundColor) {
+        target->backgroundColor = style->backgroundColor; }
+    if(style->overrideFlags & blu_styleFlags_textColor) {
+        target->textColor = style->textColor; }
+    if(style->overrideFlags & blu_styleFlags_textPadding) {
+        target->textPadding = style->textPadding; }
+    if(style->overrideFlags & blu_styleFlags_animationStrength) {
+        target->animationStrength = style->animationStrength; }
+    if(style->overrideFlags & blu_styleFlags_cornerRadius) {
+        target->cornerRadius = style->cornerRadius; }
+    if(style->overrideFlags & blu_styleFlags_borderColor) {
+        target->borderColor = style->borderColor; }
+    if(style->overrideFlags & blu_styleFlags_borderSize) {
+        target->borderSize = style->borderSize; }
+
+    target->overrideFlags |= style->overrideFlags;
+}
 
 
 
