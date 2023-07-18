@@ -317,6 +317,8 @@ void draw_line(gfx_Pass* p, float thickness, V4f color, V2f start, V2f end) {
 
 void draw_graph2d(Graph2dInfo* info, float dt) {
 
+
+
     // APPEND NEW VALUES
     for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
         if(!info->keys[i].chars) { continue; }
@@ -387,6 +389,20 @@ void draw_graph2d(Graph2dInfo* info, float dt) {
                 draw_line(p, 2, color, lastPoint, point);
                 lastPoint = point;
             }
+        }
+    }
+
+
+
+
+    if(blu_interactionFromWidget(a).hovered) {
+
+        a = blu_getCursorParent();
+        blu_parentScope(a) {
+        blu_style_sizeX({ blu_sizeKind_PX, 50, });
+        blu_style_sizeY({ blu_sizeKind_PX, 50, });
+
+            blu_areaMake("HELP", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT);
         }
     }
 };

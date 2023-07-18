@@ -150,7 +150,9 @@ struct blu_Area {
     // tree links, [2] means double buffered
     // CLEANUP: replace double buffer/ benchmark vs a copy version
     // CLEANUP: better way of iterating over all elements
-    blu_Area* parent = nullptr;
+
+    blu_Area* ctorParent = nullptr; // where to go after popParent() is called (because sometimes you push to another tree (like the cursor tree))
+    blu_Area* parent = nullptr; // actual parent in the tree
     blu_Area* firstChild[2] = { 0 };
     blu_Area* lastChild = nullptr;
     blu_Area* nextSibling[2] = { 0 };
@@ -212,6 +214,8 @@ blu_Area* blu_areaMake(str s, U32 flags);
 blu_Area* blu_areaMake(const char* string, U32 flags);
 void blu_pushParent(blu_Area* parent);
 void blu_popParent();
+
+blu_Area* blu_getCursorParent();
 
 void blu_areaAddDisplayStr(blu_Area* area, str s); // CLEANUP: inconsistent, ctor functions or no
 void blu_areaAddDisplayStr(blu_Area* area, const char* s);
@@ -277,8 +281,9 @@ struct blu_Glyph {
 
 struct blu_Globs {
 
-    blu_Area* currentParent = nullptr; // CLEANUP: replace with currentArea
     blu_Area* ogParent = nullptr;
+    blu_Area* cursorParent = nullptr;
+    blu_Area* currentParent = nullptr; // CLEANUP: replace with currentArea
 
 
     blu_Area** hash = nullptr; // array of pointers to the actual area structs, for hash-based access
@@ -494,6 +499,7 @@ blu_Area* blu_areaMake(str string, U32 flags) {
 
 
     area->parent = parent;
+    area->ctorParent = parent;
     area->flags = flags;
     area->lastTouchedIdx = globs.frameIndex;
 
@@ -517,11 +523,26 @@ void blu_pushParent(blu_Area* parent) {
     globs.currentParent = parent;
 }
 void blu_popParent() {
-    ASSERT(globs.currentParent->parent != nullptr);
-    globs.currentParent = globs.currentParent->parent;
+    ASSERT(globs.currentParent->ctorParent != nullptr);
+    globs.currentParent = globs.currentParent->ctorParent;
 }
 
 
+
+
+
+blu_Area* blu_getCursorParent() {
+    ASSERT(globs.cursorParent == nullptr);
+    blu_Area* temp = globs.currentParent;
+
+    globs.currentParent = nullptr;
+    blu_Area* p = blu_areaMake("WOAHHHH CURSOR PARENT HOLY SHIT", 0);
+    globs.currentParent = temp;
+
+    p->ctorParent = temp;
+    globs.cursorParent = p;
+    return p;
+}
 
 
 
