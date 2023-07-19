@@ -35,6 +35,12 @@ void initGraph2dInfo(Graph2dInfo* info, BumpAlloc* resArena) {
 
     info->colors[1] = col_red;
     info->keys[1] = str_copy(STR("FLSteerPos"), resArena);
+
+    info->colors[2] = col_purple;
+    info->keys[2] = str_copy(STR("FRSteerSpeed"), resArena);
+
+    info->colors[3] = col_yellow;
+    info->keys[3] = str_copy(STR("FRSteerPos"), resArena);
 }
 
 struct FieldInfo {
@@ -447,7 +453,9 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
             blu_style_backgroundColor(col_lightGray);
             blu_style_cornerRadius(5);
 
-                for(int i = 0; i < 2; i++) {
+                for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
+                    if(!info->keys[i].chars) { continue; }
+
                     a = blu_areaMake(str_format(scratch, STR("thing %i"), i),
                         blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT |
                         blu_areaFlags_DROP_EVENTS | blu_areaFlags_HOVER_ANIM);
@@ -803,7 +811,7 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
 
 
 
-// TODO: texures
+// TODO: button texures
 void makeViewSrc(const char* name, ViewType type) {
 
     blu_Area* a = blu_areaMake(name,
