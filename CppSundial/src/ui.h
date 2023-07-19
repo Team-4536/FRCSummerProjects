@@ -849,8 +849,8 @@ void makeView(const char* name, View* v, float dt, BumpAlloc* scratch, GLFWwindo
 
             updateView(v, dt, window, scratch);
 
-            // a = blu_areaMake("hoverIndicator", blu_areaFlags_FLOATING);
-            // a->style.backgroundColor = v4f_lerp(V4f(0, 0, 0, 0), V4f(1, 1, 1, 1), t);
+            a = blu_areaMake("hoverIndicator", blu_areaFlags_FLOATING | blu_areaFlags_DRAW_BACKGROUND);
+            a->style.backgroundColor = v4f_lerp(V4f(0, 0, 0, 0), V4f(1, 1, 1, 0.3), t);
         }
     }
 }

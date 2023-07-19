@@ -1031,15 +1031,11 @@ bool __blu_genInteractionsRecurse(blu_Area* area, blu_Area* dragged, bool* outBl
     bool containsMouse = _blu_rectContainsPoint(area->clipRect, globs.inputMousePos);
     if(!containsMouse) { return false; }
 
-    *outBlockSiblings = true;
-
-
+    bool clickable = (area->flags & blu_areaFlags_CLICKABLE) && (!dragged);
+    if(clickable) { *outBlockSiblings = true; }
 
     bool recievesDrop = (dragged && dragged != area) && (area->flags & blu_areaFlags_DROP_EVENTS) && (area->dropTypeMask & dragged->dropType);
-    bool clickable = (area->flags & blu_areaFlags_CLICKABLE) && (!dragged);
-
     if(!recievesDrop && !clickable) { return false; }
-
 
     *outCursor = area->cursor;
     area->prevHovered = true;
@@ -1061,9 +1057,11 @@ bool __blu_genScrollInteractionsRecurse(blu_Area* area, bool* outBlockSiblings, 
     }
 
     if(!_blu_rectContainsPoint(area->clipRect, globs.inputMousePos)) { return false; }
-    *outBlockSiblings = true;
 
-    if(!(area->flags & blu_areaFlags_SCROLLABLE)) { return false; }
+    bool scrollable = (area->flags & blu_areaFlags_SCROLLABLE);
+    if(!scrollable) { return false; }
+
+    *outBlockSiblings = true;
 
     area->scrollDelta = scrollDelta;
     return true;
