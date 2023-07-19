@@ -307,11 +307,17 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt) 
     };
 
     // TODO: hash get is not typesafe
-    net_Prop* props[] = {
+    net_Prop* rotationProps[] = {
         net_hashGet(STR("FLSteerPos")),
         net_hashGet(STR("FRSteerPos")),
         net_hashGet(STR("BLSteerPos")),
         net_hashGet(STR("BRSteerPos"))
+    };
+    net_Prop* distProps[] = {
+        net_hashGet(STR("FLDrivePos")),
+        net_hashGet(STR("FRDrivePos")),
+        net_hashGet(STR("BLDrivePos")),
+        net_hashGet(STR("BRDrivePos"))
     };
 
     net_Prop* angle = net_hashGet(STR("yaw"));
@@ -320,23 +326,41 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt) 
 
 
     for(int i = 0; i < 4; i++) {
-        gfx_UniformBlock* b = gfx_registerCall(p);
-        b->texture = globs.wheelTex;
 
-        matrixTranslation(translations[i].x, translations[i].y, 0, b->model);
-        matrixScale(1, 1, 0, temp);
-        b->model = b->model * temp;
+        Mat4f t;
+        matrixTranslation(translations[i].x, translations[i].y, 0, t);
+
+        if(rotationProps[i]) {
+            matrixZRotation(-(F32)rotationProps[i]->data->f64 * 360, temp);
+            t = temp * t;
+        }
 
         if(angle) {
             matrixZRotation(-(F32)angle->data->f64, temp);
-            b->model = b->model * temp;
+            t = t * temp;
         }
 
-        if(props[i]) {
-            matrixZRotation(-(F32)props[i]->data->f64 * 360, temp);
-            b->model = temp * b->model;
+        // wheel
+        gfx_UniformBlock* b = gfx_registerCall(p);
+        b->texture = globs.wheelTex;
+        b->model = t;
+
+        // tread
+        matrixScale(0.25, 0.95, 0, temp);
+
+        float pos = 0;
+        if(distProps[i]) {
+            pos = (F32)distProps[i]->data->f64 * 0.1f;
         }
+
+        b = gfx_registerCall(p);
+        b->texture = globs.treadTex;
+        b->model = temp * t;
+        b->srcStart = V2f(0, pos);
+        b->srcEnd = V2f(1, pos - 1);
     }
+
+
 
     gfx_UniformBlock* b = gfx_registerCall(p);
     b->texture = globs.arrowTex;
