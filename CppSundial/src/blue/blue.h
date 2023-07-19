@@ -69,7 +69,7 @@ enum blu_SizeKind {
     blu_sizeKind_REMAINDER,
 };
 
-enum blu_AreaFlags {
+enum blu_AreaFlags { // TODO: name these better
     blu_areaFlags_NONE =            (0 << 0),
     blu_areaFlags_DRAW_BACKGROUND = (1 << 0),
     blu_areaFlags_DRAW_TEXT =       (1 << 1),
@@ -180,8 +180,10 @@ struct blu_Area {
     blu_Cursor cursor = blu_cursor_norm;
 
     // CLEANUP: do these need to be reset every frame? (not rn)
-    U32 dragMask = 0; // masks which events are given (which other elems can recieve)
-    U32 dropMask = 0; // masks which events are recieved
+    // masks which events are recieved
+    U32 dropTypeMask = 0;
+    // masks which events are given (which other elems can recieve)
+    U32 dropType = 0;
     void* dropVal = nullptr;
 
     // layout pass data //////////////////////////////
@@ -211,7 +213,7 @@ struct blu_WidgetInteraction {
     // another elem has been dropped on this one
     bool dropped = false;
     void* dropVal = nullptr;
-    U32 dropMask = 0;
+    U32 dropType = 0;
 };
 
 
@@ -1033,7 +1035,7 @@ bool __blu_genInteractionsRecurse(blu_Area* area, blu_Area* dragged, bool* outBl
 
 
 
-    bool recievesDrop = (dragged && dragged != area) && (area->flags & blu_areaFlags_DROP_EVENTS) && (area->dropMask & dragged->dragMask);
+    bool recievesDrop = (dragged && dragged != area) && (area->flags & blu_areaFlags_DROP_EVENTS) && (area->dropTypeMask & dragged->dropType);
     bool clickable = (area->flags & blu_areaFlags_CLICKABLE) && (!dragged);
 
     if(!recievesDrop && !clickable) { return false; }
@@ -1103,10 +1105,10 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
 
     if(globs.prevDragged != area && globs.prevDragged) {
         if(globs.inputPrevLButton && !globs.inputCurLButton) {
-            if(globs.prevDragged->dragMask & area->dropMask) {
+            if(globs.prevDragged->dropType & area->dropTypeMask) {
                 if(area->prevHovered) {
                     out.dropped = true;
-                    out.dropMask = globs.prevDragged->dropMask;
+                    out.dropType = globs.prevDragged->dropTypeMask;
                     out.dropVal = globs.prevDragged->dropVal;
                 }
             }

@@ -188,7 +188,7 @@ int main() {
 
 
 
-        ui_update(&frameArena, window, dt);
+        ui_update(&frameArena, &lifetimeArena, window, dt);
 
 
 

@@ -22,24 +22,26 @@ struct Graph2dInfo {
     str keys[GRAPH2D_LINECOUNT] = { 0 };
     V4f colors[GRAPH2D_LINECOUNT];
 
-    gfx_Framebuffer* target = nullptr;
     float yScale = 1;
     float yOffset = 0;
 };
+void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAlloc* scratch);
+void initGraph2dInfo(Graph2dInfo* info, BumpAlloc* resArena) {
+
+    info->colors[0] = col_green;
+    info->keys[0] = str_copy(STR("FLSteerSpeed"), resArena); // TODO: access by hash key instead of str
+    // TODO: after NT reset, graph ptrs are invalid
+    // TODO: memory leak here lol
+
+    info->colors[1] = col_red;
+    info->keys[1] = str_copy(STR("FLSteerPos"), resArena);
+}
 
 struct FieldInfo {
-    gfx_Framebuffer* fb = nullptr;
-
-    gfx_VertexArray* robotVA = nullptr;
-    gfx_IndexBuffer* robotIB = nullptr;
-    gfx_VertexArray* fieldVA = nullptr;
-    gfx_IndexBuffer* fieldIB = nullptr;
-
-    gfx_Texture* fieldTex = nullptr;
-
     Transform camTransform;
     Transform camTarget;
 };
+void draw_field(FieldInfo* info, gfx_Framebuffer* fb, float dt, GLFWwindow* window);
 
 struct NetInfo {
     float clipSize = 0;
@@ -47,30 +49,58 @@ struct NetInfo {
     float clipMax = 1000;
     // TODO: adaptive max size
 };
+void draw_network(NetInfo* info, float dt, BumpAlloc* scratch);
 
 struct SwerveDriveInfo {
-    gfx_Framebuffer* target = nullptr;
-    gfx_Texture* wheelTex = nullptr;
-    gfx_Texture* treadTex = nullptr;
-    gfx_Texture* arrowTex = nullptr;
+
+};
+void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt);
+
+
+enum ViewType {
+    viewType_graph2d,
+    viewType_field,
+    viewType_net,
+    viewType_swerveDrive,
+};
+union ViewUnion {
+    Graph2dInfo graph2dInfo;
+    FieldInfo fieldInfo;
+    NetInfo netInfo;
+    SwerveDriveInfo swerveDriveInfo;
+
+    ViewUnion() {  };
+};
+struct View {
+    ViewUnion data;
+    ViewType type;
+    gfx_Framebuffer* target; // CLEANUP: bad
 };
 
 
 
+#define UI_VIEW_COUNT 3
 static struct UIGlobs {
 
     gfx_Shader* sceneShader3d = nullptr;
     gfx_Shader* sceneShader2d = nullptr;
     gfx_Texture* solidTex;
 
-    float rightSize = 400;
-    float botSize = 200;
+    float rightSize;
+    float downSize;
 
+    View views[UI_VIEW_COUNT];
 
-    FieldInfo fieldInfo = FieldInfo();
-    NetInfo netInfo = NetInfo();
-    SwerveDriveInfo swerveInfo = SwerveDriveInfo();
-    Graph2dInfo graph2dInfo = Graph2dInfo();
+    gfx_Texture* wheelTex = nullptr;
+    gfx_Texture* treadTex = nullptr;
+    gfx_Texture* arrowTex = nullptr;
+
+    gfx_VertexArray* robotVA = nullptr;
+    gfx_IndexBuffer* robotIB = nullptr;
+    gfx_VertexArray* fieldVA = nullptr;
+    gfx_IndexBuffer* fieldIB = nullptr;
+
+    gfx_Texture* fieldTex = nullptr;
 } globs;
 
 
@@ -78,6 +108,7 @@ static struct UIGlobs {
 enum DropMasks {
     dropMasks_NONE = 0,
     dropMasks_NT_PROP = (1 << 0),
+    dropMasks_VIEW_TYPE = (1 << 1),
 };
 
 
@@ -101,11 +132,30 @@ void areaAddFB(blu_Area* area, gfx_Framebuffer* target) {
 }
 
 
+void initView(View* v, BumpAlloc* resArena) {
+    if(v->type == viewType_field) { v->data.fieldInfo = FieldInfo(); }
+    else if(v->type == viewType_graph2d) { v->data.graph2dInfo = Graph2dInfo(); initGraph2dInfo(&v->data.graph2dInfo, resArena); }
+    else if(v->type == viewType_swerveDrive) { v->data.swerveDriveInfo = SwerveDriveInfo(); }
+    else if(v->type == viewType_net) { v->data.netInfo = NetInfo(); }
+    else { ASSERT(false); };
+}
+
+void updateView(View* v, float dt, GLFWwindow* window, BumpAlloc* scratch) {
+    if(v->type == viewType_field) { draw_field(&v->data.fieldInfo, v->target, dt, window); }
+    else if(v->type == viewType_graph2d) { draw_graph2d(&v->data.graph2dInfo, v->target, dt, scratch); }
+    else if(v->type == viewType_swerveDrive) { draw_swerveDrive(&v->data.swerveDriveInfo, v->target, dt); }
+    else if(v->type == viewType_net) { draw_network(&v->data.netInfo, dt, scratch); }
+    else { ASSERT(false); };
+}
+
+
 blu_Style borderStyle;
 
 
 void ui_init(BumpAlloc* frameArena, BumpAlloc* resArena, gfx_Texture* solidTex) {
-    globs = UIGlobs();
+
+    globs.rightSize = 400;
+    globs.downSize = 400;
 
     globs.solidTex = solidTex;
 
@@ -118,50 +168,42 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* resArena, gfx_Texture* solidTex) 
     blu_style_borderSize(1, &borderStyle);
 
 
+    for(int i = 0; i < UI_VIEW_COUNT; i++) {
+        View* v = &(globs.views[i]);
+        v->target = gfx_registerFramebuffer();
+    }
+    globs.views[0].type = viewType_field;
+    globs.views[1].type = viewType_graph2d;
+    globs.views[2].type = viewType_net;
 
-    globs.fieldInfo.fb = gfx_registerFramebuffer();
+    initView(&globs.views[0], resArena);
+    initView(&globs.views[1], resArena);
+    initView(&globs.views[2], resArena);
 
-    bool res = gfx_loadOBJMesh("res/models/Chassis2.obj", frameArena, &globs.fieldInfo.robotVA, &globs.fieldInfo.robotIB);
+
+    bool res = gfx_loadOBJMesh("res/models/Chassis2.obj", frameArena, &globs.robotVA, &globs.robotIB);
     ASSERT(res);
     bump_clear(frameArena);
 
-    res = gfx_loadOBJMesh("res/models/plane.obj", frameArena, &globs.fieldInfo.fieldVA, &globs.fieldInfo.fieldIB);
+    res = gfx_loadOBJMesh("res/models/plane.obj", frameArena, &globs.fieldVA, &globs.fieldIB);
     ASSERT(res);
     bump_clear(frameArena);
-
 
     data = stbi_load("res/textures/field.png", &w, &h, &bpp, 4);
     ASSERT(data);
-    globs.fieldInfo.fieldTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
-
-
-
-
-    globs.swerveInfo.target = gfx_registerFramebuffer();
+    globs.fieldTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
 
     data = stbi_load("res/textures/swerveWheel.png", &w, &h, &bpp, 4);
     ASSERT(data);
-    globs.swerveInfo.wheelTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
+    globs.wheelTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
 
     data = stbi_load("res/textures/swerveTread.png", &w, &h, &bpp, 4);
     ASSERT(data);
-    globs.swerveInfo.treadTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
+    globs.treadTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
 
     data = stbi_load("res/textures/vector.png", &w, &h, &bpp, 4);
     ASSERT(data);
-    globs.swerveInfo.arrowTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
-
-
-
-
-    globs.graph2dInfo = Graph2dInfo();
-    globs.graph2dInfo.target = gfx_registerFramebuffer();
-
-    globs.graph2dInfo.colors[0] = col_green;
-    globs.graph2dInfo.keys[0] = str_copy(STR("FLSteerSpeed"), resArena); // TODO: access by hash key instead of str
-
-    globs.graph2dInfo.colors[1] = col_red;
-    globs.graph2dInfo.keys[1] = str_copy(STR("FLSteerPos"), resArena);
+    globs.arrowTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
 
 
 
@@ -226,20 +268,20 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* resArena, gfx_Texture* solidTex) 
 
 
 
-void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
+void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt) {
 
     blu_Area* a = blu_areaMake("swerveDisplay", blu_areaFlags_DRAW_TEXTURE);
-    a->texture = info->target->texture;
+    a->texture = target->texture;
 
-    areaAddFB(a, info->target);
+    areaAddFB(a, target);
 
-    gfx_Pass* p = gfx_registerClearPass(col_darkBlue, info->target);
+    gfx_Pass* p = gfx_registerClearPass(col_darkBlue, target);
 
     p = gfx_registerPass();
-    p->target = info->target;
+    p->target = target;
     p->shader = globs.sceneShader2d;
 
-    float aspect = ((float)info->target->texture->width/info->target->texture->height);
+    float aspect = ((float)target->texture->width/target->texture->height);
     float size = 4;
     float width = size * aspect;
     float height = size;
@@ -273,7 +315,7 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
 
     for(int i = 0; i < 4; i++) {
         gfx_UniformBlock* b = gfx_registerCall(p);
-        b->texture = info->wheelTex;
+        b->texture = globs.wheelTex;
 
         matrixTranslation(translations[i].x, translations[i].y, 0, b->model);
         matrixScale(1, 1, 0, temp);
@@ -291,11 +333,11 @@ void draw_swerveDrive(SwerveDriveInfo* info, float dt) {
     }
 
     gfx_UniformBlock* b = gfx_registerCall(p);
-    b->texture = info->arrowTex;
+    b->texture = globs.arrowTex;
     if(angle) {
         matrixZRotation(-(F32)angle->data->f64, b->model); }
 
-    matrixScale((F32)info->arrowTex->width / info->arrowTex->height, 1, 1, temp);
+    matrixScale((F32)globs.arrowTex->width / globs.arrowTex->height, 1, 1, temp);
     b->model = temp * b->model;
 }
 
@@ -320,7 +362,7 @@ void draw_line(gfx_Pass* p, float thickness, V4f color, V2f start, V2f end) {
     b->model = matrixTransform(t);
 }
 
-void draw_graph2d(Graph2dInfo* info, float dt, BumpAlloc* scratch) {
+void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAlloc* scratch) {
 
     // APPEND NEW VALUES
     for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
@@ -350,14 +392,14 @@ void draw_graph2d(Graph2dInfo* info, float dt, BumpAlloc* scratch) {
 
         a = blu_areaMake("upperBit", blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE | blu_areaFlags_SCROLLABLE);
         blu_style_sizeY({blu_sizeKind_REMAINDER, 0}, &a->style);
-        areaAddFB(a, info->target);
-        float width = info->target->texture->width;
-        float height = info->target->texture->height;
+        areaAddFB(a, target);
+        float width = target->texture->width;
+        float height = target->texture->height;
 
-        gfx_registerClearPass(col_darkBlue, info->target);
+        gfx_registerClearPass(col_darkBlue, target);
 
         gfx_Pass* p = gfx_registerPass();
-        p->target = info->target;
+        p->target = target;
         p->shader = globs.sceneShader2d;
         matrixOrtho(0, width, height, 0, 0, 100, p->passUniforms.vp);
 
@@ -414,7 +456,7 @@ void draw_graph2d(Graph2dInfo* info, float dt, BumpAlloc* scratch) {
 
                     a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, col_white, a->target_hoverAnim);
 
-                    a->dropMask = dropMasks_NT_PROP;
+                    a->dropTypeMask = dropMasks_NT_PROP;
                     inter = blu_interactionFromWidget(a);
                     if(inter.dropped) {
                         net_Prop* prop = ((net_Prop*)(inter.dropVal));
@@ -441,7 +483,7 @@ blu_WidgetInteraction makeButton(str text, V4f hoverColor) {
     return blu_interactionFromWidget(a);
 }
 
-void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
+void draw_field(FieldInfo* info, gfx_Framebuffer* fb, float dt, GLFWwindow* window) {
 
     V4f mVec = { 0, 0, 0, 0 };
 
@@ -489,16 +531,16 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
 
     blu_Area* a = blu_areaMake("fieldDisplay", blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE);
-    a->texture = info->fb->texture;
+    a->texture = fb->texture;
 
     V2f delta = blu_interactionFromWidget(a).dragDelta;
     info->camTarget.ry -= delta.x * 0.5f;
     info->camTarget.rx -= delta.y * 0.5f;
 
-    areaAddFB(a, info->fb);
+    areaAddFB(a, fb);
 
     Mat4f proj = Mat4f(1.0f);
-    matrixPerspective(90, (float)info->fb->texture->width / info->fb->texture->height, 0.01, 1000000, proj);
+    matrixPerspective(90, (float)fb->texture->width / fb->texture->height, 0.01, 1000000, proj);
 
 
     blu_parentScope(a) {
@@ -510,6 +552,7 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
             a = blu_areaMake("buttonParent", blu_areaFlags_FLOATING);
             blu_style_sizeX({ blu_sizeKind_PERCENT, 1 }, &a->style);
+            blu_style_childLayoutAxis(blu_axis_X, &a->style);
             a->offset = V2f(5, 5);
             blu_parentScope(a) {
 
@@ -541,7 +584,7 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
 
 
-    gfx_Pass* p = gfx_registerClearPass(col_darkBlue, info->fb);
+    gfx_Pass* p = gfx_registerClearPass(col_darkBlue, fb);
 
 
     // CLEANUP: transform lerp func, also quaternions would be cool
@@ -558,7 +601,7 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
     matrixInverse(view, view);
 
     p = gfx_registerPass();
-    p->target = info->fb;
+    p->target = fb;
     p->shader = globs.sceneShader3d;
     p->passUniforms.vp = view * proj;
 
@@ -568,9 +611,9 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
     b = gfx_registerCall(p);
     b->color = V4f(1, 1, 1, 1);
-    b->ib = info->fieldIB;
-    b->va = info->fieldVA;
-    b->texture = info->fieldTex;
+    b->ib = globs.fieldIB;
+    b->va = globs.fieldVA;
+    b->texture = globs.fieldTex;
 
     Transform field = Transform(); // TODO: get a field model
     field.sx = 16.4846 / 2;
@@ -580,16 +623,16 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
     b = gfx_registerCall(p);
     b->color = V4f(1, 0, 0, 0.5);
-    b->ib = info->robotIB;
-    b->va = info->robotVA;
+    b->ib = globs.robotIB;
+    b->va = globs.robotVA;
     b->model = matrixTransform(estimateTransform);
     b->texture = globs.solidTex;
 
 
     b = gfx_registerCall(p);
     b->color = V4f(1, 0, 0, 1);
-    b->ib = info->robotIB;
-    b->va = info->robotVA;
+    b->ib = globs.robotIB;
+    b->va = globs.robotVA;
     b->model = matrixTransform(robotTransform);
     b->texture = globs.solidTex;
 }
@@ -604,6 +647,7 @@ void draw_field(FieldInfo* info, float dt, GLFWwindow* window) {
 
 void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
     blu_Area* a;
+
 
     blu_styleScope(blu_Style()) {
     blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
@@ -627,14 +671,14 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
             if(net_getConnected()) {
                 a->style.backgroundColor = col_green; }
         } // end connection parent
-    }
+    } // end top bar section
 
 
-    a = blu_areaMake(STR("left"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
+
+    a = blu_areaMake(STR("lower"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
     info->clipSize = a->calculatedSizes[blu_axis_Y];
     a->style.childLayoutAxis = blu_axis_X;
     blu_parentScope(a) {
-
 
         a = blu_areaMake(STR("clip"), blu_areaFlags_VIEW_OFFSET | blu_areaFlags_CLICKABLE | blu_areaFlags_SCROLLABLE);
         blu_Area* clip = a;
@@ -660,7 +704,7 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                     blu_Area* parent = blu_areaMake(prop->name, blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
                     blu_style_style(&borderStyle, &parent->style);
                     F32 t = parent->target_hoverAnim;
-                    parent->dragMask = dropMasks_NT_PROP;
+                    parent->dropType = dropMasks_NT_PROP;
                     parent->dropVal = prop;
 
                     if(blu_interactionFromWidget(parent).held) {
@@ -759,9 +803,59 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
 
 
 
+// TODO: texures
+void makeViewSrc(const char* name, ViewType type) {
+
+    blu_Area* a = blu_areaMake(name,
+        blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CLICKABLE | blu_areaFlags_DRAW_BACKGROUND);
+    blu_areaAddDisplayStr(a, name);
+    a->style.backgroundColor = v4f_lerp(col_darkGray, col_lightGray, a->target_hoverAnim);
+
+    a->dropType = dropMasks_VIEW_TYPE;
+    a->dropVal = (void*)type;
+    if(blu_interactionFromWidget(a).held) {
+        blu_parentScope(blu_getCursorParent()) {
+            blu_styleScope(blu_Style()) {
+            blu_style_style(&borderStyle);
+            blu_style_sizeX({ blu_sizeKind_TEXT, 0 });
+            blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
+            blu_style_borderSize(2);
+                a = blu_areaMake("drag indicator", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT);
+                blu_areaAddDisplayStr(a, name);
+            }
+        }
+    }
+}
+
+void makeView(const char* name, View* v, float dt, BumpAlloc* scratch, GLFWwindow* window, BumpAlloc* res) {
+
+    blu_Area* a = blu_areaMake(name, blu_areaFlags_DROP_EVENTS | blu_areaFlags_HOVER_ANIM);
+    blu_style_childLayoutAxis(blu_axis_Y, &a->style);
+    a->dropTypeMask = dropMasks_VIEW_TYPE;
+
+    blu_WidgetInteraction inter = blu_interactionFromWidget(a);
+    if(inter.dropped) {
+        v->type = (ViewType)(U64)inter.dropVal; // sorry
+        initView(v, res);
+    }
+
+    float t = a->target_hoverAnim;
 
 
-void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
+    blu_parentScope(a) {
+        blu_styleScope(blu_Style()) {
+        blu_style_sizeX({ blu_sizeKind_PERCENT, 1 });
+        blu_style_sizeY({ blu_sizeKind_PERCENT, 1 });
+
+            updateView(v, dt, window, scratch);
+
+            // a = blu_areaMake("hoverIndicator", blu_areaFlags_FLOATING);
+            // a->style.backgroundColor = v4f_lerp(V4f(0, 0, 0, 0), V4f(1, 1, 1, 1), t);
+        }
+    }
+}
+
+void ui_update(BumpAlloc* scratch, BumpAlloc* res, GLFWwindow* window, float dt) {
 
     blu_Area* a;
 
@@ -778,6 +872,18 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
         a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 50 };
         a->style.childLayoutAxis = blu_axis_Y;
 
+        blu_parentScope(a) {
+            blu_styleScope(blu_Style()) {
+            blu_style_sizeY({ blu_sizeKind_PX, 50 });
+            blu_style_backgroundColor(col_darkGray);
+            blu_style_cornerRadius(4);
+                makeViewSrc("Field", viewType_field);
+                makeViewSrc("Graph", viewType_graph2d);
+                makeViewSrc("Swerve", viewType_swerveDrive);
+                makeViewSrc("NT", viewType_net);
+            }
+        }
+
         a = blu_areaMake(STR("leftBarSep"), blu_areaFlags_DRAW_BACKGROUND);
         a->style.backgroundColor = col_black;
         a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 3 };
@@ -786,7 +892,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
         blu_styleScope(blu_Style())
         {
         blu_style_sizeX({blu_sizeKind_REMAINDER, 0 });
-            draw_field(&globs.fieldInfo, dt, window);
+            makeView("left", &globs.views[0], dt, scratch, window, res);
         }
 
 
@@ -811,8 +917,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
             blu_styleScope(blu_Style()) {
             blu_style_sizeY({ blu_sizeKind_REMAINDER, 0 });
 
-                draw_graph2d(&globs.graph2dInfo, dt, scratch);
-                // draw_swerveDrive(&globs.swerveInfo, dt);
+                makeView("top", &globs.views[1], dt, scratch, window, res);
             }
 
 
@@ -822,12 +927,12 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
             blu_WidgetInteraction inter = blu_interactionFromWidget(a);
             float t = inter.held? 1 : a->target_hoverAnim;
             a->style.backgroundColor = v4f_lerp(col_black, col_white, t);
-            globs.botSize += -inter.dragDelta.y;
+            globs.downSize += -inter.dragDelta.y;
             a->cursor = blu_cursor_resizeV;
 
             blu_styleScope(blu_Style()) {
-            blu_style_sizeY({blu_sizeKind_PX, globs.botSize });
-                draw_network(&globs.netInfo, dt, scratch);
+            blu_style_sizeY({blu_sizeKind_PX, globs.downSize });
+                makeView("bottom", &globs.views[2], dt, scratch, window, res);
             }
         }
     }
