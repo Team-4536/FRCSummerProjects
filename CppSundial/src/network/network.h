@@ -553,6 +553,7 @@ void net_update(BumpAlloc* scratch, float curTime) {
 
     net_SockErr err;
 
+    bool wasConnected = globs.connected;
     if(!globs.connected) {
         bool connected = _net_sockCreateConnect("localhost", "7000", &globs.simSocket, &err);
 
@@ -565,7 +566,6 @@ void net_update(BumpAlloc* scratch, float curTime) {
             str s = STR("[CONNECTED]\n");
             fwrite(s.chars, 1, s.length, globs.logFile);
         }
-
     }
 
 
@@ -636,7 +636,7 @@ void net_update(BumpAlloc* scratch, float curTime) {
     }
 
 
-    if(!globs.connected) {
+    if(!globs.connected && wasConnected) {
         str s = STR("[DISCONNECTED]\n");
         fwrite(s.chars, 1, s.length, globs.logFile);
     }
