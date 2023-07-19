@@ -36,7 +36,7 @@ THE CHECKLIST:
     [X] rounding
     [X] borders
     [X] tooltips
-    [ ] drag drop
+    [X] drag drop
     [ ] dropdowns
     [ ] padding
     [ ] drop shadows
@@ -80,6 +80,7 @@ enum blu_AreaFlags {
     blu_areaFlags_CLICKABLE =       (1 << 6),
     blu_areaFlags_SCROLLABLE =      (1 << 7),
     blu_areaFlags_VIEW_OFFSET =     (1 << 8),
+    blu_areaFlags_DROP_EVENTS =     (1 << 9),
 };
 
 struct blu_Size {
@@ -178,6 +179,11 @@ struct blu_Area {
 
     blu_Cursor cursor = blu_cursor_norm;
 
+    // CLEANUP: do these need to be reset every frame? (not rn)
+    U32 dragMask = 0; // masks which events are given (which other elems can recieve)
+    U32 dropMask = 0; // masks which events are recieved
+    void* dropVal = nullptr;
+
     // layout pass data //////////////////////////////
     F32 calculatedSizes[blu_axis_COUNT];
     Rect2f rect;
@@ -201,6 +207,11 @@ struct blu_WidgetInteraction {
     V2f mousePos = V2f();
 
     float scrollDelta = 0;
+
+    // another elem has been dropped on this one
+    bool dropped = false;
+    void* dropVal = nullptr;
+    U32 dropMask = 0;
 };
 
 
@@ -287,7 +298,11 @@ struct blu_Globs {
 
     blu_Area* ogParent = nullptr;
     blu_Area* cursorParent = nullptr;
-    blu_Area* currentParent = nullptr; // CLEANUP: replace with currentArea
+    blu_Area* currentParent = nullptr;
+
+    blu_StyleStackNode* currentStyle = nullptr;
+    blu_StyleStackNode* ogStyle = nullptr;
+
 
 
     blu_Area** hash = nullptr; // array of pointers to the actual area structs, for hash-based access
@@ -297,16 +312,12 @@ struct blu_Globs {
 
     BumpAlloc frameArena = { };
 
-    blu_StyleStackNode* currentStyle = nullptr;
-    blu_StyleStackNode* ogStyle = nullptr;
 
     U64 frameIndex = 0;
     bool linkSide = 0;
 
 
     gfx_Texture* solidTex = 0;
-
-
 
     gfx_Texture* fontTex = 0;
     float fontAscent = 0;
@@ -317,11 +328,11 @@ struct blu_Globs {
     blu_Glyph fontGlyphs[BLU_FONT_CHARCOUNT];
 
 
-
     V2f inputMousePos = V2f();
     bool inputCurLButton = false;
     bool inputPrevLButton = false;
     blu_Area* dragged = nullptr;
+    blu_Area* prevDragged = nullptr;
     V2f dragDelta = V2f();
 };
 
@@ -497,7 +508,7 @@ blu_Area* blu_areaMake(str string, U32 flags) {
     area->flags = flags;
     area->lastTouchedIdx = globs.frameIndex;
 
-    blu_areaAddDisplayStr(area, string);
+    // blu_areaAddDisplayStr(area, string);
 
     return area;
 }
@@ -1003,13 +1014,13 @@ void __blu_updateInteractionsRecurse(blu_Area* elem) {
 }
 
 // return indicates if parent has been blocked
-bool __blu_genInteractionsRecurse(blu_Area* area, bool* outBlockSiblings, blu_Cursor* outCursor) {
+bool __blu_genInteractionsRecurse(blu_Area* area, blu_Area* dragged, bool* outBlockSiblings, blu_Cursor* outCursor) {
     *outBlockSiblings = false;
 
     blu_Area* elem = area->lastChild;
     while(elem) {
         bool b;
-        if(__blu_genInteractionsRecurse(elem, &b, outCursor)) { return true; }
+        if(__blu_genInteractionsRecurse(elem, dragged, &b, outCursor)) { return true; }
         if(b) { break; }
         elem = elem->prevSibling;
     }
@@ -1020,15 +1031,18 @@ bool __blu_genInteractionsRecurse(blu_Area* area, bool* outBlockSiblings, blu_Cu
 
     *outBlockSiblings = true;
 
-    bool clickable = area->flags & blu_areaFlags_CLICKABLE;
-    if(!clickable) { return false; }
+
+
+    bool recievesDrop = (dragged && dragged != area) && (area->flags & blu_areaFlags_DROP_EVENTS) && (area->dropMask & dragged->dragMask);
+    bool clickable = (area->flags & blu_areaFlags_CLICKABLE) && (!dragged);
+
+    if(!recievesDrop && !clickable) { return false; }
 
 
     *outCursor = area->cursor;
     area->prevHovered = true;
     area->prevPressed = globs.inputCurLButton && !globs.inputPrevLButton;
     if(area->prevPressed) { globs.dragged = area; }
-
     return true;
 }
 
@@ -1055,6 +1069,7 @@ bool __blu_genScrollInteractionsRecurse(blu_Area* area, bool* outBlockSiblings, 
 
 void blu_input(V2f npos, bool lmbState, float scrollDelta, blu_Cursor* outCursor) {
 
+    globs.prevDragged = globs.dragged;
     if(!globs.inputCurLButton && globs.inputPrevLButton) {
         globs.dragged = nullptr;
     }
@@ -1070,9 +1085,9 @@ void blu_input(V2f npos, bool lmbState, float scrollDelta, blu_Cursor* outCursor
     if(globs.dragged) { *outCursor = globs.dragged->cursor; }
 
     __blu_clearInteractionsRecurse(globs.ogParent);
+    bool x;
+    __blu_genInteractionsRecurse(globs.ogParent, globs.dragged, &x, outCursor);
     if(globs.dragged == nullptr) {
-        bool x;
-        __blu_genInteractionsRecurse(globs.ogParent, &x, outCursor);
         __blu_genScrollInteractionsRecurse(globs.ogParent, &x, scrollDelta);
     }
     __blu_updateInteractionsRecurse(globs.ogParent);
@@ -1081,12 +1096,24 @@ void blu_input(V2f npos, bool lmbState, float scrollDelta, blu_Cursor* outCursor
 
 
 blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
-    ASSERT(area->flags & blu_areaFlags_CLICKABLE);
+    // ASSERT(area->flags & blu_areaFlags_CLICKABLE);
 
-    blu_WidgetInteraction out;
+    blu_WidgetInteraction out = blu_WidgetInteraction();
 
-    if(globs.dragged && globs.dragged != area) {
-        return out; }
+
+    if(globs.prevDragged != area && globs.prevDragged) {
+        if(globs.inputPrevLButton && !globs.inputCurLButton) {
+            if(globs.prevDragged->dragMask & area->dropMask) {
+                if(area->prevHovered) {
+                    out.dropped = true;
+                    out.dropMask = globs.prevDragged->dropMask;
+                    out.dropVal = globs.prevDragged->dropVal;
+                }
+            }
+        }
+    }
+
+    if(globs.dragged && globs.dragged != area) { return out; }
 
 
     out.hovered = area->prevHovered;

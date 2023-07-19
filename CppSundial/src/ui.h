@@ -75,6 +75,11 @@ static struct UIGlobs {
 
 
 
+enum DropMasks {
+    dropMasks_NONE = 0,
+    dropMasks_NT_PROP = (1 << 0),
+};
+
 
 
 // TEMP:
@@ -315,7 +320,7 @@ void draw_line(gfx_Pass* p, float thickness, V4f color, V2f start, V2f end) {
     b->model = matrixTransform(t);
 }
 
-void draw_graph2d(Graph2dInfo* info, float dt) {
+void draw_graph2d(Graph2dInfo* info, float dt, BumpAlloc* scratch) {
 
     // APPEND NEW VALUES
     for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
@@ -357,11 +362,10 @@ void draw_graph2d(Graph2dInfo* info, float dt) {
         matrixOrtho(0, width, height, 0, 0, 100, p->passUniforms.vp);
 
 
-
-
-        info->yScale += -blu_interactionFromWidget(a).scrollDelta * 10;
+        blu_WidgetInteraction inter = blu_interactionFromWidget(a);
+        info->yScale += -inter.scrollDelta * 10;
         info->yScale = max(0, info->yScale);
-        info->yOffset += blu_interactionFromWidget(a).dragDelta.y;
+        info->yOffset += inter.dragDelta.y;
 
         float scale = -info->yScale;
         float offset = info->yOffset + height/2;
@@ -388,7 +392,40 @@ void draw_graph2d(Graph2dInfo* info, float dt) {
                 lastPoint = point;
             }
         }
-    }
+
+
+        a = blu_areaMake("lowerBit", blu_areaFlags_DRAW_BACKGROUND);
+        blu_style_backgroundColor(col_darkGray, &a->style);
+        blu_style_sizeY({ blu_sizeKind_TEXT, 0 }, &a->style);
+        blu_style_childLayoutAxis(blu_axis_X, &a->style);
+        blu_parentScope(a) {
+            blu_styleScope(blu_Style()) {
+            blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
+            blu_style_sizeX({ blu_sizeKind_TEXT, 0 });
+            blu_style_backgroundColor(col_lightGray);
+            blu_style_cornerRadius(5);
+
+                for(int i = 0; i < 2; i++) {
+                    a = blu_areaMake(str_format(scratch, STR("thing %i"), i),
+                        blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT |
+                        blu_areaFlags_DROP_EVENTS | blu_areaFlags_HOVER_ANIM);
+
+                    blu_areaAddDisplayStr(a, info->keys[i]);
+
+                    a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, col_white, a->target_hoverAnim);
+
+                    a->dropMask = dropMasks_NT_PROP;
+                    inter = blu_interactionFromWidget(a);
+                    if(inter.dropped) {
+                        net_Prop* prop = ((net_Prop*)(inter.dropVal));
+                        if(prop->type == net_propType_F64) {
+                            info->keys[i] = prop->name;
+                        }
+                    }
+                }
+            }
+        }
+    } // end area
 };
 
 
@@ -623,6 +660,8 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                     blu_Area* parent = blu_areaMake(prop->name, blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
                     blu_style_style(&borderStyle, &parent->style);
                     F32 t = parent->target_hoverAnim;
+                    parent->dragMask = dropMasks_NT_PROP;
+                    parent->dropVal = prop;
 
                     if(blu_interactionFromWidget(parent).held) {
                         t = 1;
@@ -772,7 +811,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt) {
             blu_styleScope(blu_Style()) {
             blu_style_sizeY({ blu_sizeKind_REMAINDER, 0 });
 
-                draw_graph2d(&globs.graph2dInfo, dt);
+                draw_graph2d(&globs.graph2dInfo, dt, scratch);
                 // draw_swerveDrive(&globs.swerveInfo, dt);
             }
 
