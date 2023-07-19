@@ -35,8 +35,8 @@ THE CHECKLIST:
     [X] cursor changes
     [X] rounding
     [X] borders
+    [X] tooltips
     [ ] drag drop
-    [ ] tooltips
     [ ] dropdowns
     [ ] padding
     [ ] drop shadows
@@ -78,7 +78,8 @@ enum blu_AreaFlags {
     blu_areaFlags_HOVER_ANIM =      (1 << 4),
     blu_areaFlags_CENTER_TEXT =     (1 << 5),
     blu_areaFlags_CLICKABLE =       (1 << 6),
-    blu_areaFlags_VIEW_OFFSET =     (1 << 7),
+    blu_areaFlags_SCROLLABLE =      (1 << 7),
+    blu_areaFlags_VIEW_OFFSET =     (1 << 8),
 };
 
 struct blu_Size {
@@ -180,11 +181,14 @@ struct blu_Area {
     // layout pass data //////////////////////////////
     F32 calculatedSizes[blu_axis_COUNT];
     Rect2f rect;
+    Rect2f clipRect;
 
     // persistant shit for input / anim //////////////
-    F32 target_hoverAnim = 1;
+    F32 target_hoverAnim = 0;
+
     bool prevHovered = false;
     bool prevPressed = false;
+    F32 scrollDelta = 0;
 };
 
 
@@ -206,8 +210,8 @@ void blu_init(gfx_Texture* solidTex);
 void blu_loadFont(const char* path);
 void blu_beginFrame(); // cull, reset globals
 // build code goes here
-void blu_input(V2f npos, bool lmbState, float scrollDelta, blu_Cursor* outCursor);  // set current and update prev input // CLEANUP: merge with begin?
 void blu_layout(V2f scSize); // calculate layout shit
+void blu_input(V2f npos, bool lmbState, float scrollDelta, blu_Cursor* outCursor);  // set current and update prev input // CLEANUP: merge with begin?
 void blu_makeDrawCalls(gfx_Pass* normalPass);
 
 blu_Area* blu_areaMake(str s, U32 flags);
@@ -319,7 +323,6 @@ struct blu_Globs {
     bool inputPrevLButton = false;
     blu_Area* dragged = nullptr;
     V2f dragDelta = V2f();
-    float scrollDelta = 0;
 };
 
 static blu_Globs globs = blu_Globs();
@@ -437,15 +440,6 @@ void _blu_areaReset(blu_Area* a) {
     a->cursor = blu_cursor_norm;
 }
 
-// persistant value updates
-void _blu_areaUpdate(blu_Area* a) {
-    bool hover = a->prevHovered;
-
-    if(a->flags & blu_areaFlags_HOVER_ANIM) {
-        a->target_hoverAnim += (hover - a->target_hoverAnim) * a->style.animationStrength; }
-    else { a->target_hoverAnim = 0; }
-}
-
 
 
 blu_Area* blu_areaMake(const char* string, U32 flags) {
@@ -503,8 +497,7 @@ blu_Area* blu_areaMake(str string, U32 flags) {
     area->flags = flags;
     area->lastTouchedIdx = globs.frameIndex;
 
-    _blu_areaUpdate(area);
-    // blu_areaAddDisplayStr(area, string);
+    blu_areaAddDisplayStr(area, string);
 
     return area;
 }
@@ -685,7 +678,7 @@ void __blu_solveChildRemaindersRecurse(blu_Area* parent, int axis) {
 }
 
 // NOTE: does not operate on parent object
-void __blu_calculateChildRectsRecurse(blu_Area* parent) {
+void __blu_calculateChildRectsRecurse(blu_Area* parent, Rect2f clip) {
 
     bool x = parent->style.childLayoutAxis == blu_axis_X;
     V2f off = { 0, 0 };
@@ -693,6 +686,7 @@ void __blu_calculateChildRectsRecurse(blu_Area* parent) {
     if(parent->flags & blu_areaFlags_VIEW_OFFSET) {
         off = -parent->viewOffset; }
 
+    Rect2f parentClip = clip;
     blu_Area* elem = parent->firstChild[globs.linkSide];
     while(elem) {
 
@@ -716,7 +710,13 @@ void __blu_calculateChildRectsRecurse(blu_Area* parent) {
             }
         };
 
-        __blu_calculateChildRectsRecurse(elem);
+        clip.start.x = max(parentClip.start.x, elem->rect.start.x);
+        clip.start.y = max(parentClip.start.y, elem->rect.start.y);
+        clip.end.x = min(parentClip.end.x, elem->rect.end.x);
+        clip.end.y = min(parentClip.end.y, elem->rect.end.y);
+        elem->clipRect = clip;
+
+        __blu_calculateChildRectsRecurse(elem, clip);
         elem = elem->nextSibling[globs.linkSide];
     }
 }
@@ -729,6 +729,7 @@ void blu_layout(V2f scSize) {
         { 0, 0 },
         { scSize.x, scSize.y }
     };
+    globs.ogParent->clipRect = globs.ogParent->rect;
 
     globs.cursorParent->calculatedSizes[blu_axis_X] = 300;
     globs.cursorParent->calculatedSizes[blu_axis_Y] = 300;
@@ -736,6 +737,8 @@ void blu_layout(V2f scSize) {
         globs.inputMousePos,
         globs.inputMousePos + scSize
     };
+    globs.currentParent->clipRect = globs.ogParent->rect;
+
 
 
     for(int axis = 0; axis < blu_axis_COUNT; axis++) {
@@ -749,8 +752,8 @@ void blu_layout(V2f scSize) {
         __blu_solveChildRemaindersRecurse(globs.cursorParent, axis);
     }
 
-    __blu_calculateChildRectsRecurse(globs.ogParent);
-    __blu_calculateChildRectsRecurse(globs.cursorParent);
+    __blu_calculateChildRectsRecurse(globs.ogParent, globs.ogParent->clipRect);
+    __blu_calculateChildRectsRecurse(globs.cursorParent, globs.ogParent->clipRect);
 }
 
 
@@ -804,15 +807,9 @@ void _blu_renderString(str string, V2f start, Rect2f clip, V4f color, gfx_Pass* 
 }
 
 
-void _blu_genRenderCallsRecurse(blu_Area* area, Rect2f clip, gfx_Pass* pass) {
-
-    Rect2f parentClip = clip;
+void _blu_genRenderCallsRecurse(blu_Area* area, gfx_Pass* pass) {
 
     while(area) {
-        clip.start.x = max(parentClip.start.x, area->rect.start.x);
-        clip.start.y = max(parentClip.start.y, area->rect.start.y);
-        clip.end.x = min(parentClip.end.x, area->rect.end.x);
-        clip.end.y = min(parentClip.end.y, area->rect.end.y);
 
         if(area->flags & blu_areaFlags_DRAW_BACKGROUND) {
 
@@ -823,8 +820,8 @@ void _blu_genRenderCallsRecurse(blu_Area* area, Rect2f clip, gfx_Pass* pass) {
             block->color = area->style.backgroundColor;
             block->fontTexture = globs.solidTex;
             block->texture = globs.solidTex;
-            block->clipStart = clip.start;
-            block->clipEnd = clip.end;
+            block->clipStart = area->clipRect.start;
+            block->clipEnd = area->clipRect.end;
             block->cornerRadius = area->style.cornerRadius;
             block->borderSize = area->style.borderSize;
             block->borderColor = area->style.borderColor;
@@ -842,7 +839,7 @@ void _blu_genRenderCallsRecurse(blu_Area* area, Rect2f clip, gfx_Pass* pass) {
             _blu_renderString(
                 area->displayString,
                 off + area->rect.start,
-                clip,
+                area->clipRect,
                 area->style.textColor,
                 pass);
         }
@@ -855,21 +852,21 @@ void _blu_genRenderCallsRecurse(blu_Area* area, Rect2f clip, gfx_Pass* pass) {
             block->color = V4f(1, 1, 1, 1);
             block->texture = area->texture;
             block->fontTexture = globs.solidTex;
-            block->clipStart = clip.start;
-            block->clipEnd = clip.end;
+            block->clipStart = area->clipRect.start;
+            block->clipEnd = area->clipRect.end;
             block->cornerRadius = area->style.cornerRadius;
             block->borderSize = area->style.borderSize;
             block->borderColor = area->style.borderColor;
         }
 
 
-        _blu_genRenderCallsRecurse(area->firstChild[globs.linkSide], clip, pass);
+        _blu_genRenderCallsRecurse(area->firstChild[globs.linkSide], pass);
         area = area->nextSibling[globs.linkSide];
     }
 }
 void blu_makeDrawCalls(gfx_Pass* normalPass) {
-    _blu_genRenderCallsRecurse(globs.ogParent, globs.ogParent->rect, normalPass);
-    _blu_genRenderCallsRecurse(globs.cursorParent, globs.cursorParent->rect, normalPass);
+    _blu_genRenderCallsRecurse(globs.ogParent, normalPass);
+    _blu_genRenderCallsRecurse(globs.cursorParent, normalPass);
 }
 
 
@@ -969,48 +966,91 @@ void blu_style_style(blu_Style* style, blu_Style* target) {
 
 
 
+// CLEANUP: move
+bool _blu_rectContainsPoint(Rect2f r, V2f point) {
+    if(r.start.x <= point.x && r.end.x > point.x) {
+        if(r.start.y <= point.y && r.end.y > point.y) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// clears hover, pressed
+// updates hover animation
+void __blu_clearInteractionsRecurse(blu_Area* elem) {
+    while(elem) {
+        elem->prevHovered = false;
+        elem->prevPressed = false;
+        F32 scrollDelta = 0;
+
+        __blu_clearInteractionsRecurse(elem->firstChild[globs.linkSide]);
+        elem = elem->nextSibling[globs.linkSide];
+    }
+}
+
+void __blu_updateInteractionsRecurse(blu_Area* elem) {
+    while(elem) {
+
+        if(elem->flags & blu_areaFlags_HOVER_ANIM) {
+            bool hover = elem->prevHovered;
+            elem->target_hoverAnim += (hover - elem->target_hoverAnim) * elem->style.animationStrength;
+        } else { elem->target_hoverAnim = 0; }
+
+        __blu_updateInteractionsRecurse(elem->firstChild[globs.linkSide]);
+        elem = elem->nextSibling[globs.linkSide];
+    }
+}
 
 // return indicates if parent has been blocked
-// never touch this code again
-bool _blu_genInteractionsRecurse(blu_Area* area, bool covered, blu_Cursor* outCursor) {
-
+bool __blu_genInteractionsRecurse(blu_Area* area, bool* outBlockSiblings, blu_Cursor* outCursor) {
+    *outBlockSiblings = false;
 
     blu_Area* elem = area->lastChild;
     while(elem) {
-
-        if(_blu_genInteractionsRecurse(elem, covered, outCursor)) {
-            covered = true; }
-
+        bool b;
+        if(__blu_genInteractionsRecurse(elem, &b, outCursor)) { return true; }
+        if(b) { break; }
         elem = elem->prevSibling;
     }
 
-    bool containsMouse = false;
-    if(!covered) {
-        V2f pos = globs.inputMousePos;
-        if(area->rect.start.x <= pos.x && area->rect.end.x > pos.x) {
-            if(area->rect.start.y <= pos.y && area->rect.end.y > pos.y) {
-                containsMouse = true;
-            }
-        }
-    }
+
+    bool containsMouse = _blu_rectContainsPoint(area->clipRect, globs.inputMousePos);
+    if(!containsMouse) { return false; }
+
+    *outBlockSiblings = true;
 
     bool clickable = area->flags & blu_areaFlags_CLICKABLE;
-    if(clickable) {
-        area->prevHovered = containsMouse;
-        area->prevPressed = globs.inputCurLButton && !globs.inputPrevLButton && containsMouse;
+    if(!clickable) { return false; }
 
-        if(area->prevPressed) {
-            globs.dragged = area; }
 
-        if(containsMouse) {
-            *outCursor = area->cursor; }
+    *outCursor = area->cursor;
+    area->prevHovered = true;
+    area->prevPressed = globs.inputCurLButton && !globs.inputPrevLButton;
+    if(area->prevPressed) { globs.dragged = area; }
+
+    return true;
+}
+
+// return indicates blocking parent from scroll events
+bool __blu_genScrollInteractionsRecurse(blu_Area* area, bool* outBlockSiblings, float scrollDelta) {
+    *outBlockSiblings = false;
+
+    blu_Area* elem = area->lastChild;
+    while(elem) {
+        bool b;
+        if(__blu_genScrollInteractionsRecurse(elem, &b, scrollDelta)) { return true; }
+        if(b) { break; }
+        elem = elem->prevSibling;
     }
-    else {
-        area->prevHovered = false;
-        area->prevPressed = false;
-    }
 
-    return (clickable && containsMouse) || covered;
+    if(!_blu_rectContainsPoint(area->clipRect, globs.inputMousePos)) { return false; }
+    *outBlockSiblings = true;
+
+    if(!(area->flags & blu_areaFlags_SCROLLABLE)) { return false; }
+
+    area->scrollDelta = scrollDelta;
+    return true;
 }
 
 void blu_input(V2f npos, bool lmbState, float scrollDelta, blu_Cursor* outCursor) {
@@ -1025,12 +1065,17 @@ void blu_input(V2f npos, bool lmbState, float scrollDelta, blu_Cursor* outCursor
     globs.inputPrevLButton = globs.inputCurLButton;
     globs.inputCurLButton = lmbState;
 
-    globs.scrollDelta = scrollDelta;
 
     *outCursor = blu_cursor_norm;
     if(globs.dragged) { *outCursor = globs.dragged->cursor; }
 
-    _blu_genInteractionsRecurse(globs.ogParent, globs.dragged != nullptr, outCursor);
+    __blu_clearInteractionsRecurse(globs.ogParent);
+    if(globs.dragged == nullptr) {
+        bool x;
+        __blu_genInteractionsRecurse(globs.ogParent, &x, outCursor);
+        __blu_genScrollInteractionsRecurse(globs.ogParent, &x, scrollDelta);
+    }
+    __blu_updateInteractionsRecurse(globs.ogParent);
 }
 
 
@@ -1045,10 +1090,10 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
 
 
     out.hovered = area->prevHovered;
+    out.scrollDelta = area->scrollDelta;
 
     if(out.hovered || globs.dragged == area) {
         out.mousePos = globs.inputMousePos - area->rect.start;
-        out.scrollDelta = globs.scrollDelta;
     }
 
     if(globs.dragged == area) {

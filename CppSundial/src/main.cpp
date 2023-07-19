@@ -194,6 +194,8 @@ int main() {
 
 
 
+        blu_layout(V2f(w, h));
+
         blu_Cursor c;
         blu_input(V2f((F32)mx, (F32)my), leftPressed, windowScrollDelta, &c);
         if(c == blu_cursor_norm) { glfwSetCursor(window, nullptr); }
@@ -202,8 +204,6 @@ int main() {
         else if(c == blu_cursor_resizeV) { glfwSetCursor(window, resizeVCursor); }
         else if(c == blu_cursor_type) { glfwSetCursor(window, typeCursor); }
         else { ASSERT(false); }
-
-        blu_layout(V2f(w, h));
 
         { // BLU RENDERING
             Mat4f vp;

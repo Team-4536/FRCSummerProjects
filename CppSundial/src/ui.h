@@ -317,8 +317,6 @@ void draw_line(gfx_Pass* p, float thickness, V4f color, V2f start, V2f end) {
 
 void draw_graph2d(Graph2dInfo* info, float dt) {
 
-
-
     // APPEND NEW VALUES
     for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
         if(!info->keys[i].chars) { continue; }
@@ -345,7 +343,7 @@ void draw_graph2d(Graph2dInfo* info, float dt) {
 
     blu_parentScope(a) {
 
-        a = blu_areaMake("upperBit", blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE);
+        a = blu_areaMake("upperBit", blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE | blu_areaFlags_SCROLLABLE);
         blu_style_sizeY({blu_sizeKind_REMAINDER, 0}, &a->style);
         areaAddFB(a, info->target);
         float width = info->target->texture->width;
@@ -389,22 +387,6 @@ void draw_graph2d(Graph2dInfo* info, float dt) {
                 draw_line(p, 2, color, lastPoint, point);
                 lastPoint = point;
             }
-        }
-    }
-
-
-
-
-    if(blu_interactionFromWidget(a).hovered) {
-
-        a = blu_getCursorParent();
-        blu_parentScope(a) {
-        blu_style_sizeX({ blu_sizeKind_TEXT, 0 });
-        blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
-        blu_style_style(&borderStyle);
-
-            a = blu_areaMake("HELP", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT);
-            blu_areaAddDisplayStr(a, "HELP");
         }
     }
 };
@@ -617,7 +599,7 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
     blu_parentScope(a) {
 
 
-        a = blu_areaMake(STR("clip"), blu_areaFlags_VIEW_OFFSET | blu_areaFlags_CLICKABLE);
+        a = blu_areaMake(STR("clip"), blu_areaFlags_VIEW_OFFSET | blu_areaFlags_CLICKABLE | blu_areaFlags_SCROLLABLE);
         blu_Area* clip = a;
         a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
         a->style.childLayoutAxis = blu_axis_Y;
@@ -636,19 +618,41 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                 net_getTracked(&tracked, &tCount);
                 for(int i = 0; i < tCount; i++) {
                     net_Prop* prop = tracked[i];
+                    str quotedName = str_format(scratch, STR("\"%s\""), prop->name);
 
-                    a = blu_areaMake(prop->name, blu_areaFlags_DRAW_BACKGROUND);
-                    blu_style_style(&borderStyle, &a->style);
-                    a->style.backgroundColor = col_darkBlue;
+                    blu_Area* parent = blu_areaMake(prop->name, blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
+                    blu_style_style(&borderStyle, &parent->style);
+                    F32 t = parent->target_hoverAnim;
 
-                    blu_parentScope(a) {
+                    if(blu_interactionFromWidget(parent).held) {
+                        t = 1;
+                        blu_parentScope(blu_getCursorParent()) {
+                            blu_styleScope(blu_Style()) {
+                            blu_style_style(&borderStyle);
+                            blu_style_borderSize(2);
+                            blu_style_sizeX({ blu_sizeKind_TEXT, 0 });
+                            blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
+                            blu_style_cornerRadius(4);
+
+                                a = blu_areaMake("drag indicator", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT);
+                                blu_areaAddDisplayStr(a, quotedName);
+                            }
+                        }
+                    }
+                    parent->style.backgroundColor = v4f_lerp(col_darkBlue, col_darkGray, t);
+
+                    blu_parentScope(parent) {
                         blu_styleScope(blu_Style()) {
                         blu_style_sizeX({ blu_sizeKind_PERCENT, 0.5 });
+                        blu_style_style(&borderStyle);
 
                             a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
+                            blu_areaAddDisplayStr(a, quotedName);
 
-                            str n = str_format(scratch, STR("\"%s\""), prop->name);
-                            blu_areaAddDisplayStr(a, n);
+                            if(!net_getConnected()) {
+                                a->style.backgroundColor *= col_disconnect;
+                                a->style.textColor *= col_disconnect;
+                            }
 
                             a = blu_areaMake(STR("value"), blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
                             a->style.backgroundColor = col_darkGray;
