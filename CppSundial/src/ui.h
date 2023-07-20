@@ -138,6 +138,69 @@ void areaAddFB(blu_Area* area, gfx_Framebuffer* target) {
 }
 
 
+#define UI_SCROLL_SENSITIVITY 40
+#define UI_SCROLL_BAR_SIZE 10
+
+// returns parent to clip area that elems can be added
+// NOTE: any styling cant be applied in post because it returns a child area, so put sizing in a scope
+blu_Area* makeScrollArea(float* pos) {
+
+    blu_Area* clip = nullptr;
+
+    blu_Area* a = blu_areaMake("scrollParent", blu_areaFlags_DRAW_BACKGROUND);
+    blu_style_childLayoutAxis(blu_axis_X, &a->style);
+    float clipSize = a->calculatedSizes[blu_axis_Y];
+    float clipMax;
+
+    blu_parentScope(a) {
+
+        a = blu_areaMake("clip", blu_areaFlags_VIEW_OFFSET | blu_areaFlags_CLICKABLE | blu_areaFlags_SCROLLABLE );
+        clip = a;
+        blu_style_sizeX({ blu_sizeKind_REMAINDER, 0 }, &a->style);
+        blu_style_sizeY({ blu_sizeKind_CHILDSUM, 0 }, &a->style);
+        blu_style_childLayoutAxis(blu_axis_Y, &a->style);
+        *pos += blu_interactionFromWidget(a).scrollDelta * UI_SCROLL_SENSITIVITY;
+        clipMax = a->calculatedSizes[blu_axis_Y];
+
+
+
+
+        blu_Area* spacer = nullptr;
+        if(clipMax > clipSize) {
+            a = blu_areaMake("scrollArea", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_SCROLLABLE);
+            a->style.backgroundColor = col_darkGray;
+            a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, UI_SCROLL_BAR_SIZE };
+            a->style.sizes[blu_axis_Y] = { blu_sizeKind_PERCENT, 1 };
+            a->style.childLayoutAxis = blu_axis_Y;
+            *pos += blu_interactionFromWidget(a).scrollDelta * UI_SCROLL_SENSITIVITY;
+
+            blu_parentScope(a) {
+
+                a = blu_areaMake("spacer", 0);
+                spacer = a;
+
+                a = blu_areaMake("bar", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
+                a->style.backgroundColor = col_lightGray;
+                a->style.sizes[blu_axis_X] = { blu_sizeKind_PERCENT, 1 };
+                a->style.sizes[blu_axis_Y] = { blu_sizeKind_PERCENT, clipSize / clipMax };
+                *pos += blu_interactionFromWidget(a).dragDelta.y / clipSize * clipMax;
+            }
+
+            *pos = max(*pos, 0);
+            *pos = min(*pos, clipMax - clipSize);
+            spacer->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, ((*pos) / clipMax) * clipSize };
+        } else {
+            *pos = 0;
+        }
+    }
+
+    clip->viewOffset = { 0, *pos };
+
+    return clip;
+}
+
+
+
 void initView(View* v, BumpAlloc* resArena) {
     if(v->type == viewType_field) { v->data.fieldInfo = FieldInfo(); }
     else if(v->type == viewType_graph2d) { v->data.graph2dInfo = Graph2dInfo(); initGraph2dInfo(&v->data.graph2dInfo, resArena); }
@@ -153,6 +216,8 @@ void updateView(View* v, float dt, GLFWwindow* window, BumpAlloc* scratch) {
     else if(v->type == viewType_net) { draw_network(&v->data.netInfo, dt, scratch); }
     else { ASSERT(false); };
 }
+
+
 
 
 blu_Style borderStyle;
@@ -269,6 +334,22 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* resArena, gfx_Texture* solidTex) 
 }
 
 
+
+
+// CLEANUP: invalidation problem here too
+struct PowerIndicatorInfo {
+    net_Prop* props[30];
+};
+void draw_powerIndicators(PowerIndicatorInfo* info) {
+
+    for (int i = 0; i < 30; i++) {
+        net_Prop* p = info->props[i];
+        if(p == nullptr) { break; }
+
+
+    }
+
+}
 
 
 
@@ -707,127 +788,87 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
 
 
 
-    a = blu_areaMake(STR("lower"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
-    info->clipSize = a->calculatedSizes[blu_axis_Y];
-    a->style.childLayoutAxis = blu_axis_X;
+    blu_styleScope(blu_Style()) {
+        blu_style_sizeX({ blu_sizeKind_PERCENT, 1 });
+        blu_style_sizeY({ blu_sizeKind_REMAINDER, 0 });
+        a = makeScrollArea(&info->clipPos);
+    }
+
     blu_parentScope(a) {
+        blu_styleScope(blu_Style()) {
+        blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
+        blu_style_childLayoutAxis(blu_axis_X);
+        blu_style_backgroundColor(col_darkGray);
 
-        a = blu_areaMake(STR("clip"), blu_areaFlags_VIEW_OFFSET | blu_areaFlags_CLICKABLE | blu_areaFlags_SCROLLABLE);
-        blu_Area* clip = a;
-        a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
-        a->style.childLayoutAxis = blu_axis_Y;
-        info->clipPos += blu_interactionFromWidget(a).scrollDelta * 40;
-        blu_parentScope(a) {
+            net_Prop** tracked;
+            U32 tCount = 0;
+            net_getTracked(&tracked, &tCount);
+            for(int i = 0; i < tCount; i++) {
+                net_Prop* prop = tracked[i];
+                str quotedName = str_format(scratch, STR("\"%s\""), prop->name);
 
-            blu_styleScope(blu_Style()) {
-            blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
-            blu_style_childLayoutAxis(blu_axis_X);
-            blu_style_backgroundColor(col_darkGray);
+                blu_Area* parent = blu_areaMake(prop->name, blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
+                blu_style_style(&borderStyle, &parent->style);
+                F32 t = parent->target_hoverAnim;
+                parent->dropType = dropMasks_NT_PROP;
+                parent->dropVal = prop;
 
-
-
-                net_Prop** tracked;
-                U32 tCount = 0;
-                net_getTracked(&tracked, &tCount);
-                for(int i = 0; i < tCount; i++) {
-                    net_Prop* prop = tracked[i];
-                    str quotedName = str_format(scratch, STR("\"%s\""), prop->name);
-
-                    blu_Area* parent = blu_areaMake(prop->name, blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
-                    blu_style_style(&borderStyle, &parent->style);
-                    F32 t = parent->target_hoverAnim;
-                    parent->dropType = dropMasks_NT_PROP;
-                    parent->dropVal = prop;
-
-                    if(blu_interactionFromWidget(parent).held) {
-                        t = 1;
-                        blu_parentScope(blu_getCursorParent()) {
-                            blu_styleScope(blu_Style()) {
-                            blu_style_style(&borderStyle);
-                            blu_style_borderSize(2);
-                            blu_style_sizeX({ blu_sizeKind_TEXT, 0 });
-                            blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
-                            blu_style_cornerRadius(4);
-
-                                a = blu_areaMake("drag indicator", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT);
-                                blu_areaAddDisplayStr(a, quotedName);
-                            }
-                        }
-                    }
-                    parent->style.backgroundColor = v4f_lerp(col_darkBlue, col_darkGray, t);
-
-                    blu_parentScope(parent) {
+                if(blu_interactionFromWidget(parent).held) {
+                    t = 1;
+                    blu_parentScope(blu_getCursorParent()) {
                         blu_styleScope(blu_Style()) {
-                        blu_style_sizeX({ blu_sizeKind_PERCENT, 0.5 });
                         blu_style_style(&borderStyle);
+                        blu_style_borderSize(2);
+                        blu_style_sizeX({ blu_sizeKind_TEXT, 0 });
+                        blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
+                        blu_style_cornerRadius(4);
 
-                            a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
+                            a = blu_areaMake("drag indicator", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT);
                             blu_areaAddDisplayStr(a, quotedName);
-
-                            if(!net_getConnected()) {
-                                a->style.backgroundColor *= col_disconnect;
-                                a->style.textColor *= col_disconnect;
-                            }
-
-                            a = blu_areaMake(STR("value"), blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
-                            a->style.backgroundColor = col_darkGray;
-
-
-                            if(prop->type == net_propType_S32) {
-                                blu_areaAddDisplayStr(a, str_format(scratch, STR("%i"), (prop->data->s32))); }
-                            else if(prop->type == net_propType_F64) {
-                                blu_areaAddDisplayStr(a, str_format(scratch, STR("%f"), (prop->data->f64))); }
-                            else if(prop->type == net_propType_STR) {
-                                blu_areaAddDisplayStr(a, str_format(scratch, STR("\"%s\""), (prop->data->str))); }
-                            else if(prop->type == net_propType_BOOL) {
-                                blu_areaAddDisplayStr(a, str_format(scratch, STR("%b"), (prop->data->boo)));
-                                a->style.backgroundColor = prop->data->boo? col_green : col_red;
-                                a->style.cornerRadius = 2;
-                                a->style.textColor = col_darkBlue;
-                            }
-
-                            if(!net_getConnected()) {
-                                a->style.backgroundColor *= col_disconnect;
-                                a->style.textColor *= col_disconnect;
-                            }
                         }
                     }
                 }
+                parent->style.backgroundColor = v4f_lerp(col_darkBlue, col_darkGray, t);
 
-            } // end text styling
+                blu_parentScope(parent) {
+                    blu_styleScope(blu_Style()) {
+                    blu_style_sizeX({ blu_sizeKind_PERCENT, 0.5 });
+                    blu_style_style(&borderStyle);
 
-        } // end of clip
+                        a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
+                        blu_areaAddDisplayStr(a, quotedName);
 
-        blu_Area* spacer = nullptr;
-        if(info->clipMax > info->clipSize) {
-            a = blu_areaMake(STR("scrollArea"), blu_areaFlags_DRAW_BACKGROUND);
-            a->style.backgroundColor = col_darkGray;
-            a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 10 };
-            a->style.childLayoutAxis = blu_axis_Y;
+                        if(!net_getConnected()) {
+                            a->style.backgroundColor *= col_disconnect;
+                            a->style.textColor *= col_disconnect;
+                        }
 
-            blu_parentScope(a) {
+                        a = blu_areaMake(STR("value"), blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
+                        a->style.backgroundColor = col_darkGray;
 
-                a = blu_areaMake(STR("spacer"), 0);
-                spacer = a;
 
-                a = blu_areaMake(STR("bar"),
-                    blu_areaFlags_DRAW_BACKGROUND |
-                    blu_areaFlags_CLICKABLE);
-                a->style.backgroundColor = col_lightGray;
-                a->style.sizes[blu_axis_Y] = { blu_sizeKind_PERCENT, info->clipSize / info->clipMax };
-                info->clipPos += blu_interactionFromWidget(a).dragDelta.y / info->clipSize * info->clipMax;
+                        if(prop->type == net_propType_S32) {
+                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%i"), (prop->data->s32))); }
+                        else if(prop->type == net_propType_F64) {
+                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%f"), (prop->data->f64))); }
+                        else if(prop->type == net_propType_STR) {
+                            blu_areaAddDisplayStr(a, str_format(scratch, STR("\"%s\""), (prop->data->str))); }
+                        else if(prop->type == net_propType_BOOL) {
+                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%b"), (prop->data->boo)));
+                            a->style.backgroundColor = prop->data->boo? col_green : col_red;
+                            a->style.cornerRadius = 2;
+                            a->style.textColor = col_darkBlue;
+                        }
 
+                        if(!net_getConnected()) {
+                            a->style.backgroundColor *= col_disconnect;
+                            a->style.textColor *= col_disconnect;
+                        }
+                    }
+                }
             }
-
-            info->clipPos = max(info->clipPos, 0);
-            info->clipPos = min(info->clipPos, info->clipMax - (info->clipSize));
-            spacer->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, (info->clipPos / info->clipMax) * info->clipSize };
-        } else {
-            info->clipPos = 0;
-        }
-
-        clip->viewOffset = { 0, info->clipPos };
-    } // end left
+        } // end text styling
+    } // end of clip
 }
 
 
