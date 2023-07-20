@@ -37,6 +37,7 @@ THE CHECKLIST:
     [X] borders
     [X] tooltips
     [X] drag drop
+    [ ] disabling
     [ ] dropdowns
     [ ] padding
     [ ] drop shadows

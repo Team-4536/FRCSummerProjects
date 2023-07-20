@@ -13,31 +13,40 @@
 
 
 
+
+
+// contains a string and a bunch of chars
+struct NTKey {
+    str str = { nullptr, 0 };
+    U8 chars[255] = { 0 };
+};
+
+
+
 #define GRAPH2D_VCOUNT 700
 #define GRAPH2D_LINECOUNT 6
+// TODO: this is a stupidly large struct for what it does
 struct Graph2dInfo {
 
     float vals[GRAPH2D_LINECOUNT][GRAPH2D_VCOUNT] = { 0 };
     U8 connectionVals[GRAPH2D_LINECOUNT][GRAPH2D_VCOUNT] = { 0 };
-    str keys[GRAPH2D_LINECOUNT] = { 0 };
+    NTKey keys[GRAPH2D_LINECOUNT] = { 0 };
     V4f colors[GRAPH2D_LINECOUNT];
 
     float yScale = 100;
     float yOffset = 0;
 };
 void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAlloc* scratch);
-void initGraph2dInfo(Graph2dInfo* info, BumpAlloc* resArena) {
+void initGraph2dInfo(Graph2dInfo* info) {
 
     info->colors[0] = col_green;
-    info->keys[0] = str_copy(STR("FLSteerSpeed"), resArena); // TODO: access by hash key instead of str
-    // TODO: after NT reset, graph ptrs are invalid
-    // TODO: memory leak here lol
+    info->keys[0].str = str_copy(STR("FLSteerSpeed"), info->keys[0].chars);
 
     info->colors[1] = col_red;
-    info->keys[1] = str_copy(STR("FLSteerPos"), resArena);
+    info->keys[1].str = str_copy(STR("FLSteerPos"), info->keys[1].chars);
 
     info->colors[2] = col_purple;
-    info->keys[2] = str_copy(STR("FRSteerSpeed"), resArena);
+    info->keys[2].str = str_copy(STR("FRSteerSpeed"), info->keys[2].chars);
 }
 
 struct FieldInfo {
@@ -61,12 +70,12 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt);
 
 // CLEANUP: invalidation problem here too
 struct PowerIndicatorInfo {
-    net_Prop* props[30];
-    U32 propCount = 0;
+    NTKey keys[30];
+    U32 keyCount = 0;
     float scrollPosition = 0;
 };
 
-void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch);
+void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch, BumpAlloc* res);
 
 
 enum ViewType {
@@ -90,32 +99,6 @@ struct View {
     ViewType type;
     gfx_Framebuffer* target; // CLEANUP: bad
 };
-
-
-
-#define UI_VIEW_COUNT 3
-static struct UIGlobs {
-
-    gfx_Shader* sceneShader3d = nullptr;
-    gfx_Shader* sceneShader2d = nullptr;
-    gfx_Texture* solidTex;
-
-    float rightSize;
-    float downSize;
-
-    View views[UI_VIEW_COUNT];
-
-    gfx_Texture* wheelTex = nullptr;
-    gfx_Texture* treadTex = nullptr;
-    gfx_Texture* arrowTex = nullptr;
-
-    gfx_VertexArray* robotVA = nullptr;
-    gfx_IndexBuffer* robotIB = nullptr;
-    gfx_VertexArray* fieldVA = nullptr;
-    gfx_IndexBuffer* fieldIB = nullptr;
-
-    gfx_Texture* fieldTex = nullptr;
-} globs;
 
 
 
@@ -211,21 +194,70 @@ blu_Area* makeScrollArea(float* pos) {
 
 void initView(View* v, BumpAlloc* resArena) {
     if(v->type == viewType_field) { v->data.fieldInfo = FieldInfo(); }
-    else if(v->type == viewType_graph2d) { v->data.graph2dInfo = Graph2dInfo(); initGraph2dInfo(&v->data.graph2dInfo, resArena); }
+    else if(v->type == viewType_graph2d) { v->data.graph2dInfo = Graph2dInfo(); initGraph2dInfo(&v->data.graph2dInfo); }
     else if(v->type == viewType_swerveDrive) { v->data.swerveDriveInfo = SwerveDriveInfo(); }
     else if(v->type == viewType_net) { v->data.netInfo = NetInfo(); }
     else if(v->type == viewType_powerIndicators) { v->data.PowerIndicatorInfo = PowerIndicatorInfo(); }
     else { ASSERT(false); };
 }
 
-void updateView(View* v, float dt, GLFWwindow* window, BumpAlloc* scratch) {
+void updateView(View* v, float dt, GLFWwindow* window, BumpAlloc* scratch, BumpAlloc* res) {
     if(v->type == viewType_field) { draw_field(&v->data.fieldInfo, v->target, dt, window); }
     else if(v->type == viewType_graph2d) { draw_graph2d(&v->data.graph2dInfo, v->target, dt, scratch); }
     else if(v->type == viewType_swerveDrive) { draw_swerveDrive(&v->data.swerveDriveInfo, v->target, dt); }
     else if(v->type == viewType_net) { draw_network(&v->data.netInfo, dt, scratch); }
-    else if(v->type == viewType_powerIndicators) { draw_powerIndicators(&v->data.PowerIndicatorInfo, scratch); }
+    else if(v->type == viewType_powerIndicators) { draw_powerIndicators(&v->data.PowerIndicatorInfo, scratch, res); }
     else { ASSERT(false); };
 }
+
+
+
+
+#define UI_VIEW_COUNT 3
+static struct UIGlobs {
+
+    gfx_Shader* sceneShader3d = nullptr;
+    gfx_Shader* sceneShader2d = nullptr;
+    gfx_Texture* solidTex;
+
+    float rightSize;
+    float downSize;
+
+    View views[UI_VIEW_COUNT];
+
+    gfx_Texture* wheelTex = nullptr;
+    gfx_Texture* treadTex = nullptr;
+    gfx_Texture* arrowTex = nullptr;
+
+    gfx_VertexArray* robotVA = nullptr;
+    gfx_IndexBuffer* robotIB = nullptr;
+    gfx_VertexArray* fieldVA = nullptr;
+    gfx_IndexBuffer* fieldIB = nullptr;
+
+    gfx_Texture* fieldTex = nullptr;
+
+    NTKey* firstFreeNTKey = nullptr;
+} globs;
+
+// Keeping keys globally allocated for now
+/*
+
+void NTKeyFree(NTKey* k) {
+    k->nextFree = globs.firstFreeNTKey;
+    globs.firstFreeNTKey = k;
+}
+NTKey* NTKeyAlloc(BumpAlloc* arena) {
+    NTKey* k = globs.firstFreeNTKey;
+    if(!k) { k = BUMP_PUSH_NEW(arena, NTKey); }
+    else {
+        globs.firstFreeNTKey = k->nextFree;
+        *k = NTKey();
+    }
+    return k;
+}
+*/
+
+
 
 
 
@@ -346,24 +378,29 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* resArena, gfx_Texture* solidTex) 
 
 
 
-void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch) {
+void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch, BumpAlloc* res) {
 
     blu_Area* a;
 
     a = blu_areaMake("powerIndicators", blu_areaFlags_DROP_EVENTS | blu_areaFlags_DRAW_BACKGROUND);
     a->dropTypeMask = dropMasks_NT_PROP;
-    V4f hoverColor = v4f_lerp(col_darkBlue, col_darkGray, a->target_hoverAnim);
+    // TODO: background color change on hover
 
     blu_WidgetInteraction inter = blu_interactionFromWidget(a);
-    if(inter.dropped && info->propCount < 29) {
-        ARR_APPEND(info->props, info->propCount, (net_Prop*)inter.dropVal);
+    if(info->keyCount < 29) {
+        if(inter.dropped) {
+            NTKey* k = ARR_APPEND(info->keys, info->keyCount, NTKey());
+
+            net_Prop* p = (net_Prop*)inter.dropVal;
+            ASSERT(p->name.length < 255);
+            k->str = str_copy(p->name, k->chars);
+        }
     }
 
 
     blu_parentScope(a) {
 
         a = makeScrollArea(&info->scrollPosition);
-        blu_style_backgroundColor(hoverColor, &a->style);
 
         blu_parentScope(a) {
             blu_styleScope(blu_Style()) {
@@ -372,8 +409,9 @@ void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch) {
             blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
             blu_style_backgroundColor(col_darkBlue);
 
-                for (int i = 0; i < info->propCount; i++) {
-                    net_Prop* p = info->props[i];
+                for (int i = 0; i < info->keyCount; i++) {
+                    net_Prop* p = net_hashGet(info->keys[i].str);
+                    bool disabled = (!p || !net_getConnected());
 
                     str indexStr = str_format(scratch, STR("%i"), i);
                     a = blu_areaMake(indexStr, 0);
@@ -381,27 +419,35 @@ void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch) {
                     blu_parentScope(a) {
 
                         a = blu_areaMake("key", blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
-                        blu_areaAddDisplayStr(a, p->name);
+                        blu_areaAddDisplayStr(a, info->keys[i].str);
                         blu_style_sizeX({ blu_sizeKind_REMAINDER, 0 }, &a->style);
+                        if(disabled) { a->style.textColor *= col_disconnect; }
 
                         a = blu_areaMake("valueParent", 0);
                         blu_style_sizeX({ blu_sizeKind_REMAINDER, 0 }, &a->style);
                         float w = a->calculatedSizes[blu_axis_X];
                         blu_parentScope(a) {
                             a = blu_areaMake("indicator", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_FLOATING);
+
+                            a->offset = { 0, 0 };
+                            a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 0 };
+
                             blu_style_backgroundColor(col_red, &a->style);
+                            if(disabled) { a->style.backgroundColor *= col_disconnect; }
 
-                            float val = (F32)p->data->f64;
-                            float leftShift = 0;
-                            float barSize = val * (w/2);
+                            if(p) {
+                                float val = (F32)p->data->f64;
+                                float leftShift = 0;
+                                float barSize = val * (w/2);
 
-                            if(val < 0) {
-                                leftShift = barSize;
-                                barSize *= -1;
+                                if(val < 0) {
+                                    leftShift = barSize;
+                                    barSize *= -1;
+                                }
+
+                                a->offset = { w/2 + leftShift, 0 };
+                                blu_style_sizeX({ blu_sizeKind_PX, barSize }, &a->style);
                             }
-
-                            a->offset = { w/2 + leftShift, 0 };
-                            blu_style_sizeX({ blu_sizeKind_PX, barSize }, &a->style);
                         }
 
                     } // end per elem parent
@@ -539,9 +585,9 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
 
     // APPEND NEW VALUES
     for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
-        if(!info->keys[i].chars) { continue; }
+        if(info->keys[i].str.length == 0) { continue; }
 
-        net_Prop* prop = net_hashGet(info->keys[i]);
+        net_Prop* prop = net_hashGet(info->keys[i].str);
 
         bool nConn = net_getConnected();
         float nval = 0;
@@ -594,7 +640,7 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
 
 
         for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
-            if(!info->keys[i].chars) { continue; }
+            if(info->keys[i].str.length == 0) { continue; }
 
             V2f lastPoint = V2f(0, info->vals[i][0] * scale + offset);
             for(int j = 1; j < GRAPH2D_VCOUNT; j++) {
@@ -627,16 +673,21 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
                         blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT |
                         blu_areaFlags_DROP_EVENTS | blu_areaFlags_HOVER_ANIM);
 
-                    blu_areaAddDisplayStr(a, info->keys[i]);
+                    blu_areaAddDisplayStr(a, info->keys[i].str);
 
                     a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, col_white, a->target_hoverAnim);
+                    if(!info->connectionVals[i][GRAPH2D_VCOUNT-1]) {
+                        a->style.textColor *= col_disconnect;
+                        a->style.backgroundColor *= col_disconnect;
+                    }
 
                     a->dropTypeMask = dropMasks_NT_PROP;
                     inter = blu_interactionFromWidget(a);
                     if(inter.dropped) {
                         net_Prop* prop = ((net_Prop*)(inter.dropVal));
                         if(prop->type == net_propType_F64) {
-                            info->keys[i] = prop->name;
+                            ASSERT(prop->name.length < 255);
+                            info->keys[i].str = str_copy(prop->name, info->keys[i].chars);
                         }
                     }
                 }
@@ -982,7 +1033,7 @@ void makeView(const char* name, View* v, float dt, BumpAlloc* scratch, GLFWwindo
         blu_style_sizeX({ blu_sizeKind_PERCENT, 1 });
         blu_style_sizeY({ blu_sizeKind_PERCENT, 1 });
 
-            updateView(v, dt, window, scratch);
+            updateView(v, dt, window, scratch, res);
 
             a = blu_areaMake("hoverIndicator", blu_areaFlags_FLOATING | blu_areaFlags_DRAW_BACKGROUND);
             a->style.backgroundColor = v4f_lerp(V4f(0, 0, 0, 0), V4f(1, 1, 1, 0.3), t);

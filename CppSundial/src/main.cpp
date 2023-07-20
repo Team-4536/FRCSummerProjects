@@ -185,14 +185,7 @@ int main() {
         bool leftPressed = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)? true : false;
 
         blu_beginFrame();
-
-
-
         ui_update(&frameArena, &lifetimeArena, window, dt);
-
-
-
-
 
         blu_layout(V2f(w, h));
 
@@ -206,13 +199,10 @@ int main() {
         else { ASSERT(false); }
 
         { // BLU RENDERING
+            gfx_registerClearPass(V4f(0, 0, 0, 1), nullptr);
+
             Mat4f vp;
             matrixOrtho(0, w, h, 0, 0.0001, 10000, vp);
-
-            gfx_Pass* clear = gfx_registerPass();
-            clear->isClearPass = true;
-            clear->passUniforms.color = V4f(0, 0, 0, 1);
-
             gfx_Pass* p = gfx_registerPass();
             p->shader = blueShader;
             p->passUniforms = gfx_UniformBlock();
@@ -222,13 +212,9 @@ int main() {
         }
 
         gfx_drawPasses(w, h);
-
         net_update(&frameArena, (F32)time);
-
         bump_clear(&frameArena);
-
         windowScrollDelta = 0;
-
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
