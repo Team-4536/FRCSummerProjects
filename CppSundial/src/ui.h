@@ -22,7 +22,7 @@ struct Graph2dInfo {
     str keys[GRAPH2D_LINECOUNT] = { 0 };
     V4f colors[GRAPH2D_LINECOUNT];
 
-    float yScale = 1;
+    float yScale = 100;
     float yOffset = 0;
 };
 void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAlloc* scratch);
@@ -38,14 +38,11 @@ void initGraph2dInfo(Graph2dInfo* info, BumpAlloc* resArena) {
 
     info->colors[2] = col_purple;
     info->keys[2] = str_copy(STR("FRSteerSpeed"), resArena);
-
-    info->colors[3] = col_yellow;
-    info->keys[3] = str_copy(STR("FRSteerPos"), resArena);
 }
 
 struct FieldInfo {
     Transform camTransform;
-    Transform camTarget;
+    Transform camTarget = { 0, 6, 0, -90, 0, 0, 1, 1, 1 };
 };
 void draw_field(FieldInfo* info, gfx_Framebuffer* fb, float dt, GLFWwindow* window);
 
@@ -172,7 +169,7 @@ blu_Area* makeScrollArea(float* pos) {
             a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, UI_SCROLL_BAR_SIZE };
             a->style.sizes[blu_axis_Y] = { blu_sizeKind_PERCENT, 1 };
             a->style.childLayoutAxis = blu_axis_Y;
-        *pos += blu_interactionFromWidget(a).scrollDelta * UI_SCROLL_SENSITIVITY;
+            *pos += blu_interactionFromWidget(a).scrollDelta * UI_SCROLL_SENSITIVITY;
 
             blu_parentScope(a) {
 
@@ -516,8 +513,8 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
 
 
         blu_WidgetInteraction inter = blu_interactionFromWidget(a);
-        info->yScale += -inter.scrollDelta * 10;
-        info->yScale = max(0, info->yScale);
+        info->yScale += info->yScale * -inter.scrollDelta * 0.1;
+        info->yScale = max(0.001, info->yScale);
         info->yOffset += inter.dragDelta.y;
 
         float scale = -info->yScale;
