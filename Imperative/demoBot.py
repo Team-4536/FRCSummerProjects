@@ -9,6 +9,7 @@ import inputs
 from telemetryHelp import publishExpression
 import sim
 import timing
+import socketing
 
 
 
@@ -21,7 +22,7 @@ class DemoBot(wpilib.TimedRobot):
 
     def robotInit(self) -> None:
 
-        self.telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
+        self.server = socketing.Server(self.isReal())
 
         # DRIVE MOTORS ==================================================
         self.FLDrive = wpilib.Spark(2)
@@ -32,6 +33,8 @@ class DemoBot(wpilib.TimedRobot):
         self.BRDrive.setInverted(True)
 
         self.turretMotor = wpilib.Spark(0)
+
+        self.turretEncoder = wpilib.Encoder(0, 1)
 
 
         # GYRO ==========================================================
@@ -61,11 +64,15 @@ class DemoBot(wpilib.TimedRobot):
 
         self.time = timing.TimeData(self.time)
 
-        self.telemTable.putNumber("FLSpeed", self.FLDrive.get())
-        self.telemTable.putNumber("FRSpeed", self.FRDrive.get())
-        self.telemTable.putNumber("BLSpeed", self.BLDrive.get())
-        self.telemTable.putNumber("BRSpeed", self.BRDrive.get())
-        self.telemTable.putNumber("TurretSpeed", self.turretMotor.get())
+        self.server.putUpdate("FLSpeed", self.FLDrive.get())
+        self.server.putUpdate("FRSpeed", self.FRDrive.get())
+        self.server.putUpdate("BLSpeed", self.BLDrive.get())
+        self.server.putUpdate("BRSpeed", self.BRDrive.get())
+        self.server.putUpdate("TurretSpeed", self.turretMotor.get())
+        self.server.putUpdate("enabled", self.isEnabled())
+        self.server.putUpdate("turretPos", self.turretEncoder.get())
+
+        self.server.update(self.time.timeSinceInit)
 
 
 

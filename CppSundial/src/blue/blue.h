@@ -37,6 +37,7 @@ THE CHECKLIST:
     [X] borders
     [X] tooltips
     [X] drag drop
+    [ ] disabling
     [ ] dropdowns
     [ ] padding
     [ ] drop shadows
@@ -67,6 +68,7 @@ enum blu_SizeKind {
     blu_sizeKind_PERCENT, // percent of parent
     blu_sizeKind_TEXT, // large enough to fit text
     blu_sizeKind_REMAINDER,
+    blu_sizeKind_CHILDSUM,
 };
 
 enum blu_AreaFlags { // TODO: name these better
@@ -506,7 +508,6 @@ blu_Area* blu_areaMake(str string, U32 flags) {
 
 
     area->parent = parent;
-    area->ctorParent = parent;
     area->flags = flags;
     area->lastTouchedIdx = globs.frameIndex;
 
@@ -526,6 +527,7 @@ void blu_areaAddDisplayStr(blu_Area* area, str s) {
 
 
 void blu_pushParent(blu_Area* parent) {
+    parent->ctorParent = globs.currentParent;
     globs.currentParent = parent;
 }
 void blu_popParent() {
@@ -539,7 +541,6 @@ void blu_popParent() {
 
 blu_Area* blu_getCursorParent() {
     ASSERT(globs.cursorParent->firstChild[globs.linkSide] == nullptr);
-    globs.cursorParent->ctorParent = globs.currentParent;
     return globs.cursorParent;
 }
 
@@ -641,6 +642,28 @@ void __blu_calculateUpwardsSizesRecurse(blu_Area* elem, int axis) {
             elem->calculatedSizes[axis] = elem->parent->calculatedSizes[axis] * elem->style.sizes[axis].value; }
 
         __blu_calculateUpwardsSizesRecurse(elem->firstChild[globs.linkSide], axis);
+        elem = elem->nextSibling[globs.linkSide];
+    }
+}
+
+
+
+void __blu_calculateDownwardsSizesRecurse(blu_Area* elem, int axis) {
+    while(elem) {
+        __blu_calculateDownwardsSizesRecurse(elem->firstChild[globs.linkSide], axis);
+
+        if(elem->style.sizes[axis].kind == blu_sizeKind_CHILDSUM) {
+            float sum = 0;
+
+            blu_Area* child = elem->firstChild[globs.linkSide];
+            while(child) {
+                sum += child->calculatedSizes[axis];
+                child = child->nextSibling[globs.linkSide];
+            }
+            elem->calculatedSizes[axis] = sum;
+            // printf("%f", sum);
+        }
+
         elem = elem->nextSibling[globs.linkSide];
     }
 }
@@ -758,10 +781,12 @@ void blu_layout(V2f scSize) {
         // sorry :p
         __blu_calculateStandaloneSizesRecurse(globs.ogParent, axis);
         __blu_calculateUpwardsSizesRecurse(globs.ogParent, axis);
+        __blu_calculateDownwardsSizesRecurse(globs.ogParent, axis);
         __blu_solveChildRemaindersRecurse(globs.ogParent, axis);
 
         __blu_calculateStandaloneSizesRecurse(globs.cursorParent, axis);
         __blu_calculateUpwardsSizesRecurse(globs.cursorParent, axis);
+        __blu_calculateDownwardsSizesRecurse(globs.cursorParent, axis);
         __blu_solveChildRemaindersRecurse(globs.cursorParent, axis);
     }
 
@@ -1102,25 +1127,28 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
 
 
     if(globs.prevDragged != area && globs.prevDragged) {
-        if(globs.inputPrevLButton && !globs.inputCurLButton) {
+        if(area->prevHovered) {
             if(globs.prevDragged->dropType & area->dropTypeMask) {
-                if(area->prevHovered) {
+                if(globs.inputPrevLButton && !globs.inputCurLButton) {
                     out.dropped = true;
-                    out.dropType = globs.prevDragged->dropTypeMask;
-                    out.dropVal = globs.prevDragged->dropVal;
                 }
+
+                out.dropType = globs.prevDragged->dropTypeMask;
+                out.dropVal = globs.prevDragged->dropVal;
             }
         }
     }
 
+    out.hovered = area->prevHovered;
+
     if(globs.dragged && globs.dragged != area) { return out; }
 
 
-    out.hovered = area->prevHovered;
     out.scrollDelta = area->scrollDelta;
 
     if(out.hovered || globs.dragged == area) {
         out.mousePos = globs.inputMousePos - area->rect.start;
+        out.hovered = true;
     }
 
     if(globs.dragged == area) {

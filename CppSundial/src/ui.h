@@ -8,38 +8,50 @@
 #include "network/network.h"
 #include "colors.h"
 #include "stb_image/stb_image.h"
-
+#include "base/arr.h"
 #include <cstring>
+
+
+
+
+
+// contains a string and a bunch of chars
+struct NTKey {
+    str str = { nullptr, 0 };
+    U8 chars[255] = { 0 };
+};
 
 
 
 #define GRAPH2D_VCOUNT 700
 #define GRAPH2D_LINECOUNT 6
+// TODO: this is a stupidly large struct for what it does
 struct Graph2dInfo {
 
     float vals[GRAPH2D_LINECOUNT][GRAPH2D_VCOUNT] = { 0 };
     U8 connectionVals[GRAPH2D_LINECOUNT][GRAPH2D_VCOUNT] = { 0 };
-    str keys[GRAPH2D_LINECOUNT] = { 0 };
+    NTKey keys[GRAPH2D_LINECOUNT] = { 0 };
     V4f colors[GRAPH2D_LINECOUNT];
 
-    float yScale = 1;
+    float yScale = 100;
     float yOffset = 0;
 };
 void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAlloc* scratch);
-void initGraph2dInfo(Graph2dInfo* info, BumpAlloc* resArena) {
+void initGraph2dInfo(Graph2dInfo* info) {
 
     info->colors[0] = col_green;
-    info->keys[0] = str_copy(STR("FLSteerSpeed"), resArena); // TODO: access by hash key instead of str
-    // TODO: after NT reset, graph ptrs are invalid
-    // TODO: memory leak here lol
+    info->keys[0].str = str_copy(STR("FLSteerSpeed"), info->keys[0].chars);
 
     info->colors[1] = col_red;
-    info->keys[1] = str_copy(STR("FLSteerPos"), resArena);
+    info->keys[1].str = str_copy(STR("FLSteerPos"), info->keys[1].chars);
+
+    info->colors[2] = col_purple;
+    info->keys[2].str = str_copy(STR("FRSteerSpeed"), info->keys[2].chars);
 }
 
 struct FieldInfo {
     Transform camTransform;
-    Transform camTarget;
+    Transform camTarget = { 0, 6, 0, -90, 0, 0, 1, 1, 1 };
 };
 void draw_field(FieldInfo* info, gfx_Framebuffer* fb, float dt, GLFWwindow* window);
 
@@ -56,18 +68,29 @@ struct SwerveDriveInfo {
 };
 void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt);
 
+// CLEANUP: invalidation problem here too
+#define POWER_INDICATOR_COUNT 30
+struct PowerIndicatorInfo {
+    NTKey keys[POWER_INDICATOR_COUNT];
+    float scrollPosition = 0;
+};
+
+void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch, BumpAlloc* res);
+
 
 enum ViewType {
     viewType_graph2d,
     viewType_field,
     viewType_net,
     viewType_swerveDrive,
+    viewType_powerIndicators,
 };
 union ViewUnion {
     Graph2dInfo graph2dInfo;
     FieldInfo fieldInfo;
     NetInfo netInfo;
     SwerveDriveInfo swerveDriveInfo;
+    PowerIndicatorInfo PowerIndicatorInfo;
 
     ViewUnion() {  };
 };
@@ -76,32 +99,6 @@ struct View {
     ViewType type;
     gfx_Framebuffer* target; // CLEANUP: bad
 };
-
-
-
-#define UI_VIEW_COUNT 3
-static struct UIGlobs {
-
-    gfx_Shader* sceneShader3d = nullptr;
-    gfx_Shader* sceneShader2d = nullptr;
-    gfx_Texture* solidTex;
-
-    float rightSize;
-    float downSize;
-
-    View views[UI_VIEW_COUNT];
-
-    gfx_Texture* wheelTex = nullptr;
-    gfx_Texture* treadTex = nullptr;
-    gfx_Texture* arrowTex = nullptr;
-
-    gfx_VertexArray* robotVA = nullptr;
-    gfx_IndexBuffer* robotIB = nullptr;
-    gfx_VertexArray* fieldVA = nullptr;
-    gfx_IndexBuffer* fieldIB = nullptr;
-
-    gfx_Texture* fieldTex = nullptr;
-} globs;
 
 
 
@@ -132,21 +129,146 @@ void areaAddFB(blu_Area* area, gfx_Framebuffer* target) {
 }
 
 
+#define UI_SCROLL_SENSITIVITY 40
+#define UI_SCROLL_BAR_SIZE 10
+
+// returns parent to clip area that elems can be added
+// NOTE: any styling cant be applied in post because it returns a child area, so put sizing in a scope
+blu_Area* makeScrollArea(float* pos) {
+
+    blu_Area* clip = nullptr;
+
+    blu_Area* a = blu_areaMake("scrollParent", blu_areaFlags_DRAW_BACKGROUND);
+    blu_style_childLayoutAxis(blu_axis_X, &a->style);
+    float clipSize = a->calculatedSizes[blu_axis_Y];
+    float clipMax;
+
+    blu_parentScope(a) {
+
+        a = blu_areaMake("clip", blu_areaFlags_VIEW_OFFSET | blu_areaFlags_CLICKABLE | blu_areaFlags_SCROLLABLE );
+        clip = a;
+        blu_style_sizeX({ blu_sizeKind_REMAINDER, 0 }, &a->style);
+        blu_style_sizeY({ blu_sizeKind_CHILDSUM, 0 }, &a->style);
+        blu_style_childLayoutAxis(blu_axis_Y, &a->style);
+        *pos += blu_interactionFromWidget(a).scrollDelta * UI_SCROLL_SENSITIVITY;
+        clipMax = a->calculatedSizes[blu_axis_Y];
+
+
+
+
+        blu_Area* spacer = nullptr;
+        if(clipMax > clipSize) {
+            a = blu_areaMake("scrollArea", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_SCROLLABLE);
+            a->style.backgroundColor = col_darkGray;
+            a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, UI_SCROLL_BAR_SIZE };
+            a->style.sizes[blu_axis_Y] = { blu_sizeKind_PERCENT, 1 };
+            a->style.childLayoutAxis = blu_axis_Y;
+            *pos += blu_interactionFromWidget(a).scrollDelta * UI_SCROLL_SENSITIVITY;
+
+            blu_parentScope(a) {
+
+                a = blu_areaMake("spacer", 0);
+                spacer = a;
+
+                a = blu_areaMake("bar", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
+                a->style.backgroundColor = col_lightGray;
+                a->style.sizes[blu_axis_X] = { blu_sizeKind_PERCENT, 1 };
+                a->style.sizes[blu_axis_Y] = { blu_sizeKind_PERCENT, clipSize / clipMax };
+                *pos += blu_interactionFromWidget(a).dragDelta.y / clipSize * clipMax;
+            }
+
+            *pos = max(*pos, 0);
+            *pos = min(*pos, clipMax - clipSize);
+            spacer->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, ((*pos) / clipMax) * clipSize };
+        } else {
+            *pos = 0;
+        }
+    }
+
+    clip->viewOffset = { 0, *pos };
+
+    return clip;
+}
+
+blu_WidgetInteraction makeButton(str text, V4f hoverColor) {
+    // TODO: button textures
+    blu_Area* a = blu_areaMake(text, blu_areaFlags_CLICKABLE | blu_areaFlags_CENTER_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM);
+    a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, hoverColor, a->target_hoverAnim);
+    blu_areaAddDisplayStr(a, text);
+    return blu_interactionFromWidget(a);
+}
+
+
+
+
 void initView(View* v, BumpAlloc* resArena) {
     if(v->type == viewType_field) { v->data.fieldInfo = FieldInfo(); }
-    else if(v->type == viewType_graph2d) { v->data.graph2dInfo = Graph2dInfo(); initGraph2dInfo(&v->data.graph2dInfo, resArena); }
+    else if(v->type == viewType_graph2d) { v->data.graph2dInfo = Graph2dInfo(); initGraph2dInfo(&v->data.graph2dInfo); }
     else if(v->type == viewType_swerveDrive) { v->data.swerveDriveInfo = SwerveDriveInfo(); }
     else if(v->type == viewType_net) { v->data.netInfo = NetInfo(); }
+    else if(v->type == viewType_powerIndicators) { v->data.PowerIndicatorInfo = PowerIndicatorInfo(); }
     else { ASSERT(false); };
 }
 
-void updateView(View* v, float dt, GLFWwindow* window, BumpAlloc* scratch) {
+void updateView(View* v, float dt, GLFWwindow* window, BumpAlloc* scratch, BumpAlloc* res) {
     if(v->type == viewType_field) { draw_field(&v->data.fieldInfo, v->target, dt, window); }
     else if(v->type == viewType_graph2d) { draw_graph2d(&v->data.graph2dInfo, v->target, dt, scratch); }
     else if(v->type == viewType_swerveDrive) { draw_swerveDrive(&v->data.swerveDriveInfo, v->target, dt); }
     else if(v->type == viewType_net) { draw_network(&v->data.netInfo, dt, scratch); }
+    else if(v->type == viewType_powerIndicators) { draw_powerIndicators(&v->data.PowerIndicatorInfo, scratch, res); }
     else { ASSERT(false); };
 }
+
+
+
+
+#define UI_VIEW_COUNT 3
+static struct UIGlobs {
+
+    gfx_Shader* sceneShader3d = nullptr;
+    gfx_Shader* sceneShader2d = nullptr;
+    gfx_Texture* solidTex;
+
+    float rightSize;
+    float downSize;
+
+    View views[UI_VIEW_COUNT];
+
+    gfx_Texture* wheelTex = nullptr;
+    gfx_Texture* treadTex = nullptr;
+    gfx_Texture* arrowTex = nullptr;
+
+    gfx_VertexArray* robotVA = nullptr;
+    gfx_IndexBuffer* robotIB = nullptr;
+    gfx_VertexArray* fieldVA = nullptr;
+    gfx_IndexBuffer* fieldIB = nullptr;
+
+    gfx_Texture* fieldTex = nullptr;
+
+    NTKey* firstFreeNTKey = nullptr;
+} globs;
+
+// Keeping keys globally allocated for now
+/*
+
+void NTKeyFree(NTKey* k) {
+    k->nextFree = globs.firstFreeNTKey;
+    globs.firstFreeNTKey = k;
+}
+NTKey* NTKeyAlloc(BumpAlloc* arena) {
+    NTKey* k = globs.firstFreeNTKey;
+    if(!k) { k = BUMP_PUSH_NEW(arena, NTKey); }
+    else {
+        globs.firstFreeNTKey = k->nextFree;
+        *k = NTKey();
+    }
+    return k;
+}
+*/
+
+
+
+
 
 
 blu_Style borderStyle;
@@ -265,6 +387,101 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* resArena, gfx_Texture* solidTex) 
 
 
 
+void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch, BumpAlloc* res) {
+
+    blu_Area* a = makeScrollArea(&info->scrollPosition);
+    blu_parentScope(a) {
+        blu_styleScope(blu_Style()) {
+        blu_style_style(&borderStyle);
+        blu_style_sizeX({ blu_sizeKind_PERCENT, 1 });
+        blu_style_sizeY({ blu_sizeKind_PX, 40 });
+        blu_style_backgroundColor(col_darkBlue);
+
+            for (int i = 0; i < POWER_INDICATOR_COUNT; i++) {
+                net_Prop* p = nullptr;
+                if(info->keys[i].str.length > 0) { p = net_hashGet(info->keys[i].str); }
+                bool disabled = (!p || !net_getConnected());
+
+                str indexStr = str_format(scratch, STR("%i"), i);
+                a = blu_areaMake(indexStr, 0);
+                blu_style_childLayoutAxis(blu_axis_X, &a->style);
+                blu_parentScope(a) {
+
+                    a = blu_areaMake("key", blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE | blu_areaFlags_DROP_EVENTS);
+                    a->dropTypeMask = dropMasks_NT_PROP;
+                    blu_areaAddDisplayStr(a, info->keys[i].str);
+                    blu_style_sizeX({ blu_sizeKind_REMAINDER, 0 }, &a->style);
+
+
+                    blu_WidgetInteraction inter = blu_interactionFromWidget(a);
+                    if(inter.dropped) {
+                        NTKey* k = &info->keys[i];
+                        *k = NTKey();
+                        net_Prop* p = (net_Prop*)inter.dropVal;
+                        ASSERT(p->name.length < 255);
+                        k->str = str_copy(p->name, k->chars);
+                    }
+
+
+                    /*
+                    if(inter.hovered && inter.dropType) {
+                        float t = a->target_hoverAnim;
+                        blu_style_backgroundColor(v4f_lerp(a->style.backgroundColor, col_lightGray, t), &a->style);
+                    }
+                    */
+                    if(disabled) {
+                        a->style.textColor *= col_disconnect;
+                    }
+                    else if(inter.hovered && !inter.dropType && info->keys[i].str.length > 0) {
+                        a->style.textColor *= col_disconnect;
+                        blu_parentScope(a) {
+                            a = blu_areaMake("X", blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
+                            blu_style_sizeX({ blu_sizeKind_PERCENT, 1 });
+                            blu_areaAddDisplayStr(a, "X");
+                            if(inter.clicked) {
+                                info->keys[i] = NTKey();
+                            }
+                        }
+                    }
+
+
+                    a = blu_areaMake("valueParent", 0);
+                    blu_style_sizeX({ blu_sizeKind_REMAINDER, 0 }, &a->style);
+                    float w = a->calculatedSizes[blu_axis_X];
+                    blu_parentScope(a) {
+                        a = blu_areaMake("indicator", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_FLOATING);
+
+                        a->offset = { 0, 0 };
+                        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 0 };
+
+                        blu_style_backgroundColor(col_red, &a->style);
+                        if(disabled) { a->style.backgroundColor *= col_disconnect; }
+
+                        if(p) {
+                            float val = (F32)p->data->f64;
+                            float leftShift = 0;
+                            float barSize = val * (w/2);
+
+                            if(val < 0) {
+                                leftShift = barSize;
+                                barSize *= -1;
+                            }
+
+                            a->offset = { w/2 + leftShift, 0 };
+                            blu_style_sizeX({ blu_sizeKind_PX, barSize }, &a->style);
+                        }
+                    }
+
+
+                } // end per elem parent
+
+            } // end loop
+
+        }
+    } // end scroll view
+}
+
+
 
 
 
@@ -301,11 +518,17 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt) 
     };
 
     // TODO: hash get is not typesafe
-    net_Prop* props[] = {
+    net_Prop* rotationProps[] = {
         net_hashGet(STR("FLSteerPos")),
         net_hashGet(STR("FRSteerPos")),
         net_hashGet(STR("BLSteerPos")),
         net_hashGet(STR("BRSteerPos"))
+    };
+    net_Prop* distProps[] = {
+        net_hashGet(STR("FLDrivePos")),
+        net_hashGet(STR("FRDrivePos")),
+        net_hashGet(STR("BLDrivePos")),
+        net_hashGet(STR("BRDrivePos"))
     };
 
     net_Prop* angle = net_hashGet(STR("yaw"));
@@ -314,23 +537,41 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt) 
 
 
     for(int i = 0; i < 4; i++) {
-        gfx_UniformBlock* b = gfx_registerCall(p);
-        b->texture = globs.wheelTex;
 
-        matrixTranslation(translations[i].x, translations[i].y, 0, b->model);
-        matrixScale(1, 1, 0, temp);
-        b->model = b->model * temp;
+        Mat4f t;
+        matrixTranslation(translations[i].x, translations[i].y, 0, t);
+
+        if(rotationProps[i]) {
+            matrixZRotation(-(F32)rotationProps[i]->data->f64 * 360, temp);
+            t = temp * t;
+        }
 
         if(angle) {
             matrixZRotation(-(F32)angle->data->f64, temp);
-            b->model = b->model * temp;
+            t = t * temp;
         }
 
-        if(props[i]) {
-            matrixZRotation(-(F32)props[i]->data->f64 * 360, temp);
-            b->model = temp * b->model;
+        // wheel
+        gfx_UniformBlock* b = gfx_registerCall(p);
+        b->texture = globs.wheelTex;
+        b->model = t;
+
+        // tread
+        matrixScale(0.25, 0.95, 0, temp);
+
+        float pos = 0;
+        if(distProps[i]) {
+            pos = (F32)distProps[i]->data->f64 * 0.1f;
         }
+
+        b = gfx_registerCall(p);
+        b->texture = globs.treadTex;
+        b->model = temp * t;
+        b->srcStart = V2f(0, pos);
+        b->srcEnd = V2f(1, pos - 1);
     }
+
+
 
     gfx_UniformBlock* b = gfx_registerCall(p);
     b->texture = globs.arrowTex;
@@ -366,9 +607,9 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
 
     // APPEND NEW VALUES
     for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
-        if(!info->keys[i].chars) { continue; }
+        if(info->keys[i].str.length == 0) { continue; }
 
-        net_Prop* prop = net_hashGet(info->keys[i]);
+        net_Prop* prop = net_hashGet(info->keys[i].str);
 
         bool nConn = net_getConnected();
         float nval = 0;
@@ -405,8 +646,8 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
 
 
         blu_WidgetInteraction inter = blu_interactionFromWidget(a);
-        info->yScale += -inter.scrollDelta * 10;
-        info->yScale = max(0, info->yScale);
+        info->yScale += info->yScale * -inter.scrollDelta * 0.1;
+        info->yScale = max(0.001, info->yScale);
         info->yOffset += inter.dragDelta.y;
 
         float scale = -info->yScale;
@@ -421,7 +662,7 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
 
 
         for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
-            if(!info->keys[i].chars) { continue; }
+            if(info->keys[i].str.length == 0) { continue; }
 
             V2f lastPoint = V2f(0, info->vals[i][0] * scale + offset);
             for(int j = 1; j < GRAPH2D_VCOUNT; j++) {
@@ -447,21 +688,28 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
             blu_style_backgroundColor(col_lightGray);
             blu_style_cornerRadius(5);
 
-                for(int i = 0; i < 2; i++) {
+                for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
+                    if(!info->keys[i].chars) { continue; }
+
                     a = blu_areaMake(str_format(scratch, STR("thing %i"), i),
                         blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT |
                         blu_areaFlags_DROP_EVENTS | blu_areaFlags_HOVER_ANIM);
 
-                    blu_areaAddDisplayStr(a, info->keys[i]);
+                    blu_areaAddDisplayStr(a, info->keys[i].str);
 
                     a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, col_white, a->target_hoverAnim);
+                    if(!info->connectionVals[i][GRAPH2D_VCOUNT-1]) {
+                        a->style.textColor *= col_disconnect;
+                        a->style.backgroundColor *= col_disconnect;
+                    }
 
                     a->dropTypeMask = dropMasks_NT_PROP;
                     inter = blu_interactionFromWidget(a);
                     if(inter.dropped) {
                         net_Prop* prop = ((net_Prop*)(inter.dropVal));
                         if(prop->type == net_propType_F64) {
-                            info->keys[i] = prop->name;
+                            ASSERT(prop->name.length < 255);
+                            info->keys[i].str = str_copy(prop->name, info->keys[i].chars);
                         }
                     }
                 }
@@ -474,14 +722,6 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
 
 // TODO: make controls not apply unless field is "selected"
 // TODO: robot follow mode
-
-blu_WidgetInteraction makeButton(str text, V4f hoverColor) {
-    // TODO: button textures
-    blu_Area* a = blu_areaMake(text, blu_areaFlags_CLICKABLE | blu_areaFlags_CENTER_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM);
-    a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, hoverColor, a->target_hoverAnim);
-    blu_areaAddDisplayStr(a, text);
-    return blu_interactionFromWidget(a);
-}
 
 void draw_field(FieldInfo* info, gfx_Framebuffer* fb, float dt, GLFWwindow* window) {
 
@@ -675,127 +915,87 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
 
 
 
-    a = blu_areaMake(STR("lower"), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_CLICKABLE);
-    info->clipSize = a->calculatedSizes[blu_axis_Y];
-    a->style.childLayoutAxis = blu_axis_X;
+    blu_styleScope(blu_Style()) {
+        blu_style_sizeX({ blu_sizeKind_PERCENT, 1 });
+        blu_style_sizeY({ blu_sizeKind_REMAINDER, 0 });
+        a = makeScrollArea(&info->clipPos);
+    }
+
     blu_parentScope(a) {
+        blu_styleScope(blu_Style()) {
+        blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
+        blu_style_childLayoutAxis(blu_axis_X);
+        blu_style_backgroundColor(col_darkGray);
 
-        a = blu_areaMake(STR("clip"), blu_areaFlags_VIEW_OFFSET | blu_areaFlags_CLICKABLE | blu_areaFlags_SCROLLABLE);
-        blu_Area* clip = a;
-        a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
-        a->style.childLayoutAxis = blu_axis_Y;
-        info->clipPos += blu_interactionFromWidget(a).scrollDelta * 40;
-        blu_parentScope(a) {
+            net_Prop** tracked;
+            U32 tCount = 0;
+            net_getTracked(&tracked, &tCount);
+            for(int i = 0; i < tCount; i++) {
+                net_Prop* prop = tracked[i];
+                str quotedName = str_format(scratch, STR("\"%s\""), prop->name);
 
-            blu_styleScope(blu_Style()) {
-            blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
-            blu_style_childLayoutAxis(blu_axis_X);
-            blu_style_backgroundColor(col_darkGray);
+                blu_Area* parent = blu_areaMake(prop->name, blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
+                blu_style_style(&borderStyle, &parent->style);
+                F32 t = parent->target_hoverAnim;
+                parent->dropType = dropMasks_NT_PROP;
+                parent->dropVal = prop;
 
-
-
-                net_Prop** tracked;
-                U32 tCount = 0;
-                net_getTracked(&tracked, &tCount);
-                for(int i = 0; i < tCount; i++) {
-                    net_Prop* prop = tracked[i];
-                    str quotedName = str_format(scratch, STR("\"%s\""), prop->name);
-
-                    blu_Area* parent = blu_areaMake(prop->name, blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
-                    blu_style_style(&borderStyle, &parent->style);
-                    F32 t = parent->target_hoverAnim;
-                    parent->dropType = dropMasks_NT_PROP;
-                    parent->dropVal = prop;
-
-                    if(blu_interactionFromWidget(parent).held) {
-                        t = 1;
-                        blu_parentScope(blu_getCursorParent()) {
-                            blu_styleScope(blu_Style()) {
-                            blu_style_style(&borderStyle);
-                            blu_style_borderSize(2);
-                            blu_style_sizeX({ blu_sizeKind_TEXT, 0 });
-                            blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
-                            blu_style_cornerRadius(4);
-
-                                a = blu_areaMake("drag indicator", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT);
-                                blu_areaAddDisplayStr(a, quotedName);
-                            }
-                        }
-                    }
-                    parent->style.backgroundColor = v4f_lerp(col_darkBlue, col_darkGray, t);
-
-                    blu_parentScope(parent) {
+                if(blu_interactionFromWidget(parent).held) {
+                    t = 1;
+                    blu_parentScope(blu_getCursorParent()) {
                         blu_styleScope(blu_Style()) {
-                        blu_style_sizeX({ blu_sizeKind_PERCENT, 0.5 });
                         blu_style_style(&borderStyle);
+                        blu_style_borderSize(2);
+                        blu_style_sizeX({ blu_sizeKind_TEXT, 0 });
+                        blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
+                        blu_style_cornerRadius(4);
 
-                            a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
+                            a = blu_areaMake("drag indicator", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT);
                             blu_areaAddDisplayStr(a, quotedName);
-
-                            if(!net_getConnected()) {
-                                a->style.backgroundColor *= col_disconnect;
-                                a->style.textColor *= col_disconnect;
-                            }
-
-                            a = blu_areaMake(STR("value"), blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
-                            a->style.backgroundColor = col_darkGray;
-
-
-                            if(prop->type == net_propType_S32) {
-                                blu_areaAddDisplayStr(a, str_format(scratch, STR("%i"), (prop->data->s32))); }
-                            else if(prop->type == net_propType_F64) {
-                                blu_areaAddDisplayStr(a, str_format(scratch, STR("%f"), (prop->data->f64))); }
-                            else if(prop->type == net_propType_STR) {
-                                blu_areaAddDisplayStr(a, str_format(scratch, STR("\"%s\""), (prop->data->str))); }
-                            else if(prop->type == net_propType_BOOL) {
-                                blu_areaAddDisplayStr(a, str_format(scratch, STR("%b"), (prop->data->boo)));
-                                a->style.backgroundColor = prop->data->boo? col_green : col_red;
-                                a->style.cornerRadius = 2;
-                                a->style.textColor = col_darkBlue;
-                            }
-
-                            if(!net_getConnected()) {
-                                a->style.backgroundColor *= col_disconnect;
-                                a->style.textColor *= col_disconnect;
-                            }
                         }
                     }
                 }
+                parent->style.backgroundColor = v4f_lerp(col_darkBlue, col_darkGray, t);
 
-            } // end text styling
+                blu_parentScope(parent) {
+                    blu_styleScope(blu_Style()) {
+                    blu_style_sizeX({ blu_sizeKind_PERCENT, 0.5 });
+                    blu_style_style(&borderStyle);
 
-        } // end of clip
+                        a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
+                        blu_areaAddDisplayStr(a, quotedName);
 
-        blu_Area* spacer = nullptr;
-        if(info->clipMax > info->clipSize) {
-            a = blu_areaMake(STR("scrollArea"), blu_areaFlags_DRAW_BACKGROUND);
-            a->style.backgroundColor = col_darkGray;
-            a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 10 };
-            a->style.childLayoutAxis = blu_axis_Y;
+                        if(!net_getConnected()) {
+                            a->style.backgroundColor *= col_disconnect;
+                            a->style.textColor *= col_disconnect;
+                        }
 
-            blu_parentScope(a) {
+                        a = blu_areaMake(STR("value"), blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
+                        a->style.backgroundColor = col_darkGray;
 
-                a = blu_areaMake(STR("spacer"), 0);
-                spacer = a;
 
-                a = blu_areaMake(STR("bar"),
-                    blu_areaFlags_DRAW_BACKGROUND |
-                    blu_areaFlags_CLICKABLE);
-                a->style.backgroundColor = col_lightGray;
-                a->style.sizes[blu_axis_Y] = { blu_sizeKind_PERCENT, info->clipSize / info->clipMax };
-                info->clipPos += blu_interactionFromWidget(a).dragDelta.y / info->clipSize * info->clipMax;
+                        if(prop->type == net_propType_S32) {
+                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%i"), (prop->data->s32))); }
+                        else if(prop->type == net_propType_F64) {
+                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%f"), (prop->data->f64))); }
+                        else if(prop->type == net_propType_STR) {
+                            blu_areaAddDisplayStr(a, str_format(scratch, STR("\"%s\""), (prop->data->str))); }
+                        else if(prop->type == net_propType_BOOL) {
+                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%b"), (prop->data->boo)));
+                            a->style.backgroundColor = prop->data->boo? col_green : col_red;
+                            a->style.cornerRadius = 2;
+                            a->style.textColor = col_darkBlue;
+                        }
 
+                        if(!net_getConnected()) {
+                            a->style.backgroundColor *= col_disconnect;
+                            a->style.textColor *= col_disconnect;
+                        }
+                    }
+                }
             }
-
-            info->clipPos = max(info->clipPos, 0);
-            info->clipPos = min(info->clipPos, info->clipMax - (info->clipSize));
-            spacer->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, (info->clipPos / info->clipMax) * info->clipSize };
-        } else {
-            info->clipPos = 0;
-        }
-
-        clip->viewOffset = { 0, info->clipPos };
-    } // end left
+        } // end text styling
+    } // end of clip
 }
 
 
@@ -803,7 +1003,7 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
 
 
 
-// TODO: texures
+// TODO: button texures
 void makeViewSrc(const char* name, ViewType type) {
 
     blu_Area* a = blu_areaMake(name,
@@ -847,7 +1047,7 @@ void makeView(const char* name, View* v, float dt, BumpAlloc* scratch, GLFWwindo
         blu_style_sizeX({ blu_sizeKind_PERCENT, 1 });
         blu_style_sizeY({ blu_sizeKind_PERCENT, 1 });
 
-            updateView(v, dt, window, scratch);
+            updateView(v, dt, window, scratch, res);
 
             a = blu_areaMake("hoverIndicator", blu_areaFlags_FLOATING | blu_areaFlags_DRAW_BACKGROUND);
             a->style.backgroundColor = v4f_lerp(V4f(0, 0, 0, 0), V4f(1, 1, 1, 0.3), t);
@@ -881,6 +1081,7 @@ void ui_update(BumpAlloc* scratch, BumpAlloc* res, GLFWwindow* window, float dt)
                 makeViewSrc("Graph", viewType_graph2d);
                 makeViewSrc("Swerve", viewType_swerveDrive);
                 makeViewSrc("NT", viewType_net);
+                makeViewSrc("POWER", viewType_powerIndicators);
             }
         }
 
