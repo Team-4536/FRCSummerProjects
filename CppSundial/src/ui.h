@@ -8,7 +8,7 @@
 #include "network/network.h"
 #include "colors.h"
 #include "stb_image/stb_image.h"
-
+#include "base/arr.h"
 #include <cstring>
 
 
@@ -59,18 +59,29 @@ struct SwerveDriveInfo {
 };
 void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt);
 
+// CLEANUP: invalidation problem here too
+struct PowerIndicatorInfo {
+    net_Prop* props[30];
+    U32 propCount = 0;
+    float scrollPosition = 0;
+};
+
+void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch);
+
 
 enum ViewType {
     viewType_graph2d,
     viewType_field,
     viewType_net,
     viewType_swerveDrive,
+    viewType_powerIndicators,
 };
 union ViewUnion {
     Graph2dInfo graph2dInfo;
     FieldInfo fieldInfo;
     NetInfo netInfo;
     SwerveDriveInfo swerveDriveInfo;
+    PowerIndicatorInfo PowerIndicatorInfo;
 
     ViewUnion() {  };
 };
@@ -203,6 +214,7 @@ void initView(View* v, BumpAlloc* resArena) {
     else if(v->type == viewType_graph2d) { v->data.graph2dInfo = Graph2dInfo(); initGraph2dInfo(&v->data.graph2dInfo, resArena); }
     else if(v->type == viewType_swerveDrive) { v->data.swerveDriveInfo = SwerveDriveInfo(); }
     else if(v->type == viewType_net) { v->data.netInfo = NetInfo(); }
+    else if(v->type == viewType_powerIndicators) { v->data.PowerIndicatorInfo = PowerIndicatorInfo(); }
     else { ASSERT(false); };
 }
 
@@ -211,6 +223,7 @@ void updateView(View* v, float dt, GLFWwindow* window, BumpAlloc* scratch) {
     else if(v->type == viewType_graph2d) { draw_graph2d(&v->data.graph2dInfo, v->target, dt, scratch); }
     else if(v->type == viewType_swerveDrive) { draw_swerveDrive(&v->data.swerveDriveInfo, v->target, dt); }
     else if(v->type == viewType_net) { draw_network(&v->data.netInfo, dt, scratch); }
+    else if(v->type == viewType_powerIndicators) { draw_powerIndicators(&v->data.PowerIndicatorInfo, scratch); }
     else { ASSERT(false); };
 }
 
@@ -333,19 +346,71 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* resArena, gfx_Texture* solidTex) 
 
 
 
-// CLEANUP: invalidation problem here too
-struct PowerIndicatorInfo {
-    net_Prop* props[30];
-};
-void draw_powerIndicators(PowerIndicatorInfo* info) {
+void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch) {
 
-    for (int i = 0; i < 30; i++) {
-        net_Prop* p = info->props[i];
-        if(p == nullptr) { break; }
+    blu_Area* a;
 
+    a = blu_areaMake("powerIndicators", blu_areaFlags_DROP_EVENTS | blu_areaFlags_DRAW_BACKGROUND);
+    a->dropTypeMask = dropMasks_NT_PROP;
+    V4f hoverColor = v4f_lerp(col_darkBlue, col_darkGray, a->target_hoverAnim);
 
+    blu_WidgetInteraction inter = blu_interactionFromWidget(a);
+    if(inter.dropped && info->propCount < 29) {
+        ARR_APPEND(info->props, info->propCount, (net_Prop*)inter.dropVal);
     }
 
+
+    blu_parentScope(a) {
+
+        a = makeScrollArea(&info->scrollPosition);
+        blu_style_backgroundColor(hoverColor, &a->style);
+
+        blu_parentScope(a) {
+            blu_styleScope(blu_Style()) {
+            blu_style_style(&borderStyle);
+            blu_style_sizeX({ blu_sizeKind_PERCENT, 1 });
+            blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
+            blu_style_backgroundColor(col_darkBlue);
+
+                for (int i = 0; i < info->propCount; i++) {
+                    net_Prop* p = info->props[i];
+
+                    str indexStr = str_format(scratch, STR("%i"), i);
+                    a = blu_areaMake(indexStr, 0);
+                    blu_style_childLayoutAxis(blu_axis_X, &a->style);
+                    blu_parentScope(a) {
+
+                        a = blu_areaMake("key", blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
+                        blu_areaAddDisplayStr(a, p->name);
+                        blu_style_sizeX({ blu_sizeKind_REMAINDER, 0 }, &a->style);
+
+                        a = blu_areaMake("valueParent", 0);
+                        blu_style_sizeX({ blu_sizeKind_REMAINDER, 0 }, &a->style);
+                        float w = a->calculatedSizes[blu_axis_X];
+                        blu_parentScope(a) {
+                            a = blu_areaMake("indicator", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_FLOATING);
+                            blu_style_backgroundColor(col_red, &a->style);
+
+                            float val = (F32)p->data->f64;
+                            float leftShift = 0;
+                            float barSize = val * (w/2);
+
+                            if(val < 0) {
+                                leftShift = barSize;
+                                barSize *= -1;
+                            }
+
+                            a->offset = { w/2 + leftShift, 0 };
+                            blu_style_sizeX({ blu_sizeKind_PX, barSize }, &a->style);
+                        }
+
+                    } // end per elem parent
+
+                } // end loop
+
+            }
+        }
+    }
 }
 
 
@@ -951,6 +1016,7 @@ void ui_update(BumpAlloc* scratch, BumpAlloc* res, GLFWwindow* window, float dt)
                 makeViewSrc("Graph", viewType_graph2d);
                 makeViewSrc("Swerve", viewType_swerveDrive);
                 makeViewSrc("NT", viewType_net);
+                makeViewSrc("POWER", viewType_powerIndicators);
             }
         }
 
