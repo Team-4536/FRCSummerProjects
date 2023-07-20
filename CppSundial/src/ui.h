@@ -69,9 +69,9 @@ struct SwerveDriveInfo {
 void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt);
 
 // CLEANUP: invalidation problem here too
+#define POWER_INDICATOR_COUNT 30
 struct PowerIndicatorInfo {
-    NTKey keys[30];
-    U32 keyCount = 0;
+    NTKey keys[POWER_INDICATOR_COUNT];
     float scrollPosition = 0;
 };
 
@@ -189,6 +189,15 @@ blu_Area* makeScrollArea(float* pos) {
 
     return clip;
 }
+
+blu_WidgetInteraction makeButton(str text, V4f hoverColor) {
+    // TODO: button textures
+    blu_Area* a = blu_areaMake(text, blu_areaFlags_CLICKABLE | blu_areaFlags_CENTER_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM);
+    a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, hoverColor, a->target_hoverAnim);
+    blu_areaAddDisplayStr(a, text);
+    return blu_interactionFromWidget(a);
+}
+
 
 
 
@@ -380,83 +389,96 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* resArena, gfx_Texture* solidTex) 
 
 void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch, BumpAlloc* res) {
 
-    blu_Area* a;
-
-    a = blu_areaMake("powerIndicators", blu_areaFlags_DROP_EVENTS | blu_areaFlags_DRAW_BACKGROUND);
-    a->dropTypeMask = dropMasks_NT_PROP;
-    // TODO: background color change on hover
-
-    blu_WidgetInteraction inter = blu_interactionFromWidget(a);
-    if(info->keyCount < 29) {
-        if(inter.dropped) {
-            NTKey* k = ARR_APPEND(info->keys, info->keyCount, NTKey());
-
-            net_Prop* p = (net_Prop*)inter.dropVal;
-            ASSERT(p->name.length < 255);
-            k->str = str_copy(p->name, k->chars);
-        }
-    }
-
-
+    blu_Area* a = makeScrollArea(&info->scrollPosition);
     blu_parentScope(a) {
+        blu_styleScope(blu_Style()) {
+        blu_style_style(&borderStyle);
+        blu_style_sizeX({ blu_sizeKind_PERCENT, 1 });
+        blu_style_sizeY({ blu_sizeKind_PX, 40 });
+        blu_style_backgroundColor(col_darkBlue);
 
-        a = makeScrollArea(&info->scrollPosition);
+            for (int i = 0; i < POWER_INDICATOR_COUNT; i++) {
+                net_Prop* p = nullptr;
+                if(info->keys[i].str.length > 0) { p = net_hashGet(info->keys[i].str); }
+                bool disabled = (!p || !net_getConnected());
 
-        blu_parentScope(a) {
-            blu_styleScope(blu_Style()) {
-            blu_style_style(&borderStyle);
-            blu_style_sizeX({ blu_sizeKind_PERCENT, 1 });
-            blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
-            blu_style_backgroundColor(col_darkBlue);
+                str indexStr = str_format(scratch, STR("%i"), i);
+                a = blu_areaMake(indexStr, 0);
+                blu_style_childLayoutAxis(blu_axis_X, &a->style);
+                blu_parentScope(a) {
 
-                for (int i = 0; i < info->keyCount; i++) {
-                    net_Prop* p = net_hashGet(info->keys[i].str);
-                    bool disabled = (!p || !net_getConnected());
+                    a = blu_areaMake("key", blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE | blu_areaFlags_DROP_EVENTS);
+                    a->dropTypeMask = dropMasks_NT_PROP;
+                    blu_areaAddDisplayStr(a, info->keys[i].str);
+                    blu_style_sizeX({ blu_sizeKind_REMAINDER, 0 }, &a->style);
 
-                    str indexStr = str_format(scratch, STR("%i"), i);
-                    a = blu_areaMake(indexStr, 0);
-                    blu_style_childLayoutAxis(blu_axis_X, &a->style);
-                    blu_parentScope(a) {
 
-                        a = blu_areaMake("key", blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
-                        blu_areaAddDisplayStr(a, info->keys[i].str);
-                        blu_style_sizeX({ blu_sizeKind_REMAINDER, 0 }, &a->style);
-                        if(disabled) { a->style.textColor *= col_disconnect; }
+                    blu_WidgetInteraction inter = blu_interactionFromWidget(a);
+                    if(inter.dropped) {
+                        NTKey* k = &info->keys[i];
+                        *k = NTKey();
+                        net_Prop* p = (net_Prop*)inter.dropVal;
+                        ASSERT(p->name.length < 255);
+                        k->str = str_copy(p->name, k->chars);
+                    }
 
-                        a = blu_areaMake("valueParent", 0);
-                        blu_style_sizeX({ blu_sizeKind_REMAINDER, 0 }, &a->style);
-                        float w = a->calculatedSizes[blu_axis_X];
+
+                    /*
+                    if(inter.hovered && inter.dropType) {
+                        float t = a->target_hoverAnim;
+                        blu_style_backgroundColor(v4f_lerp(a->style.backgroundColor, col_lightGray, t), &a->style);
+                    }
+                    */
+                    if(disabled) {
+                        a->style.textColor *= col_disconnect;
+                    }
+                    else if(inter.hovered && !inter.dropType && info->keys[i].str.length > 0) {
+                        a->style.textColor *= col_disconnect;
                         blu_parentScope(a) {
-                            a = blu_areaMake("indicator", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_FLOATING);
-
-                            a->offset = { 0, 0 };
-                            a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 0 };
-
-                            blu_style_backgroundColor(col_red, &a->style);
-                            if(disabled) { a->style.backgroundColor *= col_disconnect; }
-
-                            if(p) {
-                                float val = (F32)p->data->f64;
-                                float leftShift = 0;
-                                float barSize = val * (w/2);
-
-                                if(val < 0) {
-                                    leftShift = barSize;
-                                    barSize *= -1;
-                                }
-
-                                a->offset = { w/2 + leftShift, 0 };
-                                blu_style_sizeX({ blu_sizeKind_PX, barSize }, &a->style);
+                            a = blu_areaMake("X", blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
+                            blu_style_sizeX({ blu_sizeKind_PERCENT, 1 });
+                            blu_areaAddDisplayStr(a, "X");
+                            if(inter.clicked) {
+                                info->keys[i] = NTKey();
                             }
                         }
+                    }
 
-                    } // end per elem parent
 
-                } // end loop
+                    a = blu_areaMake("valueParent", 0);
+                    blu_style_sizeX({ blu_sizeKind_REMAINDER, 0 }, &a->style);
+                    float w = a->calculatedSizes[blu_axis_X];
+                    blu_parentScope(a) {
+                        a = blu_areaMake("indicator", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_FLOATING);
 
-            }
+                        a->offset = { 0, 0 };
+                        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 0 };
+
+                        blu_style_backgroundColor(col_red, &a->style);
+                        if(disabled) { a->style.backgroundColor *= col_disconnect; }
+
+                        if(p) {
+                            float val = (F32)p->data->f64;
+                            float leftShift = 0;
+                            float barSize = val * (w/2);
+
+                            if(val < 0) {
+                                leftShift = barSize;
+                                barSize *= -1;
+                            }
+
+                            a->offset = { w/2 + leftShift, 0 };
+                            blu_style_sizeX({ blu_sizeKind_PX, barSize }, &a->style);
+                        }
+                    }
+
+
+                } // end per elem parent
+
+            } // end loop
+
         }
-    }
+    } // end scroll view
 }
 
 
@@ -700,14 +722,6 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
 
 // TODO: make controls not apply unless field is "selected"
 // TODO: robot follow mode
-
-blu_WidgetInteraction makeButton(str text, V4f hoverColor) {
-    // TODO: button textures
-    blu_Area* a = blu_areaMake(text, blu_areaFlags_CLICKABLE | blu_areaFlags_CENTER_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM);
-    a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, hoverColor, a->target_hoverAnim);
-    blu_areaAddDisplayStr(a, text);
-    return blu_interactionFromWidget(a);
-}
 
 void draw_field(FieldInfo* info, gfx_Framebuffer* fb, float dt, GLFWwindow* window) {
 

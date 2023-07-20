@@ -1127,25 +1127,28 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
 
 
     if(globs.prevDragged != area && globs.prevDragged) {
-        if(globs.inputPrevLButton && !globs.inputCurLButton) {
+        if(area->prevHovered) {
             if(globs.prevDragged->dropType & area->dropTypeMask) {
-                if(area->prevHovered) {
+                if(globs.inputPrevLButton && !globs.inputCurLButton) {
                     out.dropped = true;
-                    out.dropType = globs.prevDragged->dropTypeMask;
-                    out.dropVal = globs.prevDragged->dropVal;
                 }
+
+                out.dropType = globs.prevDragged->dropTypeMask;
+                out.dropVal = globs.prevDragged->dropVal;
             }
         }
     }
 
+    out.hovered = area->prevHovered;
+
     if(globs.dragged && globs.dragged != area) { return out; }
 
 
-    out.hovered = area->prevHovered;
     out.scrollDelta = area->scrollDelta;
 
     if(out.hovered || globs.dragged == area) {
         out.mousePos = globs.inputMousePos - area->rect.start;
+        out.hovered = true;
     }
 
     if(globs.dragged == area) {
