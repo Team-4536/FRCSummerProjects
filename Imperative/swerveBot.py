@@ -27,7 +27,7 @@ class SwerveBot(wpilib.TimedRobot):
 
     def robotInit(self) -> None:
 
-        self.server = socketing.Server()
+        self.server = socketing.Server(self.isReal())
         self.driveCtrlr = wpilib.XboxController(0)
         self.armCtrlr = wpilib.XboxController(1)
         self.time = timing.TimeData(None)

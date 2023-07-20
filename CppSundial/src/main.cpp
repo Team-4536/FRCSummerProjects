@@ -110,6 +110,7 @@ int main() {
 
     ui_init(&frameArena, &lifetimeArena, solidTex);
     net_init();
+    net_setTargetIp(STR("localhost"));
 
 
     gfx_Shader* blueShader;

@@ -55,6 +55,7 @@ struct net_Prop {
 
 
 void net_init();
+void net_setTargetIp(str s);
 void net_update(BumpAlloc* scratch, float curTime);
 void net_cleanup();
 
@@ -99,6 +100,7 @@ void net_putEvent(str name, BumpAlloc* scratch);
 #define NET_SEND_INTERVAL (1/50.0f)
 // #define NET_SEND_INTERVAL (1/50.0f)
 
+#define NET_PORT "7000"
 
 
 
@@ -177,6 +179,7 @@ struct net_Globs {
 
     WSADATA wsaData;
 
+    str targetIp = { nullptr, 0 };
     net_Sock simSocket = net_Sock();
     bool connected = false;
 
@@ -193,8 +196,6 @@ struct net_Globs {
     U8* recvBuffer = nullptr;
     float lastSendTime = 0;
     BumpAlloc sendArena;
-
-
 
     FILE* logFile;
 };
@@ -226,6 +227,13 @@ void net_init() {
 
 
     globs.logFile = fopen("sunLog.log", "w");
+}
+
+// NOTE: keep chars allocated for ever
+void net_setTargetIp(str s) {
+    globs.targetIp = s;
+    globs.connected = false;
+    _net_sockCloseFree(&globs.simSocket);
 }
 
 // clears and reallocs resArena
@@ -555,7 +563,7 @@ void net_update(BumpAlloc* scratch, float curTime) {
 
     bool wasConnected = globs.connected;
     if(!globs.connected) {
-        bool connected = _net_sockCreateConnect("localhost", "7000", &globs.simSocket, &err);
+        bool connected = _net_sockCreateConnect(str_cstyle(globs.targetIp, scratch), NET_PORT, &globs.simSocket, &err);
 
         if(err != net_sockErr_none) { // attempt reconnection forever on errors
             _net_sockCloseFree(&globs.simSocket); }
