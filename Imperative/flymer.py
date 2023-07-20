@@ -9,6 +9,7 @@ import inputs
 from telemetryHelp import publishExpression
 import sim
 import timing
+from real import V2f
 
 
 
@@ -84,13 +85,30 @@ class Flymer(wpilib.TimedRobot):
         self.telemTable.putBoolean("grabber", True if self.grabber.get() == wpilib.DoubleSolenoid.Value.kForward else False)
         self.telemTable.putBoolean("brakes", True if self.brakes.get() == wpilib.DoubleSolenoid.Value.kForward else False)
 
+        self.telemTable.putNumber("Gyro", self.gyro.getYaw())
+
+
+
+
+    def teleopInit(self) -> None:
+
+        self.gyro.reset()
+
+
+
+
+
     def teleopPeriodic(self) -> None:
 
         self.input = inputs.FlymerInputs(self.driveCtrlr, self.armCtrlr)
+        self.leftStickVector = V2f(self.input.driveX, self.input.driveY).rotateDegrees(-self.gyro.getYaw())
 
-        self.driveSpeeds = drive.mechController(self.input.driveX, self.input.driveY, self.input.turning)
-        self.driveSpeeds = drive.scaleSpeeds(self.driveSpeeds, 0.2)
+        self.driveSpeeds = drive.mechController(self.leftStickVector.x, self.leftStickVector.y, self.input.turning)
+        self.driveSpeeds = drive.scaleSpeeds(self.driveSpeeds, 0.3)
         drive.setMotors(self.driveSpeeds, self.FLDrive, self.FRDrive, self.BLDrive, self.BRDrive)
+
+        if self.input.gyroReset:
+            self.gyro.reset()
 
         self.liftMotor.set(self.input.lift * 0.4)
         self.retractMotor.set(self.input.retract * 0.5)
