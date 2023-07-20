@@ -22,7 +22,7 @@ class DemoBot(wpilib.TimedRobot):
 
     def robotInit(self) -> None:
 
-        self.server = socketing.Server()
+        self.server = socketing.Server(self.isReal())
 
         # DRIVE MOTORS ==================================================
         self.FLDrive = wpilib.Spark(2)
@@ -33,6 +33,8 @@ class DemoBot(wpilib.TimedRobot):
         self.BRDrive.setInverted(True)
 
         self.turretMotor = wpilib.Spark(0)
+
+        self.turretEncoder = wpilib.Encoder(0, 1)
 
 
         # GYRO ==========================================================
@@ -67,6 +69,10 @@ class DemoBot(wpilib.TimedRobot):
         self.server.putUpdate("BLSpeed", self.BLDrive.get())
         self.server.putUpdate("BRSpeed", self.BRDrive.get())
         self.server.putUpdate("TurretSpeed", self.turretMotor.get())
+        self.server.putUpdate("enabled", self.isEnabled())
+        self.server.putUpdate("turretPos", self.turretEncoder.get())
+
+        self.server.update(self.time.timeSinceInit)
 
 
 
