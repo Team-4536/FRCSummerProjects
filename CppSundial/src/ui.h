@@ -172,7 +172,7 @@ blu_Area* makeScrollArea(float* pos) {
             a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, UI_SCROLL_BAR_SIZE };
             a->style.sizes[blu_axis_Y] = { blu_sizeKind_PERCENT, 1 };
             a->style.childLayoutAxis = blu_axis_Y;
-            *pos += blu_interactionFromWidget(a).scrollDelta * UI_SCROLL_SENSITIVITY;
+        *pos += blu_interactionFromWidget(a).scrollDelta * UI_SCROLL_SENSITIVITY;
 
             blu_parentScope(a) {
 
