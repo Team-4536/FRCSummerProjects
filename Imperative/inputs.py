@@ -18,8 +18,11 @@ class FlymerInputs():
         self.driveY = deadZone((-driveCtrlr.getLeftY()))
         self.turning = deadZone(driveCtrlr.getRightX())
         # self.turning = deadZone(armCtrlr.getLeftX())
+        self.speedControl = driveCtrlr.getRightTriggerAxis() + .2
 
         self.gyroReset = driveCtrlr.getYButtonPressed()
+
+        self.absoluteDriveToggle = driveCtrlr.getXButtonPressed()
 
         self.brakeToggle = driveCtrlr.getBButtonPressed()
 
