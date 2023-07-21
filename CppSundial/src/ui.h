@@ -84,24 +84,43 @@ void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch);
 
 
 
-struct Curve {
-    bool isBezier = false; // false indicates linear
-    V2f pts[4];
-    U32 ptCount = 0;
-    Curve* next;
+struct Data {
+    str name;
+    net_PropType type;
+    void* data;
+};
+// name & data allocated acjacent
+
+struct DataFrame {
+    float timeStamp;
+    U32 itemCount;
+    Data* items;
+};
+// items allocated adjacent
+
+#define REPLAY_FRAME_COUNT 600
+struct ReplayInfo {
+    DataFrame frames[REPLAY_FRAME_COUNT];
 };
 
-struct CurveEditorInfo {
-    Curve* firstCurve;
-    V2f scale;
-    V2f offset;
+
+void replayLoad(const char* filePath, BumpAlloc* scratch, BumpAlloc* res) {
+    U64 fSize = 0;
+    U8* buffer = loadFileToBuffer(filePath, false, &fSize, scratch);
 };
 
-void draw_curveEditor(CurveEditorInfo* info, BumpAlloc* res) {
-
-    
+void allocDataFrame(net_Prop** trackedList, U32 propCount, BumpAlloc* arena) {
 
 }
+
+void allocDataFrame() {
+
+}
+
+void draw_replay() {
+
+}
+
 
 
 
@@ -429,7 +448,7 @@ void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch) {
             for (int i = 0; i < POWER_INDICATOR_COUNT; i++) {
                 net_Prop* p = nullptr;
                 if(info->keys[i].str.length > 0) { p = net_hashGet(info->keys[i].str); }
-                bool fadeText = (!p || !net_getConnected());
+                bool fadeText = (!p || !nets_getConnected());
 
                 str indexStr = str_format(scratch, STR("%i"), i);
                 a = blu_areaMake(indexStr, blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE | blu_areaFlags_DROP_EVENTS);
@@ -477,7 +496,7 @@ void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch) {
                     if(fadeText) { a->style.backgroundColor *= col_disconnect; }
 
                     if(p) {
-                        float val = (F32)p->data->f64;
+                        float val = (F32)p->data.f64;
                         float leftShift = 0;
                         float barSize = val * (w/2);
 
@@ -498,7 +517,7 @@ void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch) {
 
 
                     if(p) {
-                        int val = (int)(p->data->f64 * 100);
+                        int val = (int)(p->data.f64 * 100);
                         a = blu_areaMake("value", blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT | blu_areaFlags_FLOATING);
                         blu_areaAddDisplayStr(a, str_format(scratch, STR("%i%%"), val));
                         if(fadeText) { a->style.textColor *= col_disconnect; }
@@ -574,12 +593,12 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt) 
         matrixTranslation(translations[i].x, translations[i].y, 0, t);
 
         if(rotationProps[i]) {
-            matrixZRotation(-(F32)rotationProps[i]->data->f64 * 360, temp);
+            matrixZRotation(-(F32)rotationProps[i]->data.f64 * 360, temp);
             t = temp * t;
         }
 
         if(angle) {
-            matrixZRotation(-(F32)angle->data->f64, temp);
+            matrixZRotation(-(F32)angle->data.f64, temp);
             t = t * temp;
         }
 
@@ -593,7 +612,7 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt) 
 
         float pos = 0;
         if(distProps[i]) {
-            pos = (F32)distProps[i]->data->f64 * 0.1f;
+            pos = (F32)distProps[i]->data.f64 * 0.1f;
         }
 
         b = gfx_registerCall(p);
@@ -608,7 +627,7 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt) 
     gfx_UniformBlock* b = gfx_registerCall(p);
     b->texture = globs.arrowTex;
     if(angle) {
-        matrixZRotation(-(F32)angle->data->f64, b->model); }
+        matrixZRotation(-(F32)angle->data.f64, b->model); }
 
     matrixScale((F32)globs.arrowTex->width / globs.arrowTex->height, 1, 1, temp);
     b->model = temp * b->model;
@@ -643,9 +662,9 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
 
         net_Prop* prop = net_hashGet(info->keys[i].str);
 
-        bool nConn = net_getConnected();
+        bool nConn = nets_getConnected();
         float nval = 0;
-        if(prop) { nval = (F32)prop->data->f64; }
+        if(prop) { nval = (F32)prop->data.f64; }
         else{ nConn = false; }
 
         // CLEANUP: profiling
@@ -816,18 +835,18 @@ void draw_field(FieldInfo* info, gfx_Framebuffer* fb, float dt, GLFWwindow* wind
 
     Transform robotTransform = Transform();
     if(posX && posY && yaw) {
-        robotTransform.x = (F32)posX->data->f64;
-        robotTransform.z = -(F32)posY->data->f64;
-        robotTransform.ry = -(F32)yaw->data->f64;
+        robotTransform.x = (F32)posX->data.f64;
+        robotTransform.z = -(F32)posY->data.f64;
+        robotTransform.ry = -(F32)yaw->data.f64;
     }
 
     Transform estimateTransform = Transform();
     if(estX && estY && yaw) {
 
         Transform t = Transform();
-        estimateTransform.x = (F32)estX->data->f64;
-        estimateTransform.z = -(F32)estY->data->f64;
-        estimateTransform.ry = -(F32)yaw->data->f64;
+        estimateTransform.x = (F32)estX->data.f64;
+        estimateTransform.z = -(F32)estY->data.f64;
+        estimateTransform.ry = -(F32)yaw->data.f64;
     }
 
 
@@ -971,7 +990,7 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
             a->style.backgroundColor = col_red;
             a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
             a->style.cornerRadius = 2;
-            if(net_getConnected()) {
+            if(nets_getConnected()) {
                 a->style.backgroundColor = col_green; }
         } // end connection parent
     } // end top bar section
@@ -1028,7 +1047,7 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
                         a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
                         blu_areaAddDisplayStr(a, quotedName);
 
-                        if(!net_getConnected()) {
+                        if(!nets_getConnected()) {
                             a->style.backgroundColor *= col_disconnect;
                             a->style.textColor *= col_disconnect;
                         }
@@ -1038,19 +1057,19 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch) {
 
 
                         if(prop->type == net_propType_S32) {
-                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%i"), (prop->data->s32))); }
+                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%i"), (prop->data.s32))); }
                         else if(prop->type == net_propType_F64) {
-                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%f"), (prop->data->f64))); }
+                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%f"), (prop->data.f64))); }
                         else if(prop->type == net_propType_STR) {
-                            blu_areaAddDisplayStr(a, str_format(scratch, STR("\"%s\""), (prop->data->str))); }
+                            blu_areaAddDisplayStr(a, str_format(scratch, STR("\"%s\""), (prop->data.str))); }
                         else if(prop->type == net_propType_BOOL) {
-                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%b"), (prop->data->boo)));
-                            a->style.backgroundColor = prop->data->boo? col_green : col_red;
+                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%b"), (prop->data.boo)));
+                            a->style.backgroundColor = prop->data.boo? col_green : col_red;
                             a->style.cornerRadius = 2;
                             a->style.textColor = col_darkBlue;
                         }
 
-                        if(!net_getConnected()) {
+                        if(!nets_getConnected()) {
                             a->style.backgroundColor *= col_disconnect;
                             a->style.textColor *= col_disconnect;
                         }
@@ -1201,5 +1220,3 @@ void ui_update(BumpAlloc* scratch, BumpAlloc* res, GLFWwindow* window, float dt)
         }
     }
 }
-
-

@@ -12,7 +12,7 @@
 #include "base/utils.h"
 #include "graphics.h"
 #include "blue/blue.h"
-#include "network/network.h"
+#include "network/sockets.h"
 
 #include "ui.h"
 
@@ -42,8 +42,11 @@ int main() {
 
     BumpAlloc lifetimeArena;
     BumpAlloc frameArena;
+    BumpAlloc networkArena;
+    net_Table networkTable;
     bump_allocate(&lifetimeArena, 1000000);
     bump_allocate(&frameArena, 10000000);
+    bump_allocate(&networkArena, 10000000);
 
 
     GLFWwindow* window = nullptr;
@@ -109,8 +112,8 @@ int main() {
     blu_loadFont("C:/windows/fonts/consola.ttf");
 
     ui_init(&frameArena, &lifetimeArena, solidTex);
-    net_init();
-    net_setTargetIp(STR("localhost"));
+    nets_init();
+    nets_setTargetIp(STR("localhost"));
 
 
     gfx_Shader* blueShader;
@@ -206,14 +209,13 @@ int main() {
             matrixOrtho(0, w, h, 0, 0.0001, 10000, vp);
             gfx_Pass* p = gfx_registerPass();
             p->shader = blueShader;
-            p->passUniforms = gfx_UniformBlock();
             p->passUniforms.vp = vp;
 
             blu_makeDrawCalls(p);
         }
 
         gfx_drawPasses(w, h);
-        net_update(&frameArena, (F32)time);
+        nets_update(&frameArena, &networkArena, &networkTable, (F32)time);
         bump_clear(&frameArena);
         windowScrollDelta = 0;
         glfwSwapBuffers(window);
@@ -221,7 +223,7 @@ int main() {
     }
 
 
-    net_cleanup();
+    nets_cleanup();
     glfwDestroyWindow(window);
     glfwTerminate();
 
