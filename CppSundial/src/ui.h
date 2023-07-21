@@ -47,6 +47,10 @@ void initGraph2dInfo(Graph2dInfo* info) {
 
     info->colors[2] = col_purple;
     info->keys[2].str = str_copy(STR("FRSteerSpeed"), info->keys[2].chars);
+
+    info->colors[3] = col_yellow;
+    info->colors[4] = col_black;
+    info->colors[5] = col_white;
 }
 
 struct FieldInfo {
@@ -75,7 +79,33 @@ struct PowerIndicatorInfo {
     float scrollPosition = 0;
 };
 
-void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch, BumpAlloc* res);
+void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch);
+
+
+
+
+struct Curve {
+    bool isBezier = false; // false indicates linear
+    V2f pts[4];
+    U32 ptCount = 0;
+    Curve* next;
+};
+
+struct CurveEditorInfo {
+    Curve* firstCurve;
+    V2f scale;
+    V2f offset;
+};
+
+void draw_curveEditor(CurveEditorInfo* info, BumpAlloc* res) {
+
+    
+
+}
+
+
+
+
 
 
 enum ViewType {
@@ -98,6 +128,7 @@ struct View {
     ViewUnion data;
     ViewType type;
     gfx_Framebuffer* target; // CLEANUP: bad
+    BumpAlloc* res;
 };
 
 
@@ -215,7 +246,7 @@ void updateView(View* v, float dt, GLFWwindow* window, BumpAlloc* scratch, BumpA
     else if(v->type == viewType_graph2d) { draw_graph2d(&v->data.graph2dInfo, v->target, dt, scratch); }
     else if(v->type == viewType_swerveDrive) { draw_swerveDrive(&v->data.swerveDriveInfo, v->target, dt); }
     else if(v->type == viewType_net) { draw_network(&v->data.netInfo, dt, scratch); }
-    else if(v->type == viewType_powerIndicators) { draw_powerIndicators(&v->data.PowerIndicatorInfo, scratch, res); }
+    else if(v->type == viewType_powerIndicators) { draw_powerIndicators(&v->data.PowerIndicatorInfo, scratch); }
     else { ASSERT(false); };
 }
 
@@ -387,7 +418,7 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* resArena, gfx_Texture* solidTex) 
 
 
 
-void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch, BumpAlloc* res) {
+void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch) {
 
     blu_Area* a = makeScrollArea(&info->scrollPosition);
     blu_parentScope(a) {
@@ -678,34 +709,33 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
         }
 
 
-        a = blu_areaMake("lowerBit", blu_areaFlags_DRAW_BACKGROUND);
-        blu_style_backgroundColor(col_darkGray, &a->style);
-        blu_style_sizeY({ blu_sizeKind_TEXT, 0 }, &a->style);
-        blu_style_childLayoutAxis(blu_axis_X, &a->style);
+        a = blu_areaMake("lowerBit", blu_areaFlags_FLOATING);
+        blu_style_sizeY({ blu_sizeKind_PERCENT, 1 }, &a->style);
+        blu_style_childLayoutAxis(blu_axis_Y, &a->style);
         blu_parentScope(a) {
             blu_styleScope(blu_Style()) {
             blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
-            blu_style_sizeX({ blu_sizeKind_TEXT, 0 });
-            blu_style_backgroundColor(col_lightGray);
+            blu_style_sizeX({ blu_sizeKind_CHILDSUM, 0 });
+            blu_style_backgroundColor(col_darkGray);
             blu_style_cornerRadius(5);
+            blu_style_childLayoutAxis(blu_axis_X);
 
                 for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
                     if(!info->keys[i].chars) { continue; }
 
                     a = blu_areaMake(str_format(scratch, STR("thing %i"), i),
-                        blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT |
-                        blu_areaFlags_DROP_EVENTS | blu_areaFlags_HOVER_ANIM);
+                        blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DROP_EVENTS | blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM);
+                    inter = blu_interactionFromWidget(a);
 
-                    blu_areaAddDisplayStr(a, info->keys[i].str);
+                    bool fadeChildren = false;
+                    if(!info->connectionVals[GRAPH2D_VCOUNT-1]) { fadeChildren = true; }
+                    if(inter.hovered && !inter.dropType) { fadeChildren = true; }
 
-                    a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, col_white, a->target_hoverAnim);
-                    if(!info->connectionVals[i][GRAPH2D_VCOUNT-1]) {
-                        a->style.textColor *= col_disconnect;
-                        a->style.backgroundColor *= col_disconnect;
-                    }
+                    float hoverTarget = a->target_hoverAnim;
+                    a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, col_lightGray, hoverTarget);
+                    if(fadeChildren) { a->style.backgroundColor *= col_disconnect; }
 
                     a->dropTypeMask = dropMasks_NT_PROP;
-                    inter = blu_interactionFromWidget(a);
                     if(inter.dropped) {
                         net_Prop* prop = ((net_Prop*)(inter.dropVal));
                         if(prop->type == net_propType_F64) {
@@ -713,6 +743,38 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
                             info->keys[i].str = str_copy(prop->name, info->keys[i].chars);
                         }
                     }
+
+                    if(inter.clicked && !inter.dropType) {
+                        memset(&info->keys[i], 0, sizeof(NTKey));
+                    }
+
+                    blu_parentScope(a) {
+
+                        a = blu_areaMake("color", blu_areaFlags_DRAW_BACKGROUND);
+                        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 14 };
+                        a->style.backgroundColor = info->colors[i];
+                        if(fadeChildren) { a->style.backgroundColor *= col_disconnect; }
+
+                        a = blu_areaMake("text", blu_areaFlags_DRAW_TEXT);
+                        blu_areaAddDisplayStr(a, info->keys[i].str);
+                        a->style.sizes[blu_axis_X] = { blu_sizeKind_TEXT, 0 };
+
+                        if(fadeChildren) { a->style.textColor *= col_disconnect; }
+
+
+                        if(inter.hovered && info->keys[i].str.length == 0) {
+                            a = blu_areaMake("spacer", 0);
+                            a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, hoverTarget * 10 };
+                        }
+                        if(inter.hovered && !inter.dropType) {
+
+                            a = blu_areaMake("X", blu_areaFlags_DRAW_TEXT);
+                            blu_areaAddDisplayStr(a, "X");
+                            a->style.sizes[blu_axis_X] = { blu_sizeKind_TEXT, 0 };
+                        }
+
+                    }
+
                 }
             }
         }

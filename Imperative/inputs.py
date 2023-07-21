@@ -29,6 +29,7 @@ class FlymerInputs():
         self.grabToggle = armCtrlr.getAButtonPressed()
 
 
+
 class DemoInputs():
     def __init__(self, driveCtrlr: wpilib.XboxController) -> None:
         self.drive = -deadZone(driveCtrlr.getLeftY())
