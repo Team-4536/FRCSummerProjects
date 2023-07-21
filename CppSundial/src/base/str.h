@@ -72,6 +72,7 @@ void str_split(str s, char delim, BumpAlloc* arena, U32* outCount, str** outArr)
 
 // CLEANUP: reuse this code,
 // CLEANUP: bumpalloc default clear could slow it down a ton
+
 str str_format(BumpAlloc* arena, str fmt, ...) {
     va_list argp;
     va_start(argp, fmt);

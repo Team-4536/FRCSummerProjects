@@ -1133,7 +1133,7 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
                     out.dropped = true;
                 }
 
-                out.dropType = globs.prevDragged->dropTypeMask;
+                out.dropType = globs.prevDragged->dropType;
                 out.dropVal = globs.prevDragged->dropVal;
             }
         }

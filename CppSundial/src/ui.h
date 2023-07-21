@@ -392,84 +392,85 @@ void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch, BumpAllo
     blu_Area* a = makeScrollArea(&info->scrollPosition);
     blu_parentScope(a) {
         blu_styleScope(blu_Style()) {
-        blu_style_style(&borderStyle);
         blu_style_sizeX({ blu_sizeKind_PERCENT, 1 });
-        blu_style_sizeY({ blu_sizeKind_PX, 40 });
-        blu_style_backgroundColor(col_darkBlue);
+        blu_style_sizeY({ blu_sizeKind_PERCENT, 1 });
 
             for (int i = 0; i < POWER_INDICATOR_COUNT; i++) {
                 net_Prop* p = nullptr;
                 if(info->keys[i].str.length > 0) { p = net_hashGet(info->keys[i].str); }
-                bool disabled = (!p || !net_getConnected());
+                bool fadeText = (!p || !net_getConnected());
 
                 str indexStr = str_format(scratch, STR("%i"), i);
-                a = blu_areaMake(indexStr, 0);
+                a = blu_areaMake(indexStr, blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE | blu_areaFlags_DROP_EVENTS);
+                blu_style_style(&borderStyle, &a->style);
                 blu_style_childLayoutAxis(blu_axis_X, &a->style);
+                blu_style_backgroundColor(col_darkBlue, &a->style);
+                blu_style_sizeY({ blu_sizeKind_PX, 40 }, &a->style);
+
+
+                a->dropTypeMask = dropMasks_NT_PROP;
+                blu_WidgetInteraction inter = blu_interactionFromWidget(a);
+                if(inter.dropped) {
+                    NTKey* k = &info->keys[i];
+                    *k = NTKey();
+                    net_Prop* p = (net_Prop*)inter.dropVal;
+                    ASSERT(p->name.length < 255);
+                    k->str = str_copy(p->name, k->chars);
+                }
+
+
+                if(inter.hovered && inter.dropType) {
+                    float t = a->target_hoverAnim;
+                    blu_style_backgroundColor(v4f_lerp(a->style.backgroundColor, col_lightGray, t), &a->style);
+                }
+                else if(inter.hovered && !inter.dropType && info->keys[i].str.length > 0) {
+                    fadeText = true;
+                    blu_parentScope(a) {
+                        a = blu_areaMake("X", blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
+                        blu_areaAddDisplayStr(a, "X");
+                        blu_style_sizeX({ blu_sizeKind_PERCENT, 1 });
+                        if(inter.clicked) {
+                            info->keys[i] = NTKey();
+                        }
+                    }
+                }
+
                 blu_parentScope(a) {
 
-                    a = blu_areaMake("key", blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE | blu_areaFlags_DROP_EVENTS);
-                    a->dropTypeMask = dropMasks_NT_PROP;
-                    blu_areaAddDisplayStr(a, info->keys[i].str);
-                    blu_style_sizeX({ blu_sizeKind_REMAINDER, 0 }, &a->style);
-
-
-                    blu_WidgetInteraction inter = blu_interactionFromWidget(a);
-                    if(inter.dropped) {
-                        NTKey* k = &info->keys[i];
-                        *k = NTKey();
-                        net_Prop* p = (net_Prop*)inter.dropVal;
-                        ASSERT(p->name.length < 255);
-                        k->str = str_copy(p->name, k->chars);
-                    }
-
-
-                    /*
-                    if(inter.hovered && inter.dropType) {
-                        float t = a->target_hoverAnim;
-                        blu_style_backgroundColor(v4f_lerp(a->style.backgroundColor, col_lightGray, t), &a->style);
-                    }
-                    */
-                    if(disabled) {
-                        a->style.textColor *= col_disconnect;
-                    }
-                    else if(inter.hovered && !inter.dropType && info->keys[i].str.length > 0) {
-                        a->style.textColor *= col_disconnect;
-                        blu_parentScope(a) {
-                            a = blu_areaMake("X", blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
-                            blu_style_sizeX({ blu_sizeKind_PERCENT, 1 });
-                            blu_areaAddDisplayStr(a, "X");
-                            if(inter.clicked) {
-                                info->keys[i] = NTKey();
-                            }
-                        }
-                    }
-
-
-                    a = blu_areaMake("valueParent", 0);
-                    blu_style_sizeX({ blu_sizeKind_REMAINDER, 0 }, &a->style);
                     float w = a->calculatedSizes[blu_axis_X];
-                    blu_parentScope(a) {
-                        a = blu_areaMake("indicator", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_FLOATING);
+                    a = blu_areaMake("indicator", blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_FLOATING);
+                    a->offset = { 0, 0 };
+                    a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 0 };
 
-                        a->offset = { 0, 0 };
-                        a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 0 };
+                    blu_style_backgroundColor(col_red, &a->style);
+                    if(fadeText) { a->style.backgroundColor *= col_disconnect; }
 
-                        blu_style_backgroundColor(col_red, &a->style);
-                        if(disabled) { a->style.backgroundColor *= col_disconnect; }
+                    if(p) {
+                        float val = (F32)p->data->f64;
+                        float leftShift = 0;
+                        float barSize = val * (w/2);
 
-                        if(p) {
-                            float val = (F32)p->data->f64;
-                            float leftShift = 0;
-                            float barSize = val * (w/2);
-
-                            if(val < 0) {
-                                leftShift = barSize;
-                                barSize *= -1;
-                            }
-
-                            a->offset = { w/2 + leftShift, 0 };
-                            blu_style_sizeX({ blu_sizeKind_PX, barSize }, &a->style);
+                        if(val < 0) {
+                            leftShift = barSize;
+                            barSize *= -1;
                         }
+
+                        a->offset = { w/2 + leftShift, 0 };
+                        blu_style_sizeX({ blu_sizeKind_PX, barSize }, &a->style);
+                    }
+
+
+                    a = blu_areaMake("key", blu_areaFlags_DRAW_TEXT | blu_areaFlags_FLOATING);
+                    a->offset = V2f(0, 0);
+                    blu_areaAddDisplayStr(a, info->keys[i].str);
+                    if(fadeText) { a->style.textColor *= col_disconnect; }
+
+
+                    if(p) {
+                        int val = (int)(p->data->f64 * 100);
+                        a = blu_areaMake("value", blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT | blu_areaFlags_FLOATING);
+                        blu_areaAddDisplayStr(a, str_format(scratch, STR("%i%%"), val));
+                        if(fadeText) { a->style.textColor *= col_disconnect; }
                     }
 
 
