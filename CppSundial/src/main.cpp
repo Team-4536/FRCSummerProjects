@@ -173,6 +173,7 @@ int main() {
         };
     }
 
+    net_Frame* prevFrame = nullptr;
 
     F64 prevTime = glfwGetTime();
     while(!glfwWindowShouldClose(window)) {
@@ -189,11 +190,15 @@ int main() {
         bool leftPressed = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)? true : false;
 
         blu_beginFrame();
-        ui_update(&frameArena, &lifetimeArena, window, dt);
+
+        // CLEANUP: this
+        net_Frame* thisFrame = nets_update(&frameArena, &networkArena, &networkTable, (F32)time);
+        if(thisFrame->propCount > 0 || prevFrame == nullptr) { prevFrame = thisFrame; }
+        ui_update(&frameArena, &lifetimeArena, window, dt, prevFrame);
 
         blu_layout(V2f(w, h));
 
-        blu_Cursor c;
+        blu_Cursor c, frame;
         blu_input(V2f((F32)mx, (F32)my), leftPressed, windowScrollDelta, &c);
         if(c == blu_cursor_norm) { glfwSetCursor(window, nullptr); }
         else if(c == blu_cursor_hand) { glfwSetCursor(window, handCursor); }
@@ -215,7 +220,6 @@ int main() {
         }
 
         gfx_drawPasses(w, h);
-        nets_update(&frameArena, &networkArena, &networkTable, (F32)time);
         bump_clear(&frameArena);
         windowScrollDelta = 0;
         glfwSwapBuffers(window);

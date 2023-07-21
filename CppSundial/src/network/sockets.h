@@ -422,6 +422,7 @@ net_Frame* nets_update(BumpAlloc* scratch, BumpAlloc* res, net_Table* table, flo
         *p = framePropHead;
         framePropHead = framePropHead->next;
     }
+    // printf("%i\n", frame->propCount);
 
     return frame;
 }

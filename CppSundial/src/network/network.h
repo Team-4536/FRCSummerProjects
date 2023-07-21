@@ -42,3 +42,25 @@ struct net_Frame {
 struct net_Table {
     net_Frame* frames[NET_FRAME_COUNT];
 };
+
+
+net_Prop* net_getProp(str name, net_Frame* frame);
+
+
+#ifdef NET_IMPL
+#include "base/hashtable.h"
+
+net_Prop* net_getProp(str name, net_Frame* frame) {
+    U64 hashKey = hash_hashStr(name);
+
+
+    for(int i = 0; i < frame->propCount; i++) {
+        net_Prop* p = frame->props[i];
+        // PERF: this is bad
+        U64 pKey = hash_hashStr(p->name);
+        if(hashKey == pKey) { return p; }
+    }
+    return nullptr;
+}
+
+#endif
