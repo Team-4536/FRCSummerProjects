@@ -111,7 +111,7 @@ int main() {
     blu_init(solidTex);
     blu_loadFont("C:/windows/fonts/consola.ttf");
 
-    ui_init(&frameArena, &lifetimeArena, solidTex);
+    ui_init(&frameArena, solidTex);
     nets_init();
     nets_setTargetIp(STR("localhost"));
 
@@ -173,7 +173,6 @@ int main() {
         };
     }
 
-    net_Frame* prevFrame = nullptr;
 
     F64 prevTime = glfwGetTime();
     while(!glfwWindowShouldClose(window)) {
@@ -191,10 +190,10 @@ int main() {
 
         blu_beginFrame();
 
-        // CLEANUP: this
-        net_Frame* thisFrame = nets_update(&frameArena, &networkArena, &networkTable, (F32)time);
-        if(thisFrame->propCount > 0 || prevFrame == nullptr) { prevFrame = thisFrame; }
-        ui_update(&frameArena, &lifetimeArena, window, dt, prevFrame);
+
+        nets_update(&networkTable, &frameArena, &networkArena, (F32)time);
+
+        ui_update(&frameArena, window, dt, time, &networkTable);
 
         blu_layout(V2f(w, h));
 

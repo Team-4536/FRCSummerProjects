@@ -14,51 +14,78 @@ enum net_PropType {
     net_propType_BOOL,
     net_propType_NONE
 };
+// TODO: update socket code to work w none type
 
-union net_PropData {
-    F64 f64;
-    S32 s32;
-    str str;
-    U8 boo;
+struct net_PropSample {
+    union {
+        F64 f64;
+        S32 s32;
+        str str;
+        U8 boo;
+    };
+    float timeStamp = 0; // client side timestamp
+    net_PropSample* next = nullptr;
 };
 
 struct net_Prop {
     str name;
     net_PropType type;
-    net_PropData data;
-
-    bool event;
-
-    net_Prop* next; // for LL based creation
-};
-
-struct net_Frame {
-    U32 propCount;
-    net_Prop** props;
+    // safe to assume that firstPt will never be nullptr if the prop exists
+    net_PropSample* firstPt; // new updates tacked on here
 };
 
 
-#define NET_FRAME_COUNT 300
+#define NET_MAX_PROP_COUNT 300
 struct net_Table {
-    net_Frame* frames[NET_FRAME_COUNT];
+    net_Prop props[NET_MAX_PROP_COUNT] = { 0 }; // NOTE: index 0 == current
+    U32 propCount = 0;
+    // TODO: convert to hash table
+    // NOTE: table should only contain one prop with a given name, even if you want two with different types
+
+    // TODO: events
 };
 
+net_Prop* net_getProp(str name, net_PropType type, net_Table* table);
+net_Prop* net_getProp(str name, net_Table* table);
 
-net_Prop* net_getProp(str name, net_Frame* frame);
+// returns nullptr on failed get
+net_PropSample* net_getPropSample(str name, net_PropType type, float sampleTime, net_Table* table);
+
 
 
 #ifdef NET_IMPL
 #include "base/hashtable.h"
 
-net_Prop* net_getProp(str name, net_Frame* frame) {
+
+net_PropSample* net_getPropSample(str name, net_PropType type, float sampleTime, net_Table* table) {
+
+    net_Prop* p = net_getProp(name, type, table);
+    if(!p) { return nullptr; }
+
+    net_PropSample* sample = p->firstPt;
+    while(sample) {
+        if(sample->timeStamp < sampleTime) { break; }
+        sample = sample->next;
+    }
+    return sample;
+}
+
+net_Prop* net_getProp(str name, net_PropType type, net_Table* table) {
+    net_Prop* p = net_getProp(name, table);
+    if(!p) { return nullptr; }
+    else if(p->type != type) { return nullptr; }
+    return p;
+}
+
+net_Prop* net_getProp(str name, net_Table* table) {
     U64 hashKey = hash_hashStr(name);
 
-
-    for(int i = 0; i < frame->propCount; i++) {
-        net_Prop* p = frame->props[i];
-        // PERF: this is bad
+    for(int i = 0; i < table->propCount; i++) {
+        net_Prop* p = &table->props[i];
         U64 pKey = hash_hashStr(p->name);
-        if(hashKey == pKey) { return p; }
+        if(hashKey == pKey) {
+            return p;
+        }
     }
     return nullptr;
 }

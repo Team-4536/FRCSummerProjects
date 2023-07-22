@@ -511,7 +511,7 @@ blu_Area* blu_areaMake(str string, U32 flags) {
     area->flags = flags;
     area->lastTouchedIdx = globs.frameIndex;
 
-    // blu_areaAddDisplayStr(area, string);
+    blu_areaAddDisplayStr(area, string);
 
     return area;
 }

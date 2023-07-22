@@ -1,16 +1,17 @@
 #pragma once
 
+#include "GLAD/gl.h"
+#include "GLFW/glfw3.h"
+#include "stb_image/stb_image.h"
+#include <cstring>
+
+#include "colors.h"
+#include "base/arr.h"
 #include "graphics.h"
 #include "base/utils.h"
 #include "blue/blue.h"
-#include "GLAD/gl.h"
-#include "GLFW/glfw3.h"
 #include "network/network.h"
-#include "colors.h"
-#include "stb_image/stb_image.h"
-#include "base/arr.h"
-#include <cstring>
-
+#include "network/sockets.h"
 
 
 
@@ -25,18 +26,17 @@ struct NTKey {
 
 #define GRAPH2D_VCOUNT 700
 #define GRAPH2D_LINECOUNT 6
+#define GRAPH2D_SAMPLE_WINDOW 10.0f
 // TODO: this is a stupidly large struct for what it does
 struct Graph2dInfo {
 
-    float vals[GRAPH2D_LINECOUNT][GRAPH2D_VCOUNT] = { 0 };
-    U8 connectionVals[GRAPH2D_LINECOUNT][GRAPH2D_VCOUNT] = { 0 };
     NTKey keys[GRAPH2D_LINECOUNT] = { 0 };
     V4f colors[GRAPH2D_LINECOUNT];
 
     float yScale = 100;
     float yOffset = 0;
 };
-void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAlloc* scratch, net_Frame* frame);
+void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target);
 void initGraph2dInfo(Graph2dInfo* info) {
 
     info->colors[0] = col_green;
@@ -57,7 +57,7 @@ struct FieldInfo {
     Transform camTransform;
     Transform camTarget = { 0, 6, 0, -90, 0, 0, 1, 1, 1 };
 };
-void draw_field(FieldInfo* info, gfx_Framebuffer* fb, float dt, GLFWwindow* window, net_Frame* frame);
+void draw_field(FieldInfo* info, gfx_Framebuffer* fb);
 
 struct NetInfo {
     float clipSize = 0;
@@ -65,12 +65,12 @@ struct NetInfo {
     float clipMax = 1000;
     // TODO: adaptive max size
 };
-void draw_network(NetInfo* info, float dt, BumpAlloc* scratch, net_Frame* frame);
+void draw_network(NetInfo* info);
 
 struct SwerveDriveInfo {
 
 };
-void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt, net_Frame* frame);
+void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target);
 
 // CLEANUP: invalidation problem here too
 #define POWER_INDICATOR_COUNT 30
@@ -79,7 +79,7 @@ struct PowerIndicatorInfo {
     float scrollPosition = 0;
 };
 
-void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch, net_Frame* frame);
+void draw_powerIndicators(PowerIndicatorInfo* info);
 
 
 
@@ -249,29 +249,6 @@ blu_WidgetInteraction makeButton(str text, V4f hoverColor) {
 }
 
 
-
-
-void initView(View* v, BumpAlloc* resArena) {
-    if(v->type == viewType_field) { v->data.fieldInfo = FieldInfo(); }
-    else if(v->type == viewType_graph2d) { v->data.graph2dInfo = Graph2dInfo(); initGraph2dInfo(&v->data.graph2dInfo); }
-    else if(v->type == viewType_swerveDrive) { v->data.swerveDriveInfo = SwerveDriveInfo(); }
-    else if(v->type == viewType_net) { v->data.netInfo = NetInfo(); }
-    else if(v->type == viewType_powerIndicators) { v->data.PowerIndicatorInfo = PowerIndicatorInfo(); }
-    else { ASSERT(false); };
-}
-
-void updateView(View* v, float dt, GLFWwindow* window, BumpAlloc* scratch, BumpAlloc* res, net_Frame* frame) {
-    if(v->type == viewType_field) { draw_field(&v->data.fieldInfo, v->target, dt, window, frame); }
-    else if(v->type == viewType_graph2d) { draw_graph2d(&v->data.graph2dInfo, v->target, dt, scratch, frame); }
-    else if(v->type == viewType_swerveDrive) { draw_swerveDrive(&v->data.swerveDriveInfo, v->target, dt, frame); }
-    else if(v->type == viewType_net) { draw_network(&v->data.netInfo, dt, scratch, frame); }
-    else if(v->type == viewType_powerIndicators) { draw_powerIndicators(&v->data.PowerIndicatorInfo, scratch, frame); }
-    else { ASSERT(false); };
-}
-
-
-
-
 #define UI_VIEW_COUNT 3
 static struct UIGlobs {
 
@@ -296,6 +273,15 @@ static struct UIGlobs {
     gfx_Texture* fieldTex = nullptr;
 
     NTKey* firstFreeNTKey = nullptr;
+
+
+
+    net_Table* table;
+    GLFWwindow* window;
+    float dt;
+    BumpAlloc* scratch;
+    float curTime;
+
 } globs;
 
 // Keeping keys globally allocated for now
@@ -316,6 +302,24 @@ NTKey* NTKeyAlloc(BumpAlloc* arena) {
 }
 */
 
+void initView(View* v) {
+    if(v->type == viewType_field) { v->data.fieldInfo = FieldInfo(); }
+    else if(v->type == viewType_graph2d) { v->data.graph2dInfo = Graph2dInfo(); initGraph2dInfo(&v->data.graph2dInfo); }
+    else if(v->type == viewType_swerveDrive) { v->data.swerveDriveInfo = SwerveDriveInfo(); }
+    else if(v->type == viewType_net) { v->data.netInfo = NetInfo(); }
+    else if(v->type == viewType_powerIndicators) { v->data.PowerIndicatorInfo = PowerIndicatorInfo(); }
+    else { ASSERT(false); };
+}
+
+void updateView(View* v) {
+    if(v->type == viewType_field) { draw_field(&v->data.fieldInfo, v->target); }
+    else if(v->type == viewType_graph2d) { draw_graph2d(&v->data.graph2dInfo, v->target); }
+    else if(v->type == viewType_swerveDrive) { draw_swerveDrive(&v->data.swerveDriveInfo, v->target); }
+    else if(v->type == viewType_net) { draw_network(&v->data.netInfo); }
+    else if(v->type == viewType_powerIndicators) { draw_powerIndicators(&v->data.PowerIndicatorInfo); }
+    else { ASSERT(false); };
+}
+
 
 
 
@@ -324,7 +328,7 @@ NTKey* NTKeyAlloc(BumpAlloc* arena) {
 blu_Style borderStyle;
 
 
-void ui_init(BumpAlloc* frameArena, BumpAlloc* resArena, gfx_Texture* solidTex) {
+void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
 
     globs.rightSize = 400;
     globs.downSize = 400;
@@ -348,9 +352,9 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* resArena, gfx_Texture* solidTex) 
     globs.views[1].type = viewType_graph2d;
     globs.views[2].type = viewType_net;
 
-    initView(&globs.views[0], resArena);
-    initView(&globs.views[1], resArena);
-    initView(&globs.views[2], resArena);
+    initView(&globs.views[0]);
+    initView(&globs.views[1]);
+    initView(&globs.views[2]);
 
 
     bool res = gfx_loadOBJMesh("res/models/Chassis2.obj", frameArena, &globs.robotVA, &globs.robotIB);
@@ -437,7 +441,7 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* resArena, gfx_Texture* solidTex) 
 
 
 
-void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch, net_Frame* frame) {
+void draw_powerIndicators(PowerIndicatorInfo* info) {
 
     blu_Area* a = makeScrollArea(&info->scrollPosition);
     blu_parentScope(a) {
@@ -446,11 +450,15 @@ void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch, net_Fram
         blu_style_sizeY({ blu_sizeKind_PERCENT, 1 });
 
             for (int i = 0; i < POWER_INDICATOR_COUNT; i++) {
-                net_Prop* p = nullptr;
-                if(info->keys[i].str.length > 0) { p = net_getProp(info->keys[i].str, frame); }
-                bool fadeText = (!p || !nets_getConnected());
+                net_PropSample* s = nullptr;
+                // TODO: make a prop to represent connection status
+                if(info->keys[i].str.length > 0) {
+                    net_Prop* p = net_getProp(info->keys[i].str, net_propType_F64, globs.table);
+                    if(p) { s = p->firstPt; }
+                }
+                bool fadeText = (!s || !nets_getConnected());
 
-                str indexStr = str_format(scratch, STR("%i"), i);
+                str indexStr = str_format(globs.scratch, STR("%i"), i);
                 a = blu_areaMake(indexStr, blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE | blu_areaFlags_DROP_EVENTS);
                 blu_style_style(&borderStyle, &a->style);
                 blu_style_childLayoutAxis(blu_axis_X, &a->style);
@@ -495,8 +503,8 @@ void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch, net_Fram
                     blu_style_backgroundColor(col_red, &a->style);
                     if(fadeText) { a->style.backgroundColor *= col_disconnect; }
 
-                    if(p) {
-                        float val = (F32)p->data.f64;
+                    if(s) {
+                        float val = (F32)s->f64;
                         float leftShift = 0;
                         float barSize = val * (w/2);
 
@@ -516,10 +524,10 @@ void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch, net_Fram
                     if(fadeText) { a->style.textColor *= col_disconnect; }
 
 
-                    if(p) {
-                        int val = (int)(p->data.f64 * 100);
+                    if(s) {
+                        int val = (int)(s->f64 * 100);
                         a = blu_areaMake("value", blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT | blu_areaFlags_FLOATING);
-                        blu_areaAddDisplayStr(a, str_format(scratch, STR("%i%%"), val));
+                        blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%i%%"), val));
                         if(fadeText) { a->style.textColor *= col_disconnect; }
                     }
 
@@ -536,7 +544,7 @@ void draw_powerIndicators(PowerIndicatorInfo* info, BumpAlloc* scratch, net_Fram
 
 
 
-void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt, net_Frame* frame) {
+void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target) {
 
     blu_Area* a = blu_areaMake("swerveDisplay", blu_areaFlags_DRAW_TEXTURE);
     a->texture = target->texture;
@@ -570,19 +578,19 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt, 
 
     // TODO: hash get is not typesafe
     net_Prop* rotationProps[] = {
-        net_getProp(STR("FLSteerPos"), frame),
-        net_getProp(STR("FRSteerPos"), frame),
-        net_getProp(STR("BLSteerPos"), frame),
-        net_getProp(STR("BRSteerPos"), frame)
+        net_getProp(STR("FLSteerPos"), net_propType_F64, globs.table),
+        net_getProp(STR("FRSteerPos"), net_propType_F64, globs.table),
+        net_getProp(STR("BLSteerPos"), net_propType_F64, globs.table),
+        net_getProp(STR("BRSteerPos"), net_propType_F64, globs.table)
     };
     net_Prop* distProps[] = {
-        net_getProp(STR("FLDrivePos"), frame),
-        net_getProp(STR("FRDrivePos"), frame),
-        net_getProp(STR("BLDrivePos"), frame),
-        net_getProp(STR("BRDrivePos"), frame)
+        net_getProp(STR("FLDrivePos"), net_propType_F64, globs.table),
+        net_getProp(STR("FRDrivePos"), net_propType_F64, globs.table),
+        net_getProp(STR("BLDrivePos"), net_propType_F64, globs.table),
+        net_getProp(STR("BRDrivePos"), net_propType_F64, globs.table)
     };
 
-    net_Prop* angle = net_getProp(STR("yaw"), frame);
+    net_Prop* angle = net_getProp(STR("yaw"), net_propType_F64, globs.table);
 
     Mat4f temp;
 
@@ -593,12 +601,12 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt, 
         matrixTranslation(translations[i].x, translations[i].y, 0, t);
 
         if(rotationProps[i]) {
-            matrixZRotation(-(F32)rotationProps[i]->data.f64 * 360, temp);
+            matrixZRotation(-(F32)rotationProps[i]->firstPt->f64 * 360, temp);
             t = temp * t;
         }
 
         if(angle) {
-            matrixZRotation(-(F32)angle->data.f64, temp);
+            matrixZRotation(-(F32)angle->firstPt->f64, temp);
             t = t * temp;
         }
 
@@ -612,7 +620,7 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt, 
 
         float pos = 0;
         if(distProps[i]) {
-            pos = (F32)distProps[i]->data.f64 * 0.1f;
+            pos = (F32)distProps[i]->firstPt->f64 * 0.1f;
         }
 
         b = gfx_registerCall(p);
@@ -627,7 +635,7 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target, float dt, 
     gfx_UniformBlock* b = gfx_registerCall(p);
     b->texture = globs.arrowTex;
     if(angle) {
-        matrixZRotation(-(F32)angle->data.f64, b->model); }
+        matrixZRotation(-(F32)angle->firstPt->f64, b->model); }
 
     matrixScale((F32)globs.arrowTex->width / globs.arrowTex->height, 1, 1, temp);
     b->model = temp * b->model;
@@ -654,28 +662,7 @@ void draw_line(gfx_Pass* p, float thickness, V4f color, V2f start, V2f end) {
     b->model = matrixTransform(t);
 }
 
-void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAlloc* scratch, net_Frame* frame) {
-
-    // APPEND NEW VALUES
-    for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
-        if(info->keys[i].str.length == 0) { continue; }
-
-        net_Prop* prop = net_getProp(info->keys[i].str, frame);
-
-        bool nConn = nets_getConnected();
-        float nval = 0;
-        if(prop) { nval = (F32)prop->data.f64; }
-        else{ nConn = false; }
-
-        // CLEANUP: profiling
-        memmove(info->vals[i], &(info->vals[i][1]), (GRAPH2D_VCOUNT-1)*sizeof(float));
-        info->vals[i][GRAPH2D_VCOUNT - 1] = nval;
-
-        memmove(info->connectionVals[i], &(info->connectionVals[i][1]), (GRAPH2D_VCOUNT-1)*sizeof(U8));
-        info->connectionVals[i][GRAPH2D_VCOUNT - 1] = nConn;
-    }
-
-
+void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
 
     blu_Area* a = blu_areaMake("graph2d", blu_areaFlags_DRAW_BACKGROUND);
     blu_style_childLayoutAxis(blu_axis_Y, &a->style);
@@ -704,6 +691,7 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
         float scale = -info->yScale;
         float offset = info->yOffset + height/2;
         float pointGap = width / (float)GRAPH2D_VCOUNT;
+        float sampleGap = GRAPH2D_SAMPLE_WINDOW / GRAPH2D_VCOUNT;
 
         // TODO: batch line calls
         draw_line(p, 1, col_darkGray, { 0, offset }, { width, offset });
@@ -715,13 +703,26 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
         for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
             if(info->keys[i].str.length == 0) { continue; }
 
-            V2f lastPoint = V2f(0, info->vals[i][0] * scale + offset);
+            // TODO: bool graphing
+            float sHeight = 0;
+            net_PropSample* sample = net_getPropSample(info->keys[i].str, net_propType_F64, globs.curTime, globs.table);
+            if(sample) { sHeight = (float)sample->f64; }
+            V2f lastPoint = V2f(width, sHeight * scale + offset);
             for(int j = 1; j < GRAPH2D_VCOUNT; j++) {
 
                 V4f color = info->colors[i];
-                if(!(info->connectionVals[i][j])) { color *= col_disconnect; }
 
-                V2f point = { j*pointGap, info->vals[i][j] * scale + offset };
+                sHeight = 0;
+                // TODO: inline traversal instead of restarting constantly
+                sample = net_getPropSample(info->keys[i].str, net_propType_F64, globs.curTime - sampleGap*j, globs.table);
+                if(sample) { sHeight = (float)sample->f64; }
+                else { color *= col_disconnect; }
+
+                if(sample && !nets_getConnected()) { color *= col_disconnect; }
+
+                // TODO: disconnection history
+
+                V2f point = { width - j*pointGap, sHeight * scale + offset };
                 draw_line(p, 2, color, lastPoint, point);
                 lastPoint = point;
             }
@@ -742,12 +743,12 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
                 for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
                     if(!info->keys[i].chars) { continue; }
 
-                    a = blu_areaMake(str_format(scratch, STR("thing %i"), i),
+                    a = blu_areaMake(str_format(globs.scratch, STR("thing %i"), i),
                         blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DROP_EVENTS | blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM);
                     inter = blu_interactionFromWidget(a);
 
                     bool fadeChildren = false;
-                    if(!info->connectionVals[GRAPH2D_VCOUNT-1]) { fadeChildren = true; }
+                    if(!nets_getConnected()) { fadeChildren = true; }
                     if(inter.hovered && !inter.dropType) { fadeChildren = true; }
 
                     float hoverTarget = a->target_hoverAnim;
@@ -805,11 +806,13 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target, float dt, BumpAllo
 // TODO: make controls not apply unless field is "selected"
 // TODO: robot follow mode
 
-void draw_field(FieldInfo* info, gfx_Framebuffer* fb, float dt, GLFWwindow* window, net_Frame* frame) {
+void draw_field(FieldInfo* info, gfx_Framebuffer* fb) {
 
     V4f mVec = { 0, 0, 0, 0 };
 
     F32 moveSpeed = 3;
+    GLFWwindow* window = globs.window;
+    float dt = globs.dt;
     mVec.x += (glfwGetKey(window, GLFW_KEY_D) - glfwGetKey(window, GLFW_KEY_A)) * moveSpeed * dt;
     mVec.z -= (glfwGetKey(window, GLFW_KEY_W) - glfwGetKey(window, GLFW_KEY_S)) * moveSpeed * dt;
     mVec.y += (glfwGetKey(window, GLFW_KEY_E) - glfwGetKey(window, GLFW_KEY_Q)) * moveSpeed * dt;
@@ -826,27 +829,28 @@ void draw_field(FieldInfo* info, gfx_Framebuffer* fb, float dt, GLFWwindow* wind
 
 
 
-    net_Prop* posX = net_getProp(STR("posX"), frame);
-    net_Prop* posY = net_getProp(STR("posY"), frame);
-    net_Prop* yaw = net_getProp(STR("yaw"), frame);
+    // TODO: get first sample function
+    net_Prop* posX = net_getProp(STR("posX"), net_propType_F64, globs.table);
+    net_Prop* posY = net_getProp(STR("posY"), net_propType_F64, globs.table);
+    net_Prop* yaw = net_getProp(STR("yaw"), net_propType_F64, globs.table);
 
-    net_Prop* estX = net_getProp(STR("estX"), frame);
-    net_Prop* estY = net_getProp(STR("estY"), frame);
+    net_Prop* estX = net_getProp(STR("estX"), net_propType_F64, globs.table);
+    net_Prop* estY = net_getProp(STR("estY"), net_propType_F64, globs.table);
 
     Transform robotTransform = Transform();
     if(posX && posY && yaw) {
-        robotTransform.x = (F32)posX->data.f64;
-        robotTransform.z = -(F32)posY->data.f64;
-        robotTransform.ry = -(F32)yaw->data.f64;
+        robotTransform.x = (F32)posX->firstPt->f64;
+        robotTransform.z = -(F32)posY->firstPt->f64;
+        robotTransform.ry = -(F32)yaw->firstPt->f64;
     }
 
     Transform estimateTransform = Transform();
     if(estX && estY && yaw) {
 
         Transform t = Transform();
-        estimateTransform.x = (F32)estX->data.f64;
-        estimateTransform.z = -(F32)estY->data.f64;
-        estimateTransform.ry = -(F32)yaw->data.f64;
+        estimateTransform.x = (F32)estX->firstPt->f64;
+        estimateTransform.z = -(F32)estY->firstPt->f64;
+        estimateTransform.ry = -(F32)yaw->firstPt->f64;
     }
 
 
@@ -967,7 +971,7 @@ void draw_field(FieldInfo* info, gfx_Framebuffer* fb, float dt, GLFWwindow* wind
 
 
 
-void draw_network(NetInfo* info, float dt, BumpAlloc* scratch, net_Frame* frame) {
+void draw_network(NetInfo* info) {
     blu_Area* a;
 
 
@@ -977,7 +981,7 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch, net_Frame* frame)
     blu_style_backgroundColor(col_darkGray);
 
         a = blu_areaMake(STR("FPS"), blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
-        str n = str_format(scratch, STR("FPS: %f"), 1/dt);
+        str n = str_format(globs.scratch, STR("FPS: %f"), 1/globs.dt);
         blu_areaAddDisplayStr(a, n);
 
         a = blu_areaMake(STR("connectionStatus"), blu_areaFlags_DRAW_BACKGROUND);
@@ -1009,11 +1013,11 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch, net_Frame* frame)
         blu_style_childLayoutAxis(blu_axis_X);
         blu_style_backgroundColor(col_darkGray);
 
-            for(int i = 0; i < frame->propCount; i++) {
-                net_Prop* prop = frame->props[i];
-                str quotedName = str_format(scratch, STR("\"%s\""), prop->name);
+            for(int i = 0; i < globs.table->propCount; i++) {
+                net_Prop* prop = &globs.table->props[i];
+                str quotedName = str_format(globs.scratch, STR("\"%s\""), prop->name);
 
-                blu_Area* parent = blu_areaMake(prop->name, blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
+                blu_Area* parent = blu_areaMake(str_format(globs.scratch, STR("%i"), i), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
                 blu_style_style(&borderStyle, &parent->style);
                 F32 t = parent->target_hoverAnim;
                 parent->dropType = dropMasks_NT_PROP;
@@ -1041,7 +1045,7 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch, net_Frame* frame)
                     blu_style_sizeX({ blu_sizeKind_PERCENT, 0.5 });
                     blu_style_style(&borderStyle);
 
-                        a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
+                        a = blu_areaMake("label", blu_areaFlags_DRAW_TEXT);
                         blu_areaAddDisplayStr(a, quotedName);
 
                         if(!nets_getConnected()) {
@@ -1049,19 +1053,19 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch, net_Frame* frame)
                             a->style.textColor *= col_disconnect;
                         }
 
-                        a = blu_areaMake(STR("value"), blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
+                        a = blu_areaMake("value", blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
                         a->style.backgroundColor = col_darkGray;
 
-
+                        BumpAlloc* scratch = globs.scratch;
                         if(prop->type == net_propType_S32) {
-                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%i"), (prop->data.s32))); }
+                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%i"), (prop->firstPt->s32))); }
                         else if(prop->type == net_propType_F64) {
-                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%f"), (prop->data.f64))); }
+                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%f"), (prop->firstPt->f64))); }
                         else if(prop->type == net_propType_STR) {
-                            blu_areaAddDisplayStr(a, str_format(scratch, STR("\"%s\""), (prop->data.str))); }
+                            blu_areaAddDisplayStr(a, str_format(scratch, STR("\"%s\""), (prop->firstPt->str))); }
                         else if(prop->type == net_propType_BOOL) {
-                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%b"), (prop->data.boo)));
-                            a->style.backgroundColor = prop->data.boo? col_green : col_red;
+                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%b"), (prop->firstPt->boo)));
+                            a->style.backgroundColor = prop->firstPt->boo? col_green : col_red;
                             a->style.cornerRadius = 2;
                             a->style.textColor = col_darkBlue;
                         }
@@ -1076,6 +1080,9 @@ void draw_network(NetInfo* info, float dt, BumpAlloc* scratch, net_Frame* frame)
         } // end text styling
     } // end of clip
 }
+
+
+
 
 
 
@@ -1106,7 +1113,7 @@ void makeViewSrc(const char* name, ViewType type) {
     }
 }
 
-void makeView(const char* name, View* v, float dt, BumpAlloc* scratch, GLFWwindow* window, BumpAlloc* res, net_Frame* frame) {
+void makeView(const char* name, View* v) {
 
     blu_Area* a = blu_areaMake(name, blu_areaFlags_DROP_EVENTS | blu_areaFlags_HOVER_ANIM);
     blu_style_childLayoutAxis(blu_axis_Y, &a->style);
@@ -1115,7 +1122,7 @@ void makeView(const char* name, View* v, float dt, BumpAlloc* scratch, GLFWwindo
     blu_WidgetInteraction inter = blu_interactionFromWidget(a);
     if(inter.dropped) {
         v->type = (ViewType)(U64)inter.dropVal; // sorry
-        initView(v, res);
+        initView(v);
     }
 
     float t = a->target_hoverAnim;
@@ -1126,7 +1133,7 @@ void makeView(const char* name, View* v, float dt, BumpAlloc* scratch, GLFWwindo
         blu_style_sizeX({ blu_sizeKind_PERCENT, 1 });
         blu_style_sizeY({ blu_sizeKind_PERCENT, 1 });
 
-            updateView(v, dt, window, scratch, res, frame);
+            updateView(v);
 
             a = blu_areaMake("hoverIndicator", blu_areaFlags_FLOATING | blu_areaFlags_DRAW_BACKGROUND);
             a->style.backgroundColor = v4f_lerp(V4f(0, 0, 0, 0), V4f(1, 1, 1, 0.3), t);
@@ -1134,7 +1141,14 @@ void makeView(const char* name, View* v, float dt, BumpAlloc* scratch, GLFWwindo
     }
 }
 
-void ui_update(BumpAlloc* scratch, BumpAlloc* res, GLFWwindow* window, float dt, net_Frame* frame) {
+void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime, net_Table* table) {
+
+    globs.scratch = scratch;
+    globs.window = window;
+    globs.dt = dt;
+    globs.table = table;
+    globs.curTime = curTime;
+
 
     blu_Area* a;
 
@@ -1172,7 +1186,7 @@ void ui_update(BumpAlloc* scratch, BumpAlloc* res, GLFWwindow* window, float dt,
         blu_styleScope(blu_Style())
         {
         blu_style_sizeX({blu_sizeKind_REMAINDER, 0 });
-            makeView("left", &globs.views[0], dt, scratch, window, res, frame);
+            makeView("left", &globs.views[0]);
         }
 
 
@@ -1197,7 +1211,7 @@ void ui_update(BumpAlloc* scratch, BumpAlloc* res, GLFWwindow* window, float dt,
             blu_styleScope(blu_Style()) {
             blu_style_sizeY({ blu_sizeKind_REMAINDER, 0 });
 
-                makeView("top", &globs.views[1], dt, scratch, window, res, frame);
+                makeView("top", &globs.views[1]);
             }
 
 
@@ -1212,7 +1226,7 @@ void ui_update(BumpAlloc* scratch, BumpAlloc* res, GLFWwindow* window, float dt,
 
             blu_styleScope(blu_Style()) {
             blu_style_sizeY({blu_sizeKind_PX, globs.downSize });
-                makeView("bottom", &globs.views[2], dt, scratch, window, res, frame);
+                makeView("bottom", &globs.views[2]);
             }
         }
     }
