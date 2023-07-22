@@ -46,7 +46,7 @@ int main() {
     net_Table networkTable;
     bump_allocate(&lifetimeArena, 1000000);
     bump_allocate(&frameArena, 10000000);
-    bump_allocate(&networkArena, 10000000);
+    bump_allocate(&networkArena, 1000000);
 
 
     GLFWwindow* window = nullptr;
@@ -192,6 +192,7 @@ int main() {
 
 
         nets_update(&networkTable, &frameArena, &networkArena, (F32)time);
+        // printf("%i\n", (U8*)networkArena.end - (U8*)networkArena.start);
 
         ui_update(&frameArena, window, dt, time, &networkTable);
 

@@ -24,20 +24,28 @@ struct net_PropSample {
         U8 boo;
     };
     float timeStamp = 0; // client side timestamp
-    net_PropSample* next = nullptr;
+    net_PropSample* next = nullptr; // further back in time
+
+    // used to track allocation and clean up when there is a live connection
+    net_PropSample* prev = nullptr; // forward in time
+    net_PropSample* nextFree = nullptr;
 };
 
+// data held in a double linked list
 struct net_Prop {
     str name;
     net_PropType type;
     // safe to assume that firstPt will never be nullptr if the prop exists
-    net_PropSample* firstPt; // new updates tacked on here
+    net_PropSample* firstPt = nullptr; // most recent
+    net_PropSample* lastPt = nullptr; // oldest
+    U32 ptCount = 0;
 };
+
 
 
 #define NET_MAX_PROP_COUNT 300
 struct net_Table {
-    net_Prop props[NET_MAX_PROP_COUNT] = { 0 }; // NOTE: index 0 == current
+    net_Prop props[NET_MAX_PROP_COUNT] = { 0 };
     U32 propCount = 0;
     // TODO: convert to hash table
     // NOTE: table should only contain one prop with a given name, even if you want two with different types
@@ -45,11 +53,13 @@ struct net_Table {
     // TODO: events
 };
 
-net_Prop* net_getProp(str name, net_PropType type, net_Table* table);
 net_Prop* net_getProp(str name, net_Table* table);
+net_Prop* net_getProp(str name, net_PropType type, net_Table* table);
 
 // returns nullptr on failed get
-net_PropSample* net_getPropSample(str name, net_PropType type, float sampleTime, net_Table* table);
+net_PropSample* net_getSample(str name, net_PropType type, float sampleTime, net_Table* table);
+// returns first sample, nullptr if prop does not exist
+net_PropSample* net_getSample(str name, net_PropType type, net_Table* table);
 
 
 
@@ -57,7 +67,13 @@ net_PropSample* net_getPropSample(str name, net_PropType type, float sampleTime,
 #include "base/hashtable.h"
 
 
-net_PropSample* net_getPropSample(str name, net_PropType type, float sampleTime, net_Table* table) {
+net_PropSample* net_getSample(str name, net_PropType type, net_Table* table) {
+    net_Prop* p = net_getProp(name, type, table);
+    if(!p) { return nullptr; }
+    return p->firstPt;
+}
+
+net_PropSample* net_getSample(str name, net_PropType type, float sampleTime, net_Table* table) {
 
     net_Prop* p = net_getProp(name, type, table);
     if(!p) { return nullptr; }

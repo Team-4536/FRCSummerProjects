@@ -26,8 +26,7 @@ struct NTKey {
 
 #define GRAPH2D_VCOUNT 700
 #define GRAPH2D_LINECOUNT 6
-#define GRAPH2D_SAMPLE_WINDOW 10.0f
-// TODO: this is a stupidly large struct for what it does
+#define GRAPH2D_SAMPLE_WINDOW 5.0f
 struct Graph2dInfo {
 
     NTKey keys[GRAPH2D_LINECOUNT] = { 0 };
@@ -60,10 +59,7 @@ struct FieldInfo {
 void draw_field(FieldInfo* info, gfx_Framebuffer* fb);
 
 struct NetInfo {
-    float clipSize = 0;
     float clipPos = 0;
-    float clipMax = 1000;
-    // TODO: adaptive max size
 };
 void draw_network(NetInfo* info);
 
@@ -576,21 +572,20 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target) {
         { 1, -1 }
     };
 
-    // TODO: hash get is not typesafe
-    net_Prop* rotationProps[] = {
-        net_getProp(STR("FLSteerPos"), net_propType_F64, globs.table),
-        net_getProp(STR("FRSteerPos"), net_propType_F64, globs.table),
-        net_getProp(STR("BLSteerPos"), net_propType_F64, globs.table),
-        net_getProp(STR("BRSteerPos"), net_propType_F64, globs.table)
+    net_PropSample* rotationProps[] = {
+        net_getSample(STR("FLSteerPos"), net_propType_F64, globs.table),
+        net_getSample(STR("FRSteerPos"), net_propType_F64, globs.table),
+        net_getSample(STR("BLSteerPos"), net_propType_F64, globs.table),
+        net_getSample(STR("BRSteerPos"), net_propType_F64, globs.table)
     };
-    net_Prop* distProps[] = {
-        net_getProp(STR("FLDrivePos"), net_propType_F64, globs.table),
-        net_getProp(STR("FRDrivePos"), net_propType_F64, globs.table),
-        net_getProp(STR("BLDrivePos"), net_propType_F64, globs.table),
-        net_getProp(STR("BRDrivePos"), net_propType_F64, globs.table)
+    net_PropSample* distProps[] = {
+        net_getSample(STR("FLDrivePos"), net_propType_F64, globs.table),
+        net_getSample(STR("FRDrivePos"), net_propType_F64, globs.table),
+        net_getSample(STR("BLDrivePos"), net_propType_F64, globs.table),
+        net_getSample(STR("BRDrivePos"), net_propType_F64, globs.table)
     };
 
-    net_Prop* angle = net_getProp(STR("yaw"), net_propType_F64, globs.table);
+    net_PropSample* angle = net_getSample(STR("yaw"), net_propType_F64, globs.table);
 
     Mat4f temp;
 
@@ -601,12 +596,12 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target) {
         matrixTranslation(translations[i].x, translations[i].y, 0, t);
 
         if(rotationProps[i]) {
-            matrixZRotation(-(F32)rotationProps[i]->firstPt->f64 * 360, temp);
+            matrixZRotation(-(F32)rotationProps[i]->f64 * 360, temp);
             t = temp * t;
         }
 
         if(angle) {
-            matrixZRotation(-(F32)angle->firstPt->f64, temp);
+            matrixZRotation(-(F32)angle->f64, temp);
             t = t * temp;
         }
 
@@ -620,7 +615,7 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target) {
 
         float pos = 0;
         if(distProps[i]) {
-            pos = (F32)distProps[i]->firstPt->f64 * 0.1f;
+            pos = (F32)distProps[i]->f64 * 0.1f;
         }
 
         b = gfx_registerCall(p);
@@ -635,7 +630,7 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target) {
     gfx_UniformBlock* b = gfx_registerCall(p);
     b->texture = globs.arrowTex;
     if(angle) {
-        matrixZRotation(-(F32)angle->firstPt->f64, b->model); }
+        matrixZRotation(-(F32)angle->f64, b->model); }
 
     matrixScale((F32)globs.arrowTex->width / globs.arrowTex->height, 1, 1, temp);
     b->model = temp * b->model;
@@ -705,7 +700,7 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
 
             // TODO: bool graphing
             float sHeight = 0;
-            net_PropSample* sample = net_getPropSample(info->keys[i].str, net_propType_F64, globs.curTime, globs.table);
+            net_PropSample* sample = net_getSample(info->keys[i].str, net_propType_F64, globs.curTime, globs.table);
             if(sample) { sHeight = (float)sample->f64; }
             V2f lastPoint = V2f(width, sHeight * scale + offset);
             for(int j = 1; j < GRAPH2D_VCOUNT; j++) {
@@ -714,7 +709,7 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
 
                 sHeight = 0;
                 // TODO: inline traversal instead of restarting constantly
-                sample = net_getPropSample(info->keys[i].str, net_propType_F64, globs.curTime - sampleGap*j, globs.table);
+                sample = net_getSample(info->keys[i].str, net_propType_F64, globs.curTime - sampleGap*j, globs.table);
                 if(sample) { sHeight = (float)sample->f64; }
                 else { color *= col_disconnect; }
 
@@ -829,28 +824,27 @@ void draw_field(FieldInfo* info, gfx_Framebuffer* fb) {
 
 
 
-    // TODO: get first sample function
-    net_Prop* posX = net_getProp(STR("posX"), net_propType_F64, globs.table);
-    net_Prop* posY = net_getProp(STR("posY"), net_propType_F64, globs.table);
-    net_Prop* yaw = net_getProp(STR("yaw"), net_propType_F64, globs.table);
+    net_PropSample* posX = net_getSample(STR("posX"), net_propType_F64, globs.table);
+    net_PropSample* posY = net_getSample(STR("posY"), net_propType_F64, globs.table);
+    net_PropSample* yaw = net_getSample(STR("yaw"), net_propType_F64, globs.table);
 
-    net_Prop* estX = net_getProp(STR("estX"), net_propType_F64, globs.table);
-    net_Prop* estY = net_getProp(STR("estY"), net_propType_F64, globs.table);
+    net_PropSample* estX = net_getSample(STR("estX"), net_propType_F64, globs.table);
+    net_PropSample* estY = net_getSample(STR("estY"), net_propType_F64, globs.table);
 
     Transform robotTransform = Transform();
     if(posX && posY && yaw) {
-        robotTransform.x = (F32)posX->firstPt->f64;
-        robotTransform.z = -(F32)posY->firstPt->f64;
-        robotTransform.ry = -(F32)yaw->firstPt->f64;
+        robotTransform.x = (F32)posX->f64;
+        robotTransform.z = -(F32)posY->f64;
+        robotTransform.ry = -(F32)yaw->f64;
     }
 
     Transform estimateTransform = Transform();
     if(estX && estY && yaw) {
 
         Transform t = Transform();
-        estimateTransform.x = (F32)estX->firstPt->f64;
-        estimateTransform.z = -(F32)estY->firstPt->f64;
-        estimateTransform.ry = -(F32)yaw->firstPt->f64;
+        estimateTransform.x = (F32)estX->f64;
+        estimateTransform.z = -(F32)estY->f64;
+        estimateTransform.ry = -(F32)yaw->f64;
     }
 
 

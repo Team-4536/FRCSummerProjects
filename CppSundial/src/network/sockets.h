@@ -19,10 +19,8 @@ bool nets_getConnected();
 void nets_setTargetIp(str s);
 
 
-// For now, only recieved data is recorded, not sent stuff
 // new info is added to table when recieved
-// data points allocated in res arena
-// TODO: make it so older samples are freed up
+// data points allocated into res arena
 void nets_update(net_Table* table, BumpAlloc* scratch, BumpAlloc* res, float curTime);
 
 void nets_putMessage(str name, F64 data, BumpAlloc* scratch);
@@ -41,12 +39,13 @@ void nets_putMessage(str name, bool data, BumpAlloc* scratch);
 #include "base/arr.h"
 #include "base/utils.h"
 
-#define NET_PACKET_SIZE 1024
-#define NET_RECV_BUFFER_SIZE 2048
-#define NET_SEND_BUFFER_SIZE 2048
+#define NETS_PACKET_SIZE 1024
+#define NETS_RECV_BUFFER_SIZE 2048
+#define NETS_SEND_BUFFER_SIZE 2048
 
-#define NET_SEND_INTERVAL (1/50.0f)
-#define NET_PORT "7000"
+#define NETS_SEND_INTERVAL (1/50.0f)
+#define NETS_PORT "7000"
+#define NETS_MAX_SAMPLE_COUNT 200
 
 
 
@@ -143,6 +142,8 @@ struct nets_Globs {
     U8* recvBuffer = nullptr;
     float lastSendTime = 0;
     BumpAlloc sendArena;
+
+    net_PropSample* firstFreeSample = nullptr;
 };
 
 static nets_Globs globs = nets_Globs();
@@ -150,8 +151,8 @@ static nets_Globs globs = nets_Globs();
 // Asserts on failures
 void nets_init() {
 
-    globs.recvBuffer = (U8*)arr_allocate0(1, NET_RECV_BUFFER_SIZE);
-    bump_allocate(&globs.sendArena, NET_SEND_BUFFER_SIZE);
+    globs.recvBuffer = (U8*)arr_allocate0(1, NETS_RECV_BUFFER_SIZE);
+    bump_allocate(&globs.sendArena, NETS_SEND_BUFFER_SIZE);
 
     // Initialize Winsock
     int err = WSAStartup(MAKEWORD(2,2), &globs.wsaData);
@@ -298,7 +299,7 @@ void nets_putMessage(str name, bool data, BumpAlloc* scratch) {
 
 // takes message info and constructs a sample inside of res
 // appends sample to prop in table, if no prop a new one is created
-// char data also allocated in res, (TODO:) copies chars on prop create, check on if they are freed
+// char data also allocated in res, (TODO: this is a memory leak)
 // does nothing on invalid messages and messages that have a different type than the one being used
 void _nets_processMessage(U8 isEvent, str name, U8* data, U8 dataType, U32 dataSize, BumpAlloc* scratch, BumpAlloc* res, net_Table* table, float currentTime) {
 
@@ -319,11 +320,34 @@ void _nets_processMessage(U8 isEvent, str name, U8* data, U8 dataType, U32 dataS
         prop->type = (net_PropType)dataType;
     }
 
-    net_PropSample* sample = BUMP_PUSH_NEW(res, net_PropSample);
+
+
+    net_PropSample* sample = globs.firstFreeSample;
+    if(sample) {
+        globs.firstFreeSample = sample->nextFree;
+    }
+    else {
+        sample = BUMP_PUSH_NEW(res, net_PropSample);
+    }
     sample->timeStamp = currentTime;
 
+
     sample->next = prop->firstPt;
+    if(prop->firstPt) { prop->firstPt->prev = sample; }
+    else { prop->lastPt = sample; }
     prop->firstPt = sample;
+    prop->ptCount++;
+
+
+    // start freeing samples if they are too old
+    if(prop->ptCount > NETS_MAX_SAMPLE_COUNT) {
+        prop->lastPt->nextFree = globs.firstFreeSample;
+        globs.firstFreeSample = prop->lastPt;
+
+        prop->lastPt->prev->next = nullptr;
+        prop->lastPt = prop->lastPt->prev;
+        prop->ptCount--;
+    }
 
 
 
@@ -379,13 +403,14 @@ void nets_update(net_Table* table, BumpAlloc* scratch, BumpAlloc* res, float cur
 
     bool wasConnected = globs.connected;
     if(!globs.connected) {
-        bool connected = _nets_sockCreateConnect(str_cstyle(globs.targetIp, scratch), NET_PORT, &globs.simSocket, &err);
+        bool connected = _nets_sockCreateConnect(str_cstyle(globs.targetIp, scratch), NETS_PORT, &globs.simSocket, &err);
 
         if(err != net_sockErr_none) { // attempt reconnection forever on errors
             _nets_sockCloseFree(&globs.simSocket); }
         else if(connected) {
             globs.connected = true;
 
+            printf("[CONNECTED]\n");
             // str s = STR("[CONNECTED]\n");
             // fwrite(s.chars, 1, s.length, globs.logFile);
         }
@@ -394,14 +419,14 @@ void nets_update(net_Table* table, BumpAlloc* scratch, BumpAlloc* res, float cur
 
     // SEND LOOP ///////////////////////////////////////////////////////////////////////////
 
-    if(globs.lastSendTime + NET_SEND_INTERVAL < curTime) {
+    if(globs.lastSendTime + NETS_SEND_INTERVAL < curTime) {
         globs.lastSendTime = curTime;
 
         U8* start = (U8*)globs.sendArena.start;
         U8* end = (U8*)globs.sendArena.end;
         while (start < end && globs.connected) {
             // TODO: sent message logging
-            int res = send(globs.simSocket.s, (const char*)start, min(end - start, NET_PACKET_SIZE), 0);
+            int res = send(globs.simSocket.s, (const char*)start, min(end - start, NETS_PACKET_SIZE), 0);
             if(res == SOCKET_ERROR) {
                 if(WSAGetLastError() != WSAEWOULDBLOCK) {
 
@@ -426,7 +451,7 @@ void nets_update(net_Table* table, BumpAlloc* scratch, BumpAlloc* res, float cur
     while(globs.connected) {
 
         U8* buf = (globs.recvBuffer + globs.recvBufStartOffset);
-        int recvSize = recv(globs.simSocket.s, (char*)buf, NET_PACKET_SIZE, 0);
+        int recvSize = recv(globs.simSocket.s, (char*)buf, NETS_PACKET_SIZE, 0);
 
         if (recvSize == SOCKET_ERROR) {
             if(WSAGetLastError() != WSAEWOULDBLOCK) {
