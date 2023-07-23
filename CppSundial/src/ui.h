@@ -82,8 +82,8 @@ void draw_powerIndicators(PowerIndicatorInfo* info);
 
 
 struct ControlsInfo {
-    bool usingSockets = false;
-    bool sim = false;
+    bool usingSockets = true;
+    bool sim = true;
 };
 void draw_controls(ControlsInfo* info);
 
@@ -103,7 +103,6 @@ union ViewUnion {
     NetInfo netInfo;
     SwerveDriveInfo swerveDriveInfo;
     PowerIndicatorInfo powerIndicatorInfo;
-    ControlsInfo controlsInfo;
 
     ViewUnion() {  };
 };
@@ -246,13 +245,13 @@ static struct UIGlobs {
     NTKey* firstFreeNTKey = nullptr;
 
 
+    ControlsInfo ctrlInfo;
 
-    net_Table* table;
+    net_Table table;
     GLFWwindow* window;
     float dt;
     BumpAlloc* scratch;
     float curTime;
-
 } globs;
 
 // Keeping keys globally allocated for now
@@ -279,7 +278,7 @@ void initView(View* v) {
     else if(v->type == viewType_swerveDrive) { v->data.swerveDriveInfo = SwerveDriveInfo(); }
     else if(v->type == viewType_net) { v->data.netInfo = NetInfo(); }
     else if(v->type == viewType_powerIndicators) { v->data.powerIndicatorInfo = PowerIndicatorInfo(); }
-    else if(v->type == viewType_controls) { v->data.controlsInfo = ControlsInfo(); }
+    else if(v->type == viewType_controls) { }
     else { ASSERT(false); };
 }
 
@@ -289,7 +288,7 @@ void updateView(View* v) {
     else if(v->type == viewType_swerveDrive) { draw_swerveDrive(&v->data.swerveDriveInfo, v->target); }
     else if(v->type == viewType_net) { draw_network(&v->data.netInfo); }
     else if(v->type == viewType_powerIndicators) { draw_powerIndicators(&v->data.powerIndicatorInfo); }
-    else if(v->type == viewType_controls) { draw_controls(&v->data.controlsInfo); }
+    else if(v->type == viewType_controls) { draw_controls(&globs.ctrlInfo); }
     else { ASSERT(false); };
 }
 
@@ -331,6 +330,9 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
     initView(&globs.views[1]);
     initView(&globs.views[2]);
     initView(&globs.views[3]);
+
+    globs.ctrlInfo = ControlsInfo();
+    nets_setTargetIp(STR("localhost"), &globs.table, 0);
 
 
     bool res = gfx_loadOBJMesh("res/models/Chassis2.obj", frameArena, &globs.robotVA, &globs.robotIB);
@@ -412,6 +414,7 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
         gfx_bindVertexArray(pass, uniforms->va);
         gfx_bindIndexBuffer(pass, uniforms->ib);
     };
+
 }
 
 
@@ -438,10 +441,13 @@ void draw_controls(ControlsInfo* info) {
 
                     if(makeButton(STR("LIVE"), !info->usingSockets?col_darkGray:col_darkBlue, col_lightGray).clicked) {
                         info->usingSockets = true;
+                        str s = info->sim? STR("localhost") : STR("10.45.36.2");
+                        nets_setTargetIp(s, &globs.table, globs.curTime);
                     }
 
                     if(makeButton(STR("REPLAY"), info->usingSockets?col_darkGray:col_darkBlue, col_lightGray).clicked) {
                         info->usingSockets = false;
+                        nets_setTargetIp(STR(""), &globs.table, globs.curTime); // closes socket, setting useSockets stops updates from happening
                     }
                 }
             }
@@ -468,9 +474,35 @@ void draw_controls(ControlsInfo* info) {
                             a->style.backgroundColor = col_red;
                             a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
                             a->style.cornerRadius = 2;
-                            if(net_getConnected(globs.table)) {
+                            if(net_getConnected(&globs.table)) {
                                 a->style.backgroundColor = col_green; }
                         } // end connection parent
+
+
+                        a = blu_areaMake("simSwitchParent", 0);
+                        a->style.sizes[blu_axis_X] = { blu_sizeKind_PERCENT, .2 };
+                        blu_parentScope(a) {
+                            blu_styleScope(blu_Style()) {
+                            blu_style_sizeX({ blu_sizeKind_REMAINDER, 0 });
+                            blu_style_style(&borderStyle);
+
+                                bool clicked = false;
+                                if(makeButton(STR("sim"), info->sim? col_darkGray:col_darkBlue, col_lightGray).clicked) {
+                                    info->sim = true;
+                                    clicked = true;
+                                };
+                                if(makeButton(STR("real"), !info->sim? col_darkGray:col_darkBlue, col_lightGray).clicked) {
+                                    info->sim = false;
+                                    clicked = true;
+                                };
+
+                                if(clicked) {
+                                    str s = info->sim? STR("localhost") : STR("10.45.36.2");
+                                    nets_setTargetIp(s, &globs.table, globs.curTime);
+                                }
+                            }
+                        }
+
                     }
                     else {
 
@@ -495,10 +527,10 @@ void draw_powerIndicators(PowerIndicatorInfo* info) {
             for (int i = 0; i < POWER_INDICATOR_COUNT; i++) {
                 net_PropSample* s = nullptr;
                 if(info->keys[i].str.length > 0) {
-                    net_Prop* p = net_getProp(info->keys[i].str, net_propType_F64, globs.table);
+                    net_Prop* p = net_getProp(info->keys[i].str, net_propType_F64, &globs.table);
                     if(p) { s = p->firstPt; }
                 }
-                bool fadeText = (!s || !net_getConnected(globs.table));
+                bool fadeText = (!s || !net_getConnected(&globs.table));
 
                 str indexStr = str_format(globs.scratch, STR("%i"), i);
                 a = blu_areaMake(indexStr, blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE | blu_areaFlags_DROP_EVENTS);
@@ -617,19 +649,19 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target) {
     };
 
     net_PropSample* rotationProps[] = {
-        net_getSample(STR("FLSteerPos"), net_propType_F64, globs.table),
-        net_getSample(STR("FRSteerPos"), net_propType_F64, globs.table),
-        net_getSample(STR("BLSteerPos"), net_propType_F64, globs.table),
-        net_getSample(STR("BRSteerPos"), net_propType_F64, globs.table)
+        net_getSample(STR("FLSteerPos"), net_propType_F64, &globs.table),
+        net_getSample(STR("FRSteerPos"), net_propType_F64, &globs.table),
+        net_getSample(STR("BLSteerPos"), net_propType_F64, &globs.table),
+        net_getSample(STR("BRSteerPos"), net_propType_F64, &globs.table)
     };
     net_PropSample* distProps[] = {
-        net_getSample(STR("FLDrivePos"), net_propType_F64, globs.table),
-        net_getSample(STR("FRDrivePos"), net_propType_F64, globs.table),
-        net_getSample(STR("BLDrivePos"), net_propType_F64, globs.table),
-        net_getSample(STR("BRDrivePos"), net_propType_F64, globs.table)
+        net_getSample(STR("FLDrivePos"), net_propType_F64, &globs.table),
+        net_getSample(STR("FRDrivePos"), net_propType_F64, &globs.table),
+        net_getSample(STR("BLDrivePos"), net_propType_F64, &globs.table),
+        net_getSample(STR("BRDrivePos"), net_propType_F64, &globs.table)
     };
 
-    net_PropSample* angle = net_getSample(STR("yaw"), net_propType_F64, globs.table);
+    net_PropSample* angle = net_getSample(STR("yaw"), net_propType_F64, &globs.table);
 
     Mat4f temp;
 
@@ -744,7 +776,7 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
 
             // TODO: bool graphing
             float sHeight = 0;
-            net_PropSample* sample = net_getSample(info->keys[i].str, net_propType_F64, globs.curTime, globs.table);
+            net_PropSample* sample = net_getSample(info->keys[i].str, net_propType_F64, globs.curTime, &globs.table);
             if(sample) { sHeight = (float)sample->f64; }
             V2f lastPoint = V2f(width, sHeight * scale + offset);
             for(int j = 1; j < GRAPH2D_VCOUNT; j++) {
@@ -754,11 +786,11 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
                 sHeight = 0;
                 // TODO: inline traversal instead of restarting constantly
                 float sampleTime = globs.curTime - sampleGap*j;
-                sample = net_getSample(info->keys[i].str, net_propType_F64, sampleTime, globs.table);
+                sample = net_getSample(info->keys[i].str, net_propType_F64, sampleTime, &globs.table);
                 if(sample) { sHeight = (float)sample->f64; }
                 else { color *= col_disconnect; }
 
-                sample = net_getSample(STR("/connected"), net_propType_BOOL, sampleTime, globs.table);
+                sample = net_getSample(STR("/connected"), net_propType_BOOL, sampleTime, &globs.table);
                 bool connected = false;
                 if(sample && sample->boo) { connected = true; }
                 if(sample && !connected) { color *= col_disconnect; }
@@ -789,7 +821,7 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
                     inter = blu_interactionFromWidget(a);
 
                     bool fadeChildren = false;
-                    if(!net_getConnected(globs.table)) { fadeChildren = true; }
+                    if(!net_getConnected(&globs.table)) { fadeChildren = true; }
                     if(inter.hovered && !inter.dropType) { fadeChildren = true; }
 
                     float hoverTarget = a->target_hoverAnim;
@@ -870,12 +902,12 @@ void draw_field(FieldInfo* info, gfx_Framebuffer* fb) {
 
 
 
-    net_PropSample* posX = net_getSample(STR("posX"), net_propType_F64, globs.table);
-    net_PropSample* posY = net_getSample(STR("posY"), net_propType_F64, globs.table);
-    net_PropSample* yaw = net_getSample(STR("yaw"), net_propType_F64, globs.table);
+    net_PropSample* posX = net_getSample(STR("posX"), net_propType_F64, &globs.table);
+    net_PropSample* posY = net_getSample(STR("posY"), net_propType_F64, &globs.table);
+    net_PropSample* yaw = net_getSample(STR("yaw"), net_propType_F64, &globs.table);
 
-    net_PropSample* estX = net_getSample(STR("estX"), net_propType_F64, globs.table);
-    net_PropSample* estY = net_getSample(STR("estY"), net_propType_F64, globs.table);
+    net_PropSample* estX = net_getSample(STR("estX"), net_propType_F64, &globs.table);
+    net_PropSample* estY = net_getSample(STR("estY"), net_propType_F64, &globs.table);
 
     Transform robotTransform = Transform();
     if(posX && posY && yaw) {
@@ -1032,8 +1064,8 @@ void draw_network(NetInfo* info) {
         blu_style_childLayoutAxis(blu_axis_X);
         blu_style_backgroundColor(col_darkGray);
 
-            for(int i = 0; i < globs.table->propCount; i++) {
-                net_Prop* prop = &globs.table->props[i];
+            for(int i = 0; i < globs.table.propCount; i++) {
+                net_Prop* prop = &globs.table.props[i];
                 str quotedName = str_format(globs.scratch, STR("\"%s\""), prop->name);
 
                 blu_Area* parent = blu_areaMake(str_format(globs.scratch, STR("%i"), i), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
@@ -1067,7 +1099,7 @@ void draw_network(NetInfo* info) {
                         a = blu_areaMake("label", blu_areaFlags_DRAW_TEXT);
                         blu_areaAddDisplayStr(a, quotedName);
 
-                        bool connected = net_getConnected(globs.table);
+                        bool connected = net_getConnected(&globs.table);
                         if(!connected) {
                             a->style.backgroundColor *= col_disconnect;
                             a->style.textColor *= col_disconnect;
@@ -1161,14 +1193,12 @@ void makeView(const char* name, View* v) {
     }
 }
 
-void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime, net_Table* table) {
+void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) {
 
     globs.scratch = scratch;
     globs.window = window;
     globs.dt = dt;
-    globs.table = table;
     globs.curTime = curTime;
-
 
     blu_Area* a;
 
@@ -1272,5 +1302,9 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime, 
                 makeView("bottom", &globs.views[3]);
             }
         }
+    }
+
+    if(globs.ctrlInfo.usingSockets) {
+        nets_update(&globs.table, (F32)curTime);
     }
 }

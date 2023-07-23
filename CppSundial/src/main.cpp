@@ -43,8 +43,6 @@ int main() {
     BumpAlloc frameArena;
     bump_allocate(&frameArena, 10000000);
 
-    net_Table networkTable;
-
 
     GLFWwindow* window = nullptr;
     GLFWcursor* typeCursor = nullptr;
@@ -108,9 +106,8 @@ int main() {
     blu_init(solidTex);
     blu_loadFont("C:/windows/fonts/consola.ttf");
 
-    ui_init(&frameArena, solidTex);
     nets_init(&frameArena);
-    nets_setTargetIp(STR("localhost"));
+    ui_init(&frameArena, solidTex);
 
 
     gfx_Shader* blueShader;
@@ -188,9 +185,8 @@ int main() {
         blu_beginFrame();
 
 
-        nets_update(&networkTable, (F32)time);
+        ui_update(&frameArena, window, dt, time);
 
-        ui_update(&frameArena, window, dt, time, &networkTable);
 
         blu_layout(V2f(w, h));
 

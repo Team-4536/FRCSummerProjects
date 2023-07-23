@@ -101,7 +101,14 @@ class Server():
                 rlist, wlist, elist = select.select([self.cliSock], [], [], 0)
                 if(len(rlist) != 0):
 
-                    r = self.cliSock.recv(1024, 0)
+                    try:
+                        r = self.cliSock.recv(1024, 0)
+                    except Exception as e:
+                        self.cliSock.close()
+                        self.cliSock = None
+                        print(f"[SOCKETS] Client disconnected.")
+                        break
+
                     if(len(r) == 0):
                         self.cliSock.close()
                         self.cliSock = None

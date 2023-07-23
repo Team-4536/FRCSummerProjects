@@ -16,7 +16,8 @@ void nets_cleanup();
 // is net connected to anything?
 bool nets_getConnected();
 // NOTE: keep the string allocated because it gets used a lot
-void nets_setTargetIp(str s);
+// also disconnects socket on set
+void nets_setTargetIp(str ip, net_Table* table, float time);
 
 
 // new info is added to table when recieved
@@ -27,6 +28,7 @@ void nets_putMessage(str name, F64 data);
 void nets_putMessage(str name, S32 data);
 void nets_putMessage(str name, str data);
 void nets_putMessage(str name, bool data);
+
 
 #ifdef NET_IMPL
 
@@ -168,13 +170,6 @@ void nets_init(BumpAlloc* scratch) {
     globs.scratch = scratch;
     bump_allocate(&globs.res, 1000000);
     globs.logFile = fopen("sunLog.log", "wb");
-}
-
-// NOTE: keep chars allocated for ever
-void nets_setTargetIp(str s) {
-    globs.targetIp = s;
-    globs.connected = false;
-    _nets_sockCloseFree(&globs.simSocket);
 }
 
 bool nets_getConnected() { return globs.connected; }
@@ -542,6 +537,19 @@ void nets_cleanup() {
     WSACleanup();
 }
 
+
+void nets_setTargetIp(str ip, net_Table* table, float time) {
+
+    globs.targetIp = ip;
+    globs.connected = false;
+    _nets_sockCloseFree(&globs.simSocket);
+
+    net_PropSample* s = _nets_registerSample(table, STR("/connected"), net_propType_BOOL);
+    s->boo = false;
+    s->timeStamp = time;
+    _nets_logUpdate(net_getProp(STR("/connected"), table));
+    printf("[DISCONNECTED]\n");
+}
 
 
 #endif
