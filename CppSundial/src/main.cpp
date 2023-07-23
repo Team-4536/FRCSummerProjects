@@ -41,9 +41,8 @@ int main() {
 
 
     BumpAlloc frameArena;
-    BumpAlloc networkArena;
     bump_allocate(&frameArena, 10000000);
-    bump_allocate(&networkArena, 1000000);
+
     net_Table networkTable;
 
 
@@ -110,7 +109,7 @@ int main() {
     blu_loadFont("C:/windows/fonts/consola.ttf");
 
     ui_init(&frameArena, solidTex);
-    nets_init();
+    nets_init(&frameArena);
     nets_setTargetIp(STR("localhost"));
 
 
@@ -189,8 +188,7 @@ int main() {
         blu_beginFrame();
 
 
-        nets_update(&networkTable, &frameArena, &networkArena, (F32)time);
-        // printf("%i\n", (U8*)networkArena.end - (U8*)networkArena.start);
+        nets_update(&networkTable, (F32)time);
 
         ui_update(&frameArena, window, dt, time, &networkTable);
 

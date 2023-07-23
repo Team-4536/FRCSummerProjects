@@ -447,7 +447,6 @@ void draw_powerIndicators(PowerIndicatorInfo* info) {
 
             for (int i = 0; i < POWER_INDICATOR_COUNT; i++) {
                 net_PropSample* s = nullptr;
-                // TODO: make a prop to represent connection status
                 if(info->keys[i].str.length > 0) {
                     net_Prop* p = net_getProp(info->keys[i].str, net_propType_F64, globs.table);
                     if(p) { s = p->firstPt; }

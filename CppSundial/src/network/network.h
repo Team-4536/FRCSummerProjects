@@ -11,10 +11,8 @@ enum net_PropType {
     net_propType_S32,
     net_propType_F64,
     net_propType_STR,
-    net_propType_BOOL,
-    net_propType_NONE
+    net_propType_BOOL
 };
-// TODO: update socket code to work w none type
 
 struct net_PropSample {
     union {

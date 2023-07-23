@@ -9,7 +9,7 @@
 
 
 
-void nets_init();
+void nets_init(BumpAlloc* scratch);
 void nets_cleanup();
 
 
@@ -21,12 +21,12 @@ void nets_setTargetIp(str s);
 
 // new info is added to table when recieved
 // data points allocated into res arena
-void nets_update(net_Table* table, BumpAlloc* scratch, BumpAlloc* res, float curTime);
+void nets_update(net_Table* table, float curTime);
 
-void nets_putMessage(str name, F64 data, BumpAlloc* scratch);
-void nets_putMessage(str name, S32 data, BumpAlloc* scratch);
-void nets_putMessage(str name, str data, BumpAlloc* scratch);
-void nets_putMessage(str name, bool data, BumpAlloc* scratch);
+void nets_putMessage(str name, F64 data);
+void nets_putMessage(str name, S32 data);
+void nets_putMessage(str name, str data);
+void nets_putMessage(str name, bool data);
 
 #ifdef NET_IMPL
 
@@ -144,12 +144,16 @@ struct nets_Globs {
     BumpAlloc sendArena;
 
     net_PropSample* firstFreeSample = nullptr;
+    BumpAlloc* scratch = nullptr;
+    BumpAlloc res;
+
+    FILE* logFile = nullptr;
 };
 
 static nets_Globs globs = nets_Globs();
 
 // Asserts on failures
-void nets_init() {
+void nets_init(BumpAlloc* scratch) {
 
     globs.recvBuffer = (U8*)arr_allocate0(1, NETS_RECV_BUFFER_SIZE);
     bump_allocate(&globs.sendArena, NETS_SEND_BUFFER_SIZE);
@@ -160,6 +164,10 @@ void nets_init() {
         printf("WSAStartup failed: %d\n", err);
         ASSERT(false);
     }
+
+    globs.scratch = scratch;
+    bump_allocate(&globs.res, 1000000);
+    globs.logFile = fopen("sunLog.log", "wb");
 }
 
 // NOTE: keep chars allocated for ever
@@ -221,7 +229,7 @@ struct nets_Message {
     };
 };
 // formats and copies message into globs send buffer
-void nets_putMessage(nets_Message message, BumpAlloc* scratch) {
+void nets_putMessage(nets_Message message) {
 
     U32 bufSize = 4; // header
     bufSize += message.name.length;
@@ -254,7 +262,7 @@ void nets_putMessage(nets_Message message, BumpAlloc* scratch) {
     // VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
     if(message.type != net_propType_STR) {
         if(!_nets_isSystemBigEndian()) {
-            U8* n = _nets_reverseBytes(dataLoc, dataLen, BUMP_PUSH_ARR(scratch, dataLen, U8));
+            U8* n = _nets_reverseBytes(dataLoc, dataLen, BUMP_PUSH_ARR(globs.scratch, dataLen, U8));
             memcpy(dataLoc, n, dataLen);
         }
     }
@@ -263,33 +271,33 @@ void nets_putMessage(nets_Message message, BumpAlloc* scratch) {
 
 
 // TODO: test sending again
-void nets_putMessage(str name, F64 data, BumpAlloc* scratch) {
+void nets_putMessage(str name, F64 data) {
     nets_Message p;
     p.name = name;
     p.type = net_propType_F64;
     p.f64 = data;
-    nets_putMessage(p, scratch);
+    nets_putMessage(p);
 }
-void nets_putMessage(str name, S32 data, BumpAlloc* scratch) {
+void nets_putMessage(str name, S32 data) {
     nets_Message p;
     p.name = name;
     p.type = net_propType_S32;
     p.s32 = data;
-    nets_putMessage(p, scratch);
+    nets_putMessage(p);
 }
-void nets_putMessage(str name, str data, BumpAlloc* scratch) {
+void nets_putMessage(str name, str data) {
     nets_Message p;
     p.name = name;
     p.type = net_propType_STR;
     p.str = data;
-    nets_putMessage(p, scratch);
+    nets_putMessage(p);
 }
-void nets_putMessage(str name, bool data, BumpAlloc* scratch) {
+void nets_putMessage(str name, bool data) {
     nets_Message p;
     p.name = name;
     p.type = net_propType_STR;
     p.boo = data?1:0;
-    nets_putMessage(p, scratch);
+    nets_putMessage(p);
 }
 
 
@@ -298,12 +306,13 @@ void nets_putMessage(str name, bool data, BumpAlloc* scratch) {
 
 // returns nullptr on invalid type add
 // allocates new prop names into res
-net_PropSample* _nets_registerSample(net_Table* table, BumpAlloc* res, str propName, net_PropType type) {
+net_PropSample* _nets_registerSample(net_Table* table, str propName, net_PropType type) {
     net_Prop* prop = net_getProp(propName, table);
-    if(prop && (prop->type != type)) { return nullptr; }
+    if(prop && (prop->type != type)) {
+        return nullptr; }
     else if(!prop) {
         prop = ARR_APPEND(table->props, table->propCount, net_Prop());
-        prop->name = str_copy(propName, res);
+        prop->name = str_copy(propName, &globs.res);
         prop->type = type;
     }
 
@@ -313,7 +322,7 @@ net_PropSample* _nets_registerSample(net_Table* table, BumpAlloc* res, str propN
         globs.firstFreeSample = sample->nextFree;
     }
     else {
-        sample = BUMP_PUSH_NEW(res, net_PropSample);
+        sample = BUMP_PUSH_NEW(&globs.res, net_PropSample);
     }
 
     sample->next = prop->firstPt;
@@ -335,12 +344,34 @@ net_PropSample* _nets_registerSample(net_Table* table, BumpAlloc* res, str propN
     return sample;
 }
 
+// TODO: make better
+void _nets_logUpdate(net_Prop* prop) {
+    net_PropSample* sample = prop->firstPt;
+
+    StrList entry = StrList();
+    str_listAppend(&entry, prop->name, globs.scratch);
+    str_listAppend(&entry, STR(" "), globs.scratch);
+    str_listAppend(&entry, str_format(globs.scratch, STR("%f "), sample->timeStamp), globs.scratch);
+
+    if(prop->type == net_propType_S32) { str_listAppend(&entry, str_format(globs.scratch, STR("%i"), sample->s32), globs.scratch); }
+    else if(prop->type == net_propType_F64) { str_listAppend(&entry, str_format(globs.scratch, STR("%f"), sample->f64), globs.scratch); }
+    else if(prop->type == net_propType_BOOL) { str_listAppend(&entry, str_format(globs.scratch, STR("%b"), sample->boo), globs.scratch); }
+    else if(prop->type == net_propType_STR) { str_listAppend(&entry, sample->str, globs.scratch); }
+    else { ASSERT(false); }
+
+    str_listAppend(&entry, STR("\n"), globs.scratch);
+
+    str fin = str_listCollect(entry, globs.scratch);
+    fwrite(fin.chars, 1, fin.length, globs.logFile);
+}
+
+
 
 // takes message info and construct a sample inside of res
 // appends sample to prop in table, if no prop a new one is created
 // string and prop name char data also allocated in res, (TODO: this is a memory leak)
 // does nothing on invalid messages and messages that have a different type than the one being used
-void _nets_processMessage(U8 isEvent, str name, U8* data, U8 dataType, U32 dataSize, BumpAlloc* scratch, BumpAlloc* res, net_Table* table, float currentTime) {
+void _nets_processMessage(U8 isEvent, str name, U8* data, U8 dataType, U32 dataSize, net_Table* table, float currentTime) {
 
     if(isEvent != 0) { return; }
     if(dataType != net_propType_S32 &&
@@ -351,7 +382,7 @@ void _nets_processMessage(U8 isEvent, str name, U8* data, U8 dataType, U32 dataS
     }
 
 
-    net_PropSample* sample = _nets_registerSample(table, res, name, (net_PropType)dataType);
+    net_PropSample* sample = _nets_registerSample(table, name, (net_PropType)dataType);
     if(!sample) { return; }
     sample->timeStamp = currentTime;
 
@@ -361,7 +392,7 @@ void _nets_processMessage(U8 isEvent, str name, U8* data, U8 dataType, U32 dataS
     else if(dataType == net_propType_BOOL) { flipWithEndiannes = false; }
     else if(dataType == net_propType_STR) {
         sample->str = { (const U8*)data, dataSize };
-        sample->str = str_copy(sample->str, BUMP_PUSH_ARR(res, dataSize, U8));
+        sample->str = str_copy(sample->str, BUMP_PUSH_ARR(&globs.res, dataSize, U8));
         return;
     }
 
@@ -369,13 +400,15 @@ void _nets_processMessage(U8 isEvent, str name, U8* data, U8 dataType, U32 dataS
     // data is kept first inside of sample struct
     if(flipWithEndiannes && !_nets_isSystemBigEndian()) { _nets_reverseBytes(data, dataSize, (U8*)(sample)); }
     else { memcpy((U8*)(sample), data, dataSize); }
+
+    _nets_logUpdate(net_getProp(name, table));
 }
 
 
 // NOTE: messages are expected to be formatted correctly, if one isn't this will not be able to read future messages
 // parses out sections of a message, calls _netProcessMessage() to create/append samples to table
 // return value indicates how much of the buffer was processed
-U32 _net_processPackets(U8* buf, U32 bufSize, BumpAlloc* scratch, BumpAlloc* res, net_Table* table, float currentTime) {
+U32 _net_processPackets(U8* buf, U32 bufSize, net_Table* table, float currentTime) {
 
     U8* cur = buf;
     while(true) {
@@ -394,7 +427,7 @@ U32 _net_processPackets(U8* buf, U32 bufSize, BumpAlloc* scratch, BumpAlloc* res
         U8* dataBuf = _nets_getBytes(buf, bufSize, &cCopy, valLen);
         if(!dataBuf) { break; }
 
-        _nets_processMessage(msgKind, {nameBuf, nameLen}, dataBuf, valType, valLen, scratch, res, table, currentTime);
+        _nets_processMessage(msgKind, {nameBuf, nameLen}, dataBuf, valType, valLen, table, currentTime);
 
         cur = cCopy;
     }
@@ -402,12 +435,12 @@ U32 _net_processPackets(U8* buf, U32 bufSize, BumpAlloc* scratch, BumpAlloc* res
     return cur - buf;
 }
 
-void nets_update(net_Table* table, BumpAlloc* scratch, BumpAlloc* res, float curTime) {
+void nets_update(net_Table* table, float curTime) {
     nets_SockErr err;
 
     bool wasConnected = globs.connected;
     if(!globs.connected) {
-        bool connected = _nets_sockCreateConnect(str_cstyle(globs.targetIp, scratch), NETS_PORT, &globs.simSocket, &err);
+        bool connected = _nets_sockCreateConnect(str_cstyle(globs.targetIp, globs.scratch), NETS_PORT, &globs.simSocket, &err);
 
         if(err != net_sockErr_none) { // attempt reconnection forever on errors
             _nets_sockCloseFree(&globs.simSocket); }
@@ -415,9 +448,10 @@ void nets_update(net_Table* table, BumpAlloc* scratch, BumpAlloc* res, float cur
             globs.connected = true;
 
             printf("[CONNECTED]\n");
-            net_PropSample* s = _nets_registerSample(table, res, STR("/connected"), net_propType_BOOL);
+            net_PropSample* s = _nets_registerSample(table, STR("/connected"), net_propType_BOOL);
             s->boo = true;
             s->timeStamp = curTime;
+            _nets_logUpdate(net_getProp(STR("/connected"), table));
 
             // str s = STR("[CONNECTED]\n");
             // fwrite(s.chars, 1, s.length, globs.logFile);
@@ -441,7 +475,7 @@ void nets_update(net_Table* table, BumpAlloc* scratch, BumpAlloc* res, float cur
                     printf("[SEND ERR] %d\n", WSAGetLastError());
                     // fwrite(s.chars, 1, s.length, globs.logFile);
                     // TODO: log local events
-                    // TODO: logging
+                    // TODO: invalid message logging
 
                     globs.connected = false;
                     _nets_sockCloseFree(&globs.simSocket);
@@ -478,7 +512,7 @@ void nets_update(net_Table* table, BumpAlloc* scratch, BumpAlloc* res, float cur
         else if (recvSize > 0) {
 
             U32 bufSize = globs.recvBufStartOffset + recvSize;
-            U32 consumed = _net_processPackets(globs.recvBuffer, bufSize, scratch, res, table, curTime);
+            U32 consumed = _net_processPackets(globs.recvBuffer, bufSize, table, curTime);
 
             if(consumed > 0) {
                 U8* remainder = globs.recvBuffer + consumed;
@@ -491,11 +525,14 @@ void nets_update(net_Table* table, BumpAlloc* scratch, BumpAlloc* res, float cur
     }
 
     if(!globs.connected && wasConnected) {
-        net_PropSample* s = _nets_registerSample(table, res, STR("/connected"), net_propType_BOOL);
+        net_PropSample* s = _nets_registerSample(table, STR("/connected"), net_propType_BOOL);
         s->boo = false;
         s->timeStamp = curTime;
+        _nets_logUpdate(net_getProp(STR("/connected"), table));
         printf("[DISCONNECTED]\n");
     }
+
+    // printf("%i\n", (U8*)globs.res.end - (U8*)globs.res.start);
 }
 
 void nets_cleanup() {
