@@ -1,9 +1,5 @@
 #pragma once
 
-// Sry for the bad name
-// "Prop" refers to, roughly, network table entries
-// Except that they also represent messages
-// but message is taken to refer to the encoded version of props
 
 #include "base/str.h"
 
@@ -30,6 +26,7 @@ struct net_PropSample {
 };
 
 // data held in a double linked list
+// a prop is just a network table entry
 struct net_Prop {
     str name;
     net_PropType type;

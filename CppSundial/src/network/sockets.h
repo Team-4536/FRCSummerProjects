@@ -41,7 +41,7 @@ void nets_putMessage(str name, bool data);
 
 #define NETS_PACKET_SIZE 1024
 #define NETS_RECV_BUFFER_SIZE 2048
-#define NETS_SEND_BUFFER_SIZE 2048
+#define NETS_SEND_BUFFER_SIZE 100000
 
 #define NETS_SEND_INTERVAL (1/50.0f)
 #define NETS_PORT "7000"
@@ -247,6 +247,7 @@ void nets_putMessage(nets_Message message) {
     ASSERT(message.name.length < 256);
     buffer[1] = message.name.length;
     buffer[2] = message.type;
+    ASSERT(dataLen < 256);
     buffer[3] = dataLen;
     str_copy(message.name, &(buffer[4]));
 
@@ -270,7 +271,7 @@ void nets_putMessage(nets_Message message) {
 
 
 
-// TODO: test sending again
+// TODO: send buffering
 void nets_putMessage(str name, F64 data) {
     nets_Message p;
     p.name = name;
@@ -295,7 +296,7 @@ void nets_putMessage(str name, str data) {
 void nets_putMessage(str name, bool data) {
     nets_Message p;
     p.name = name;
-    p.type = net_propType_STR;
+    p.type = net_propType_BOOL;
     p.boo = data?1:0;
     nets_putMessage(p);
 }

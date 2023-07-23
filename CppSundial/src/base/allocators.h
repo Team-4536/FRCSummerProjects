@@ -67,7 +67,9 @@ void bump_free(BumpAlloc* a) {
 
 void* bump_push(BumpAlloc* a, U64 size) {
     char* o = static_cast<char*>(a->end);
-    ASSERT(o + size < static_cast<char*>(a->start) + a->reserved);
+    if(!(o + size < static_cast<char*>(a->start) + a->reserved)) {
+        ASSERT(false);
+    }
     a->end = o+size;
     memset(o, 0, size);
     return o;
