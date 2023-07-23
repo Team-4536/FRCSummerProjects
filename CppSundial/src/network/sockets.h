@@ -13,16 +13,9 @@ void nets_init(BumpAlloc* scratch);
 void nets_cleanup();
 
 
-// is net connected to anything?
-bool nets_getConnected();
-// NOTE: keep the string allocated because it gets used a lot
-// also disconnects socket on set
-void nets_setTargetIp(str ip, net_Table* table, float time);
-
-
 // new info is added to table when recieved
 // data points allocated into res arena
-void nets_update(net_Table* table, float curTime);
+void nets_update(net_Table* table, float curTime, str targetIp);
 
 void nets_putMessage(str name, F64 data);
 void nets_putMessage(str name, S32 data);
@@ -171,8 +164,6 @@ void nets_init(BumpAlloc* scratch) {
     bump_allocate(&globs.res, 1000000);
     globs.logFile = fopen("sunLog.log", "wb");
 }
-
-bool nets_getConnected() { return globs.connected; }
 
 
 
@@ -431,28 +422,39 @@ U32 _net_processPackets(U8* buf, U32 bufSize, net_Table* table, float currentTim
     return cur - buf;
 }
 
-void nets_update(net_Table* table, float curTime) {
+void nets_update(net_Table* table, float curTime, str targetIp) {
     nets_SockErr err;
-
     bool wasConnected = globs.connected;
-    if(!globs.connected) {
-        bool connected = _nets_sockCreateConnect(str_cstyle(globs.targetIp, globs.scratch), NETS_PORT, &globs.simSocket, &err);
 
-        if(err != net_sockErr_none) { // attempt reconnection forever on errors
-            _nets_sockCloseFree(&globs.simSocket); }
+
+    bool tryConnection = false;
+
+
+    if(!globs.connected) {
+        if(globs.targetIp.length != 0) {
+            tryConnection = true;
+        }
+    }
+
+    if(!str_compare(targetIp, globs.targetIp)) {
+        globs.connected = false; }
+
+    if(tryConnection) {
+        // retry connection forever if failed
+        bool connected = _nets_sockCreateConnect(str_cstyle(targetIp, globs.scratch), NETS_PORT, &globs.simSocket, &err);
+
+        if(err != net_sockErr_none) { _nets_sockCloseFree(&globs.simSocket); }
         else if(connected) {
             globs.connected = true;
-
             printf("[CONNECTED]\n");
             net_PropSample* s = _nets_registerSample(table, STR("/connected"), net_propType_BOOL);
             s->boo = true;
             s->timeStamp = curTime;
             _nets_logUpdate(net_getProp(STR("/connected"), table));
-
-            // str s = STR("[CONNECTED]\n");
-            // fwrite(s.chars, 1, s.length, globs.logFile);
         }
     }
+    globs.targetIp = targetIp;
+
 
 
     // SEND LOOP ///////////////////////////////////////////////////////////////////////////
@@ -469,12 +471,9 @@ void nets_update(net_Table* table, float curTime) {
                 if(WSAGetLastError() != WSAEWOULDBLOCK) {
 
                     printf("[SEND ERR] %d\n", WSAGetLastError());
-                    // fwrite(s.chars, 1, s.length, globs.logFile);
                     // TODO: log local events
                     // TODO: invalid message logging
-
                     globs.connected = false;
-                    _nets_sockCloseFree(&globs.simSocket);
                 }
             }
             else { start += res; }
@@ -495,14 +494,12 @@ void nets_update(net_Table* table, float curTime) {
             if(WSAGetLastError() != WSAEWOULDBLOCK) {
                 printf("[RECV ERR] %d\n", WSAGetLastError());
                 globs.connected = false;
-                _nets_sockCloseFree(&globs.simSocket);
             }
             break;
         }
         // size is 0, indicating shutdown
         else if (recvSize == 0) {
             globs.connected = false;
-            _nets_sockCloseFree(&globs.simSocket);
         }
         // buffer received
         else if (recvSize > 0) {
@@ -521,6 +518,9 @@ void nets_update(net_Table* table, float curTime) {
     }
 
     if(!globs.connected && wasConnected) {
+
+        _nets_sockCloseFree(&globs.simSocket);
+
         net_PropSample* s = _nets_registerSample(table, STR("/connected"), net_propType_BOOL);
         s->boo = false;
         s->timeStamp = curTime;
@@ -536,20 +536,5 @@ void nets_cleanup() {
     _nets_sockCloseFree(&globs.simSocket);
     WSACleanup();
 }
-
-
-void nets_setTargetIp(str ip, net_Table* table, float time) {
-
-    globs.targetIp = ip;
-    globs.connected = false;
-    _nets_sockCloseFree(&globs.simSocket);
-
-    net_PropSample* s = _nets_registerSample(table, STR("/connected"), net_propType_BOOL);
-    s->boo = false;
-    s->timeStamp = time;
-    _nets_logUpdate(net_getProp(STR("/connected"), table));
-    printf("[DISCONNECTED]\n");
-}
-
 
 #endif

@@ -332,7 +332,7 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
     initView(&globs.views[3]);
 
     globs.ctrlInfo = ControlsInfo();
-    nets_setTargetIp(STR("localhost"), &globs.table, 0);
+
 
 
     bool res = gfx_loadOBJMesh("res/models/Chassis2.obj", frameArena, &globs.robotVA, &globs.robotIB);
@@ -441,13 +441,10 @@ void draw_controls(ControlsInfo* info) {
 
                     if(makeButton(STR("LIVE"), !info->usingSockets?col_darkGray:col_darkBlue, col_lightGray).clicked) {
                         info->usingSockets = true;
-                        str s = info->sim? STR("localhost") : STR("10.45.36.2");
-                        nets_setTargetIp(s, &globs.table, globs.curTime);
                     }
 
                     if(makeButton(STR("REPLAY"), info->usingSockets?col_darkGray:col_darkBlue, col_lightGray).clicked) {
                         info->usingSockets = false;
-                        nets_setTargetIp(STR(""), &globs.table, globs.curTime); // closes socket, setting useSockets stops updates from happening
                     }
                 }
             }
@@ -489,17 +486,10 @@ void draw_controls(ControlsInfo* info) {
                                 bool clicked = false;
                                 if(makeButton(STR("sim"), info->sim? col_darkGray:col_darkBlue, col_lightGray).clicked) {
                                     info->sim = true;
-                                    clicked = true;
                                 };
                                 if(makeButton(STR("real"), !info->sim? col_darkGray:col_darkBlue, col_lightGray).clicked) {
                                     info->sim = false;
-                                    clicked = true;
                                 };
-
-                                if(clicked) {
-                                    str s = info->sim? STR("localhost") : STR("10.45.36.2");
-                                    nets_setTargetIp(s, &globs.table, globs.curTime);
-                                }
                             }
                         }
 
@@ -1304,7 +1294,11 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) 
         }
     }
 
+
+
+    str s = { nullptr, 0 };
     if(globs.ctrlInfo.usingSockets) {
-        nets_update(&globs.table, (F32)curTime);
+        s = globs.ctrlInfo.sim? STR("localhost") : STR("10.45.36.2");
     }
+    nets_update(&globs.table, (F32)curTime, s);
 }
