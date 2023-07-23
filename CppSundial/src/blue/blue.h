@@ -262,6 +262,8 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area);
 #define blu_parentScope(parent) blu_deferLoop(blu_pushParent(parent), blu_popParent())
 
 
+#define BLU_FONT_SIZE 20 // in px
+
 #ifdef BLU_IMPL
 
 #include "base/hashtable.h"
@@ -271,7 +273,6 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area);
 
 
 // CLEANUP: these
-#define BLU_FONT_SIZE 20 // in px
 #define BLU_FONT_FIRST 32 // fist char in font, 32 = space
 #define BLU_FONT_CHARCOUNT 96
 

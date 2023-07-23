@@ -68,7 +68,7 @@ struct SwerveDriveInfo {
 };
 void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target);
 
-// CLEANUP: invalidation problem here too
+// TODO: add bool boxes
 #define POWER_INDICATOR_COUNT 30
 struct PowerIndicatorInfo {
     NTKey keys[POWER_INDICATOR_COUNT];
@@ -80,46 +80,12 @@ void draw_powerIndicators(PowerIndicatorInfo* info);
 
 
 
-struct Data {
-    str name;
-    net_PropType type;
-    void* data;
+
+struct ControlsInfo {
+    bool usingSockets = false;
+    bool sim = false;
 };
-// name & data allocated acjacent
-
-struct DataFrame {
-    float timeStamp;
-    U32 itemCount;
-    Data* items;
-};
-// items allocated adjacent
-
-#define REPLAY_FRAME_COUNT 600
-struct ReplayInfo {
-    DataFrame frames[REPLAY_FRAME_COUNT];
-};
-
-
-void replayLoad(const char* filePath, BumpAlloc* scratch, BumpAlloc* res) {
-    U64 fSize = 0;
-    U8* buffer = loadFileToBuffer(filePath, false, &fSize, scratch);
-};
-
-void allocDataFrame(net_Prop** trackedList, U32 propCount, BumpAlloc* arena) {
-
-}
-
-void allocDataFrame() {
-
-}
-
-void draw_replay() {
-
-}
-
-
-
-
+void draw_controls(ControlsInfo* info);
 
 
 
@@ -129,13 +95,15 @@ enum ViewType {
     viewType_net,
     viewType_swerveDrive,
     viewType_powerIndicators,
+    viewType_controls,
 };
 union ViewUnion {
     Graph2dInfo graph2dInfo;
     FieldInfo fieldInfo;
     NetInfo netInfo;
     SwerveDriveInfo swerveDriveInfo;
-    PowerIndicatorInfo PowerIndicatorInfo;
+    PowerIndicatorInfo powerIndicatorInfo;
+    ControlsInfo controlsInfo;
 
     ViewUnion() {  };
 };
@@ -236,8 +204,14 @@ blu_Area* makeScrollArea(float* pos) {
     return clip;
 }
 
-blu_WidgetInteraction makeButton(str text, V4f hoverColor) {
+blu_WidgetInteraction makeButton(str text, V4f backColor, V4f hoverColor) {
     // TODO: button textures
+    blu_Area* a = blu_areaMake(text, blu_areaFlags_CLICKABLE | blu_areaFlags_CENTER_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM);
+    a->style.backgroundColor = v4f_lerp(backColor, hoverColor, a->target_hoverAnim);
+    blu_areaAddDisplayStr(a, text);
+    return blu_interactionFromWidget(a);
+}
+blu_WidgetInteraction makeButton(str text, V4f hoverColor) {
     blu_Area* a = blu_areaMake(text, blu_areaFlags_CLICKABLE | blu_areaFlags_CENTER_TEXT | blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DRAW_TEXT | blu_areaFlags_HOVER_ANIM);
     a->style.backgroundColor = v4f_lerp(a->style.backgroundColor, hoverColor, a->target_hoverAnim);
     blu_areaAddDisplayStr(a, text);
@@ -245,7 +219,7 @@ blu_WidgetInteraction makeButton(str text, V4f hoverColor) {
 }
 
 
-#define UI_VIEW_COUNT 3
+#define UI_VIEW_COUNT 4
 static struct UIGlobs {
 
     gfx_Shader* sceneShader3d = nullptr;
@@ -253,7 +227,8 @@ static struct UIGlobs {
     gfx_Texture* solidTex;
 
     float rightSize;
-    float downSize;
+    float downSizeL;
+    float downSizeR;
 
     View views[UI_VIEW_COUNT];
 
@@ -303,7 +278,8 @@ void initView(View* v) {
     else if(v->type == viewType_graph2d) { v->data.graph2dInfo = Graph2dInfo(); initGraph2dInfo(&v->data.graph2dInfo); }
     else if(v->type == viewType_swerveDrive) { v->data.swerveDriveInfo = SwerveDriveInfo(); }
     else if(v->type == viewType_net) { v->data.netInfo = NetInfo(); }
-    else if(v->type == viewType_powerIndicators) { v->data.PowerIndicatorInfo = PowerIndicatorInfo(); }
+    else if(v->type == viewType_powerIndicators) { v->data.powerIndicatorInfo = PowerIndicatorInfo(); }
+    else if(v->type == viewType_controls) { v->data.controlsInfo = ControlsInfo(); }
     else { ASSERT(false); };
 }
 
@@ -312,7 +288,8 @@ void updateView(View* v) {
     else if(v->type == viewType_graph2d) { draw_graph2d(&v->data.graph2dInfo, v->target); }
     else if(v->type == viewType_swerveDrive) { draw_swerveDrive(&v->data.swerveDriveInfo, v->target); }
     else if(v->type == viewType_net) { draw_network(&v->data.netInfo); }
-    else if(v->type == viewType_powerIndicators) { draw_powerIndicators(&v->data.PowerIndicatorInfo); }
+    else if(v->type == viewType_powerIndicators) { draw_powerIndicators(&v->data.powerIndicatorInfo); }
+    else if(v->type == viewType_controls) { draw_controls(&v->data.controlsInfo); }
     else { ASSERT(false); };
 }
 
@@ -327,7 +304,8 @@ blu_Style borderStyle;
 void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
 
     globs.rightSize = 400;
-    globs.downSize = 400;
+    globs.downSizeL = 100;
+    globs.downSizeR = 400;
 
     globs.solidTex = solidTex;
 
@@ -345,12 +323,14 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
         v->target = gfx_registerFramebuffer();
     }
     globs.views[0].type = viewType_field;
-    globs.views[1].type = viewType_graph2d;
-    globs.views[2].type = viewType_net;
+    globs.views[1].type = viewType_controls;
+    globs.views[2].type = viewType_graph2d;
+    globs.views[3].type = viewType_net;
 
     initView(&globs.views[0]);
     initView(&globs.views[1]);
     initView(&globs.views[2]);
+    initView(&globs.views[3]);
 
 
     bool res = gfx_loadOBJMesh("res/models/Chassis2.obj", frameArena, &globs.robotVA, &globs.robotIB);
@@ -433,6 +413,73 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
         gfx_bindIndexBuffer(pass, uniforms->ib);
     };
 }
+
+
+
+
+void draw_controls(ControlsInfo* info) {
+
+    blu_Area* a;
+
+    a = blu_areaMake("controlInfo", 0);
+    blu_style_childLayoutAxis(blu_axis_X, &a->style);
+    blu_style_sizeY({ blu_sizeKind_REMAINDER, 0 }, &a->style);
+    blu_parentScope(a) {
+        blu_styleScope(blu_Style()) {
+        blu_style_childLayoutAxis(blu_axis_Y);
+
+
+            a = blu_areaMake("left", blu_areaFlags_DRAW_BACKGROUND);
+            blu_style_sizeX({ blu_sizeKind_PX, 75}, &a->style);
+            blu_parentScope(a) {
+                blu_styleScope(blu_Style()) {
+                    blu_style_sizeX({blu_sizeKind_PERCENT, 1});
+                    blu_style_sizeY({blu_sizeKind_REMAINDER, 1});
+
+                    if(makeButton(STR("LIVE"), !info->usingSockets?col_darkGray:col_darkBlue, col_lightGray).clicked) {
+                        info->usingSockets = true;
+                    }
+
+                    if(makeButton(STR("REPLAY"), info->usingSockets?col_darkGray:col_darkBlue, col_lightGray).clicked) {
+                        info->usingSockets = false;
+                    }
+                }
+            }
+
+            a = blu_areaMake("right", blu_areaFlags_DRAW_BACKGROUND);
+            blu_style_sizeX({ blu_sizeKind_REMAINDER, 0}, &a->style);
+
+            blu_parentScope(a) {
+                blu_styleScope(blu_Style()) {
+                blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
+                blu_style_sizeX({ blu_sizeKind_REMAINDER, 0 });
+                blu_style_childLayoutAxis(blu_axis_X);
+
+
+                    if(info->usingSockets) {
+                        a = blu_areaMake(STR("connectionStatus"), blu_areaFlags_DRAW_BACKGROUND);
+                        blu_style_sizeX({ blu_sizeKind_REMAINDER, 0}, &a->style);
+                        blu_parentScope(a) {
+                            a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
+                            blu_areaAddDisplayStr(a, STR("Network status: "));
+                            blu_style_sizeX({ blu_sizeKind_TEXT, 0 }, &a->style);
+
+                            a = blu_areaMake(STR("box"), blu_areaFlags_DRAW_BACKGROUND);
+                            a->style.backgroundColor = col_red;
+                            a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
+                            a->style.cornerRadius = 2;
+                            if(net_getConnected(globs.table)) {
+                                a->style.backgroundColor = col_green; }
+                        } // end connection parent
+                    }
+                    else {
+
+                    }
+                }
+            } // end right side
+        }
+    } // end control info
+};
 
 
 
@@ -898,6 +945,10 @@ void draw_field(FieldInfo* info, gfx_Framebuffer* fb) {
                 }
             }
 
+            a = blu_areaMake(STR("FPS"), blu_areaFlags_DRAW_TEXT | blu_areaFlags_FLOATING);
+            a->offset = V2f(5, fb->texture->height - BLU_FONT_SIZE - 5);
+            str n = str_format(globs.scratch, STR("FPS: %f"), 1/globs.dt);
+            blu_areaAddDisplayStr(a, n);
         }
     }
 
@@ -966,31 +1017,6 @@ void draw_field(FieldInfo* info, gfx_Framebuffer* fb) {
 
 void draw_network(NetInfo* info) {
     blu_Area* a;
-
-
-    blu_styleScope(blu_Style()) {
-    blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
-    blu_style_childLayoutAxis(blu_axis_X);
-    blu_style_backgroundColor(col_darkGray);
-
-        a = blu_areaMake(STR("FPS"), blu_areaFlags_DRAW_TEXT | blu_areaFlags_DRAW_BACKGROUND);
-        str n = str_format(globs.scratch, STR("FPS: %f"), 1/globs.dt);
-        blu_areaAddDisplayStr(a, n);
-
-        a = blu_areaMake(STR("connectionStatus"), blu_areaFlags_DRAW_BACKGROUND);
-        blu_parentScope(a) {
-            a = blu_areaMake(STR("label"), blu_areaFlags_DRAW_TEXT);
-            blu_areaAddDisplayStr(a, STR("Network status: "));
-            blu_style_sizeX({ blu_sizeKind_TEXT, 0 }, &a->style);
-
-            a = blu_areaMake(STR("box"), blu_areaFlags_DRAW_BACKGROUND);
-            a->style.backgroundColor = col_red;
-            a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
-            a->style.cornerRadius = 2;
-            if(net_getConnected(globs.table)) {
-                a->style.backgroundColor = col_green; }
-        } // end connection parent
-    } // end top bar section
 
 
 
@@ -1168,7 +1194,8 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime, 
                 makeViewSrc("Graph", viewType_graph2d);
                 makeViewSrc("Swerve", viewType_swerveDrive);
                 makeViewSrc("NT", viewType_net);
-                makeViewSrc("POWER", viewType_powerIndicators);
+                makeViewSrc("Power", viewType_powerIndicators);
+                makeViewSrc("Ctrls", viewType_controls);
             }
         }
 
@@ -1177,11 +1204,34 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime, 
         a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 3 };
 
 
-        blu_styleScope(blu_Style())
-        {
-        blu_style_sizeX({blu_sizeKind_REMAINDER, 0 });
-            makeView("left", &globs.views[0]);
+
+        a = blu_areaMake("leftParent", 0);
+        a->style.sizes[blu_axis_X] = {blu_sizeKind_REMAINDER, 0 };
+        a->style.childLayoutAxis = blu_axis_Y;
+        blu_parentScope(a) {
+
+            blu_styleScope(blu_Style()) {
+            blu_style_sizeY({ blu_sizeKind_REMAINDER, 0 });
+                makeView("top", &globs.views[0]);
+            }
+
+
+            a = blu_areaMake("YresizeBar", blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
+            a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, 3 };
+
+            blu_WidgetInteraction inter = blu_interactionFromWidget(a);
+            float t = inter.held? 1 : a->target_hoverAnim;
+            a->style.backgroundColor = v4f_lerp(col_black, col_white, t);
+            globs.downSizeL += -inter.dragDelta.y;
+            a->cursor = blu_cursor_resizeV;
+
+            blu_styleScope(blu_Style()) {
+            blu_style_sizeY({blu_sizeKind_PX, globs.downSizeL });
+                makeView("bottom", &globs.views[1]);
+            }
         }
+
+        // TODO: everything is lagging by a frame
 
 
         a = blu_areaMake("XresizeBar", blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
@@ -1204,8 +1254,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime, 
 
             blu_styleScope(blu_Style()) {
             blu_style_sizeY({ blu_sizeKind_REMAINDER, 0 });
-
-                makeView("top", &globs.views[1]);
+                makeView("top", &globs.views[2]);
             }
 
 
@@ -1215,12 +1264,12 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime, 
             blu_WidgetInteraction inter = blu_interactionFromWidget(a);
             float t = inter.held? 1 : a->target_hoverAnim;
             a->style.backgroundColor = v4f_lerp(col_black, col_white, t);
-            globs.downSize += -inter.dragDelta.y;
+            globs.downSizeR += -inter.dragDelta.y;
             a->cursor = blu_cursor_resizeV;
 
             blu_styleScope(blu_Style()) {
-            blu_style_sizeY({blu_sizeKind_PX, globs.downSize });
-                makeView("bottom", &globs.views[2]);
+            blu_style_sizeY({blu_sizeKind_PX, globs.downSizeR });
+                makeView("bottom", &globs.views[3]);
             }
         }
     }
