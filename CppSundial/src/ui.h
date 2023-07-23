@@ -452,7 +452,7 @@ void draw_powerIndicators(PowerIndicatorInfo* info) {
                     net_Prop* p = net_getProp(info->keys[i].str, net_propType_F64, globs.table);
                     if(p) { s = p->firstPt; }
                 }
-                bool fadeText = (!s || !nets_getConnected());
+                bool fadeText = (!s || !net_getConnected(globs.table));
 
                 str indexStr = str_format(globs.scratch, STR("%i"), i);
                 a = blu_areaMake(indexStr, blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE | blu_areaFlags_DROP_EVENTS);
@@ -529,9 +529,7 @@ void draw_powerIndicators(PowerIndicatorInfo* info) {
 
 
                 } // end per elem parent
-
             } // end loop
-
         }
     } // end scroll view
 }
@@ -709,13 +707,15 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
 
                 sHeight = 0;
                 // TODO: inline traversal instead of restarting constantly
-                sample = net_getSample(info->keys[i].str, net_propType_F64, globs.curTime - sampleGap*j, globs.table);
+                float sampleTime = globs.curTime - sampleGap*j;
+                sample = net_getSample(info->keys[i].str, net_propType_F64, sampleTime, globs.table);
                 if(sample) { sHeight = (float)sample->f64; }
                 else { color *= col_disconnect; }
 
-                if(sample && !nets_getConnected()) { color *= col_disconnect; }
-
-                // TODO: disconnection history
+                sample = net_getSample(STR("/connected"), net_propType_BOOL, sampleTime, globs.table);
+                bool connected = false;
+                if(sample && sample->boo) { connected = true; }
+                if(sample && !connected) { color *= col_disconnect; }
 
                 V2f point = { width - j*pointGap, sHeight * scale + offset };
                 draw_line(p, 2, color, lastPoint, point);
@@ -743,7 +743,7 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
                     inter = blu_interactionFromWidget(a);
 
                     bool fadeChildren = false;
-                    if(!nets_getConnected()) { fadeChildren = true; }
+                    if(!net_getConnected(globs.table)) { fadeChildren = true; }
                     if(inter.hovered && !inter.dropType) { fadeChildren = true; }
 
                     float hoverTarget = a->target_hoverAnim;
@@ -988,7 +988,7 @@ void draw_network(NetInfo* info) {
             a->style.backgroundColor = col_red;
             a->style.sizes[blu_axis_X] = { blu_sizeKind_REMAINDER, 0 };
             a->style.cornerRadius = 2;
-            if(nets_getConnected()) {
+            if(net_getConnected(globs.table)) {
                 a->style.backgroundColor = col_green; }
         } // end connection parent
     } // end top bar section
@@ -1042,7 +1042,8 @@ void draw_network(NetInfo* info) {
                         a = blu_areaMake("label", blu_areaFlags_DRAW_TEXT);
                         blu_areaAddDisplayStr(a, quotedName);
 
-                        if(!nets_getConnected()) {
+                        bool connected = net_getConnected(globs.table);
+                        if(!connected) {
                             a->style.backgroundColor *= col_disconnect;
                             a->style.textColor *= col_disconnect;
                         }
@@ -1064,7 +1065,7 @@ void draw_network(NetInfo* info) {
                             a->style.textColor = col_darkBlue;
                         }
 
-                        if(!nets_getConnected()) {
+                        if(!connected) {
                             a->style.backgroundColor *= col_disconnect;
                             a->style.textColor *= col_disconnect;
                         }

@@ -40,13 +40,11 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 int main() {
 
 
-    BumpAlloc lifetimeArena;
     BumpAlloc frameArena;
     BumpAlloc networkArena;
-    net_Table networkTable;
-    bump_allocate(&lifetimeArena, 1000000);
     bump_allocate(&frameArena, 10000000);
     bump_allocate(&networkArena, 1000000);
+    net_Table networkTable;
 
 
     GLFWwindow* window = nullptr;

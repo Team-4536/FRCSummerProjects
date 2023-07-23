@@ -55,6 +55,7 @@ struct net_Table {
 
 net_Prop* net_getProp(str name, net_Table* table);
 net_Prop* net_getProp(str name, net_PropType type, net_Table* table);
+bool net_getConnected(net_Table* table);
 
 // returns nullptr on failed get
 net_PropSample* net_getSample(str name, net_PropType type, float sampleTime, net_Table* table);
@@ -65,6 +66,12 @@ net_PropSample* net_getSample(str name, net_PropType type, net_Table* table);
 
 #ifdef NET_IMPL
 #include "base/hashtable.h"
+
+bool net_getConnected(net_Table* table) {
+    net_PropSample* s = net_getSample(STR("/connected"), net_propType_BOOL, table);
+    if(!s) { return false; }
+    return s->boo;
+}
 
 
 net_PropSample* net_getSample(str name, net_PropType type, net_Table* table) {

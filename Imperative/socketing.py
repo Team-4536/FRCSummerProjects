@@ -37,7 +37,6 @@ class Server():
 
         self.telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
 
-        # TODO: host from actual robot
         self.servSock = socket.socket(socket.AddressFamily.AF_INET, socket.SOCK_STREAM)
         if(not isReal): self.servSock.bind(("localhost", 7000))
         else: self.servSock.bind(("10.45.36.2", 7000))
@@ -157,7 +156,7 @@ class Server():
             # https://docs.python.org/3/library/struct.html
             valEncoded += struct.pack("!l", value)
 
-        elif(type(value) == float or type(value) == numpy.float64):
+        elif(type(value) == float or type(value) == numpy.float64 or type(value) == numpy.float32):
             valType = PropType.F64
             valEncoded += struct.pack("!d", value)
 

@@ -296,10 +296,49 @@ void nets_putMessage(str name, bool data, BumpAlloc* scratch) {
 
 
 
+// returns nullptr on invalid type add
+// allocates new prop names into res
+net_PropSample* _nets_registerSample(net_Table* table, BumpAlloc* res, str propName, net_PropType type) {
+    net_Prop* prop = net_getProp(propName, table);
+    if(prop && (prop->type != type)) { return nullptr; }
+    else if(!prop) {
+        prop = ARR_APPEND(table->props, table->propCount, net_Prop());
+        prop->name = str_copy(propName, res);
+        prop->type = type;
+    }
 
-// takes message info and constructs a sample inside of res
+
+    net_PropSample* sample = globs.firstFreeSample;
+    if(sample) {
+        globs.firstFreeSample = sample->nextFree;
+    }
+    else {
+        sample = BUMP_PUSH_NEW(res, net_PropSample);
+    }
+
+    sample->next = prop->firstPt;
+    if(prop->firstPt) { prop->firstPt->prev = sample; }
+    else { prop->lastPt = sample; }
+    prop->firstPt = sample;
+    prop->ptCount++;
+
+    // start freeing samples if they are too old
+    if(prop->ptCount > NETS_MAX_SAMPLE_COUNT) {
+        prop->lastPt->nextFree = globs.firstFreeSample;
+        globs.firstFreeSample = prop->lastPt;
+
+        prop->lastPt->prev->next = nullptr;
+        prop->lastPt = prop->lastPt->prev;
+        prop->ptCount--;
+    }
+
+    return sample;
+}
+
+
+// takes message info and construct a sample inside of res
 // appends sample to prop in table, if no prop a new one is created
-// char data also allocated in res, (TODO: this is a memory leak)
+// string and prop name char data also allocated in res, (TODO: this is a memory leak)
 // does nothing on invalid messages and messages that have a different type than the one being used
 void _nets_processMessage(U8 isEvent, str name, U8* data, U8 dataType, U32 dataSize, BumpAlloc* scratch, BumpAlloc* res, net_Table* table, float currentTime) {
 
@@ -312,44 +351,9 @@ void _nets_processMessage(U8 isEvent, str name, U8* data, U8 dataType, U32 dataS
     }
 
 
-    net_Prop* prop = net_getProp(name, table);
-    if(prop && (prop->type != dataType)) { return; }
-    else if(!prop) {
-        prop = ARR_APPEND(table->props, table->propCount, net_Prop());
-        prop->name = str_copy(name, res);
-        prop->type = (net_PropType)dataType;
-    }
-
-
-
-    net_PropSample* sample = globs.firstFreeSample;
-    if(sample) {
-        globs.firstFreeSample = sample->nextFree;
-    }
-    else {
-        sample = BUMP_PUSH_NEW(res, net_PropSample);
-    }
+    net_PropSample* sample = _nets_registerSample(table, res, name, (net_PropType)dataType);
+    if(!sample) { return; }
     sample->timeStamp = currentTime;
-
-
-    sample->next = prop->firstPt;
-    if(prop->firstPt) { prop->firstPt->prev = sample; }
-    else { prop->lastPt = sample; }
-    prop->firstPt = sample;
-    prop->ptCount++;
-
-
-    // start freeing samples if they are too old
-    if(prop->ptCount > NETS_MAX_SAMPLE_COUNT) {
-        prop->lastPt->nextFree = globs.firstFreeSample;
-        globs.firstFreeSample = prop->lastPt;
-
-        prop->lastPt->prev->next = nullptr;
-        prop->lastPt = prop->lastPt->prev;
-        prop->ptCount--;
-    }
-
-
 
     bool flipWithEndiannes = false;
          if(dataType == net_propType_F64) { flipWithEndiannes = true; }
@@ -411,6 +415,10 @@ void nets_update(net_Table* table, BumpAlloc* scratch, BumpAlloc* res, float cur
             globs.connected = true;
 
             printf("[CONNECTED]\n");
+            net_PropSample* s = _nets_registerSample(table, res, STR("/connected"), net_propType_BOOL);
+            s->boo = true;
+            s->timeStamp = curTime;
+
             // str s = STR("[CONNECTED]\n");
             // fwrite(s.chars, 1, s.length, globs.logFile);
         }
@@ -483,6 +491,9 @@ void nets_update(net_Table* table, BumpAlloc* scratch, BumpAlloc* res, float cur
     }
 
     if(!globs.connected && wasConnected) {
+        net_PropSample* s = _nets_registerSample(table, res, STR("/connected"), net_propType_BOOL);
+        s->boo = false;
+        s->timeStamp = curTime;
         printf("[DISCONNECTED]\n");
     }
 }
