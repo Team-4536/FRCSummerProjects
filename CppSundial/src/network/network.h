@@ -30,7 +30,7 @@ struct net_PropSample {
 struct net_Prop {
     str name;
     net_PropType type;
-    // safe to assume that firstPt will never be nullptr if the prop exists
+    // first can be null
     net_PropSample* firstPt = nullptr; // most recent
     net_PropSample* lastPt = nullptr; // oldest
     U32 ptCount = 0;
@@ -57,6 +57,8 @@ net_PropSample* net_getSample(str name, net_PropType type, float sampleTime, net
 // returns first sample, nullptr if prop does not exist
 net_PropSample* net_getSample(str name, net_PropType type, net_Table* table);
 
+net_PropSample* net_getSample(net_Prop* p);
+
 
 
 #ifdef NET_IMPL
@@ -67,7 +69,6 @@ bool net_getConnected(net_Table* table) {
     if(!s) { return false; }
     return s->boo;
 }
-
 
 net_PropSample* net_getSample(str name, net_PropType type, net_Table* table) {
     net_Prop* p = net_getProp(name, type, table);

@@ -323,6 +323,7 @@ str str_listCollect(StrList s, str sep, BumpAlloc* arena) {
 }
 */
 
+// TODO: max split count
 void str_split(str s, char delim, BumpAlloc* arena, U32* outCount, str** outArr) {
 
     *outCount = 0;

@@ -82,8 +82,11 @@ void draw_powerIndicators(PowerIndicatorInfo* info);
 
 
 struct ControlsInfo {
+    // NOTE: socket connection is reactive to these, no updates need to happen in user code
     bool usingSockets = true;
     bool sim = true;
+    BumpAlloc replayArena;
+    net_Table replayTable;
 };
 void draw_controls(ControlsInfo* info);
 
@@ -332,6 +335,7 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
     initView(&globs.views[3]);
 
     globs.ctrlInfo = ControlsInfo();
+    bump_allocate(&globs.ctrlInfo.replayArena, 1000000);
 
 
 
@@ -420,6 +424,66 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
 
 
 
+// expects table to be empty
+void loadReplay(net_Table* table) {
+    U64 size;
+    U8* f = loadFileToBuffer("test.log", true, &size, globs.scratch);
+    ASSERT(f);
+
+    U8* c = f;
+    U8* lineStart = c;
+    while((c - f) < size) {
+        if(*c != '\n') { c++; continue; }
+
+        str line = { lineStart, c-lineStart };
+        U32 spCount;
+        str* split;
+        str_split(line, ' ', globs.scratch, &spCount, &split);
+        ASSERT(spCount > 0);
+
+        // [prop/update] [name]
+        // prop:                [type]
+        // update:              [timestamp] [value]
+
+        if(split[0].length == 1 && split[0].chars[0] == 'p') {
+            net_Prop* p = ARR_APPEND(table->props, table->propCount, net_Prop());
+            p->name = str_copy(split[1], &globs.ctrlInfo.replayArena);
+
+            str typeStr = split[2];
+            if(str_compare(typeStr, STR("s32"))) { p->type = net_propType_S32; }
+            else if(str_compare(typeStr, STR("f64"))) { p->type = net_propType_F64; }
+            else if(str_compare(typeStr, STR("bool"))) { p->type = net_propType_BOOL; }
+            else if(str_compare(typeStr, STR("str"))) { p->type = net_propType_STR; }
+            else { ASSERT(false); }
+        }
+        else if(split[0].length == 1 && split[0].chars[0] == 'u') {
+            net_PropSample* sample = BUMP_PUSH_NEW(&globs.ctrlInfo.replayArena, net_PropSample);
+
+            net_Prop* p = net_getProp(split[1], table);
+            ASSERT(p);
+            sample->next = p->firstPt;
+            p->firstPt = sample;
+
+            sample->timeStamp = atof((const char*)split[2].chars);
+
+            const char* arg = (const char*)split[3].chars;
+            if(p->type == net_propType_S32) { sample->s32 = atoi(arg); }
+            else if(p->type == net_propType_F64) { sample->f64 = atof(arg); }
+            else if(p->type == net_propType_STR) { sample->str = str_copy(split[2], &globs.ctrlInfo.replayArena); }
+            else if(p->type == net_propType_BOOL) {
+                bool end;
+                if(str_compare(split[3], STR("true"))) { sample->boo = true; }
+                else if(str_compare(split[3], STR("false"))) { sample->boo = false; }
+                else { ASSERT(false); }
+            }
+            else { ASSERT(false); }
+        }
+
+        c++;
+        lineStart = c;
+    }
+}
+
 void draw_controls(ControlsInfo* info) {
 
     blu_Area* a;
@@ -486,16 +550,48 @@ void draw_controls(ControlsInfo* info) {
                                 bool clicked = false;
                                 if(makeButton(STR("sim"), info->sim? col_darkGray:col_darkBlue, col_lightGray).clicked) {
                                     info->sim = true;
-                                };
+                                }
                                 if(makeButton(STR("real"), !info->sim? col_darkGray:col_darkBlue, col_lightGray).clicked) {
                                     info->sim = false;
-                                };
+                                }
                             }
                         }
 
                     }
                     else {
+                        if(makeButton(STR("load"), col_lightGray).clicked) {
+                            //load save file
+                            bump_clear(&globs.ctrlInfo.replayArena);
+                            memset(&globs.ctrlInfo.replayTable.props, 0, sizeof(globs.ctrlInfo.replayTable.props));
+                            globs.ctrlInfo.replayTable.propCount = 0;
+                            loadReplay(&globs.ctrlInfo.replayTable);
+                            globs.table = globs.ctrlInfo.replayTable;
+                        }
 
+                        a = blu_areaMake("nav", blu_areaFlags_DRAW_BACKGROUND |
+                                                blu_areaFlags_HOVER_ANIM |
+                                                blu_areaFlags_CLICKABLE |
+                                                blu_areaFlags_DRAW_TEXT |
+                                                blu_areaFlags_CENTER_TEXT);
+                        a->style.backgroundColor = v4f_lerp(col_darkBlue, col_darkGray, a->target_hoverAnim);
+                        blu_WidgetInteraction i = blu_interactionFromWidget(a);
+                        if(i.held) {
+                            a->cursor = blu_cursor_resizeH;
+                            globs.curTime += i.dragDelta.x * 0.01f;
+
+                            for(int i = 0; i < globs.table.propCount; i++) {
+                                net_PropSample* sample = globs.ctrlInfo.replayTable.props[i].firstPt;
+
+                                // CLEANUP: inline traversal
+                                while(sample) {
+                                    if(sample->timeStamp < globs.curTime) {
+                                        break; }
+                                    sample = sample->next;
+                                }
+                                globs.table.props[i].firstPt = sample;
+                            }
+                        }
+                        blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%f"), globs.curTime));
                     }
                 }
             } // end right side
@@ -1056,6 +1152,8 @@ void draw_network(NetInfo* info) {
 
             for(int i = 0; i < globs.table.propCount; i++) {
                 net_Prop* prop = &globs.table.props[i];
+                if(!prop->firstPt) { continue; }
+
                 str quotedName = str_format(globs.scratch, STR("\"%s\""), prop->name);
 
                 blu_Area* parent = blu_areaMake(str_format(globs.scratch, STR("%i"), i), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
@@ -1188,7 +1286,9 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) 
     globs.scratch = scratch;
     globs.window = window;
     globs.dt = dt;
-    globs.curTime = curTime;
+    if(globs.ctrlInfo.usingSockets) {
+        globs.curTime = curTime;
+    }
 
     blu_Area* a;
 
@@ -1301,4 +1401,5 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) 
         s = globs.ctrlInfo.sim? STR("localhost") : STR("10.45.36.2");
     }
     nets_update(&globs.table, (F32)curTime, s);
+
 }

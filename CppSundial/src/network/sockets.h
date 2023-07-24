@@ -301,6 +301,21 @@ net_PropSample* _nets_registerSample(net_Table* table, str propName, net_PropTyp
         prop = ARR_APPEND(table->props, table->propCount, net_Prop());
         prop->name = str_copy(propName, &globs.res);
         prop->type = type;
+
+        StrList log = StrList();
+        str_listAppend(&log, STR("p "), globs.scratch);
+        str_listAppend(&log, prop->name, globs.scratch);
+        str_listAppend(&log, STR(" "), globs.scratch);
+        str s;
+        if(prop->type == net_propType_S32) { s = STR("s32"); }
+        else if(prop->type == net_propType_F64) { s = STR("f64"); }
+        else if(prop->type == net_propType_BOOL) { s = STR("bool"); }
+        else if(prop->type == net_propType_STR) { s = STR("str"); }
+        else { ASSERT(false); }
+        str_listAppend(&log, s, globs.scratch);
+        str_listAppend(&log, STR("\n"), globs.scratch);
+        str fin = str_listCollect(log, globs.scratch);
+        fwrite(fin.chars, 1, fin.length, globs.logFile);
     }
 
 
@@ -336,6 +351,7 @@ void _nets_logUpdate(net_Prop* prop) {
     net_PropSample* sample = prop->firstPt;
 
     StrList entry = StrList();
+    str_listAppend(&entry, STR("u "), globs.scratch);
     str_listAppend(&entry, prop->name, globs.scratch);
     str_listAppend(&entry, STR(" "), globs.scratch);
     str_listAppend(&entry, str_format(globs.scratch, STR("%f "), sample->timeStamp), globs.scratch);
@@ -380,6 +396,7 @@ void _nets_processMessage(U8 isEvent, str name, U8* data, U8 dataType, U32 dataS
     else if(dataType == net_propType_STR) {
         sample->str = { (const U8*)data, dataSize };
         sample->str = str_copy(sample->str, BUMP_PUSH_ARR(&globs.res, dataSize, U8));
+        _nets_logUpdate(net_getProp(name, table));
         return;
     }
 
@@ -533,6 +550,7 @@ void nets_update(net_Table* table, float curTime, str targetIp) {
 
 void nets_cleanup() {
     printf("[QUIT]\n");
+    fclose(globs.logFile);
     _nets_sockCloseFree(&globs.simSocket);
     WSACleanup();
 }
