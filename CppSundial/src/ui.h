@@ -483,6 +483,9 @@ void loadReplay(net_Table* table) {
     }
 }
 
+// TODO: fix state bugs switching between sim and not sim
+// TODO: add pause/play button
+
 void draw_controls(ControlsInfo* info) {
 
     blu_Area* a;
