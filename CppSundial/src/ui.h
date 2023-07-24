@@ -45,8 +45,6 @@ void initGraph2dInfo(Graph2dInfo* info) {
     info->keys[1].str = str_copy(STR("FLSteerPos"), info->keys[1].chars);
 
     info->colors[2] = col_purple;
-    info->keys[2].str = str_copy(STR("FRSteerSpeed"), info->keys[2].chars);
-
     info->colors[3] = col_yellow;
     info->colors[4] = col_black;
     info->colors[5] = col_white;
@@ -776,6 +774,17 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target) {
         b->model = temp * t;
         b->srcStart = V2f(0, pos);
         b->srcEnd = V2f(1, pos - 1);
+
+
+        // forward arrow
+        b = gfx_registerCall(p);
+        b->texture = globs.solidTex;
+        matrixTranslation(0, 0.75, 0, temp);
+        t = temp * t;
+        matrixScale(0.1, 0.1, 0, temp);
+        t = temp * t;
+        b->model = t;
+
     }
 
 
