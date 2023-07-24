@@ -75,11 +75,9 @@ class SwerveBot(wpilib.TimedRobot):
             self.server.putUpdate(prefs[i] + "SteerSpeed", self.steerMotors[i].get())
             self.server.putUpdate(prefs[i] + "SteerPos", self.steerEncoders[i].getPosition())
 
-        self.server.putUpdate("posX", self.sim.position.x)
-        self.server.putUpdate("posY", self.sim.position.y)
+        self.server.putUpdate("posX", float(self.sim.position.x))
+        self.server.putUpdate("posY", float(self.sim.position.y))
         self.server.putUpdate("yaw", self.gyro.getYaw())
-
-        self.server.putUpdate("test", int(420))
 
         estimatedPose = self.estimator.update(self.time.timeSinceInit, self.gyro.getYaw(),
             [self.driveEncoders[i].getPosition() * WHEEL_CIRC for i in range(0, 4)],

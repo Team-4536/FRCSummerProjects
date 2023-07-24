@@ -12,7 +12,7 @@
 #include "base/utils.h"
 #include "graphics.h"
 #include "blue/blue.h"
-#include "network/network.h"
+#include "network/sockets.h"
 
 #include "ui.h"
 
@@ -40,9 +40,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 int main() {
 
 
-    BumpAlloc lifetimeArena;
     BumpAlloc frameArena;
-    bump_allocate(&lifetimeArena, 1000000);
     bump_allocate(&frameArena, 10000000);
 
 
@@ -108,9 +106,8 @@ int main() {
     blu_init(solidTex);
     blu_loadFont("C:/windows/fonts/consola.ttf");
 
-    ui_init(&frameArena, &lifetimeArena, solidTex);
-    net_init();
-    net_setTargetIp(STR("localhost"));
+    nets_init(&frameArena);
+    ui_init(&frameArena, solidTex);
 
 
     gfx_Shader* blueShader;
@@ -186,11 +183,14 @@ int main() {
         bool leftPressed = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)? true : false;
 
         blu_beginFrame();
-        ui_update(&frameArena, &lifetimeArena, window, dt);
+
+
+        ui_update(&frameArena, window, dt, time);
+
 
         blu_layout(V2f(w, h));
 
-        blu_Cursor c;
+        blu_Cursor c, frame;
         blu_input(V2f((F32)mx, (F32)my), leftPressed, windowScrollDelta, &c);
         if(c == blu_cursor_norm) { glfwSetCursor(window, nullptr); }
         else if(c == blu_cursor_hand) { glfwSetCursor(window, handCursor); }
@@ -206,14 +206,12 @@ int main() {
             matrixOrtho(0, w, h, 0, 0.0001, 10000, vp);
             gfx_Pass* p = gfx_registerPass();
             p->shader = blueShader;
-            p->passUniforms = gfx_UniformBlock();
             p->passUniforms.vp = vp;
 
             blu_makeDrawCalls(p);
         }
 
         gfx_drawPasses(w, h);
-        net_update(&frameArena, (F32)time);
         bump_clear(&frameArena);
         windowScrollDelta = 0;
         glfwSwapBuffers(window);
@@ -221,7 +219,7 @@ int main() {
     }
 
 
-    net_cleanup();
+    nets_cleanup();
     glfwDestroyWindow(window);
     glfwTerminate();
 

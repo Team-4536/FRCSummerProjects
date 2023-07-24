@@ -262,6 +262,8 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area);
 #define blu_parentScope(parent) blu_deferLoop(blu_pushParent(parent), blu_popParent())
 
 
+#define BLU_FONT_SIZE 20 // in px
+
 #ifdef BLU_IMPL
 
 #include "base/hashtable.h"
@@ -271,7 +273,6 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area);
 
 
 // CLEANUP: these
-#define BLU_FONT_SIZE 20 // in px
 #define BLU_FONT_FIRST 32 // fist char in font, 32 = space
 #define BLU_FONT_CHARCOUNT 96
 
@@ -511,7 +512,7 @@ blu_Area* blu_areaMake(str string, U32 flags) {
     area->flags = flags;
     area->lastTouchedIdx = globs.frameIndex;
 
-    // blu_areaAddDisplayStr(area, string);
+    blu_areaAddDisplayStr(area, string);
 
     return area;
 }
@@ -1133,7 +1134,7 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
                     out.dropped = true;
                 }
 
-                out.dropType = globs.prevDragged->dropTypeMask;
+                out.dropType = globs.prevDragged->dropType;
                 out.dropVal = globs.prevDragged->dropVal;
             }
         }
