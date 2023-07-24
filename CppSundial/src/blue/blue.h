@@ -281,8 +281,6 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area);
 #define BLU_MAX_AREA_COUNT 10000
 #define BLU_MAX_ARENA_SIZE 1000000
 
-#define BLU_STANDALONE_SCALE 2.0f
-
 
 
 // NOTE: units in pixels, except the UVs
@@ -620,7 +618,6 @@ void __blu_calculateStandaloneSizesRecurse(blu_Area* parent, int axis) {
     while(elem) {
         if(elem->style.sizes[axis].kind == blu_sizeKind_PX) {
             elem->calculatedSizes[axis] = elem->style.sizes[axis].value;
-            elem->calculatedSizes[axis] *= BLU_STANDALONE_SCALE;
         }
         else if(elem->style.sizes[axis].kind == blu_sizeKind_TEXT) {
 
@@ -630,7 +627,6 @@ void __blu_calculateStandaloneSizesRecurse(blu_Area* parent, int axis) {
             float pad = elem->style.textPadding.x * 2;
             if(axis == blu_axis_Y) { pad = elem->style.textPadding.y * 2; }
             elem->calculatedSizes[axis] = _blu_sizeOfString(elem->displayString, axis) + pad;
-            elem->calculatedSizes[axis] *= BLU_STANDALONE_SCALE;
         }
 
         __blu_calculateStandaloneSizesRecurse(elem, axis);

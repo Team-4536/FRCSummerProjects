@@ -85,6 +85,7 @@ struct ControlsInfo {
     // NOTE: socket connection is reactive to these, no updates need to happen in user code
     bool usingSockets = true;
     bool sim = true;
+
     BumpAlloc replayArena;
     net_Table replayTable;
 };
@@ -469,7 +470,7 @@ void loadReplay(net_Table* table) {
             const char* arg = (const char*)split[3].chars;
             if(p->type == net_propType_S32) { sample->s32 = atoi(arg); }
             else if(p->type == net_propType_F64) { sample->f64 = atof(arg); }
-            else if(p->type == net_propType_STR) { sample->str = str_copy(split[2], &globs.ctrlInfo.replayArena); }
+            else if(p->type == net_propType_STR) { sample->str = str_copy(split[3], &globs.ctrlInfo.replayArena); }
             else if(p->type == net_propType_BOOL) {
                 bool end;
                 if(str_compare(split[3], STR("true"))) { sample->boo = true; }
@@ -560,11 +561,13 @@ void draw_controls(ControlsInfo* info) {
                     }
                     else {
                         if(makeButton(STR("load"), col_lightGray).clicked) {
-                            //load save file
                             bump_clear(&globs.ctrlInfo.replayArena);
                             memset(&globs.ctrlInfo.replayTable.props, 0, sizeof(globs.ctrlInfo.replayTable.props));
                             globs.ctrlInfo.replayTable.propCount = 0;
+
                             loadReplay(&globs.ctrlInfo.replayTable);
+
+                            globs.curTime = 0;
                             globs.table = globs.ctrlInfo.replayTable;
                         }
 
@@ -578,18 +581,6 @@ void draw_controls(ControlsInfo* info) {
                         if(i.held) {
                             a->cursor = blu_cursor_resizeH;
                             globs.curTime += i.dragDelta.x * 0.01f;
-
-                            for(int i = 0; i < globs.table.propCount; i++) {
-                                net_PropSample* sample = globs.ctrlInfo.replayTable.props[i].firstPt;
-
-                                // CLEANUP: inline traversal
-                                while(sample) {
-                                    if(sample->timeStamp < globs.curTime) {
-                                        break; }
-                                    sample = sample->next;
-                                }
-                                globs.table.props[i].firstPt = sample;
-                            }
                         }
                         blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%f"), globs.curTime));
                     }
@@ -1286,9 +1277,11 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) 
     globs.scratch = scratch;
     globs.window = window;
     globs.dt = dt;
+
     if(globs.ctrlInfo.usingSockets) {
         globs.curTime = curTime;
     }
+    float prevTime = globs.curTime;
 
     blu_Area* a;
 
@@ -1390,6 +1383,25 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) 
             blu_styleScope(blu_Style()) {
             blu_style_sizeY({blu_sizeKind_PX, globs.downSizeR });
                 makeView("bottom", &globs.views[3]);
+            }
+        }
+    }
+
+
+
+
+    if(!globs.ctrlInfo.usingSockets) {
+        if(globs.curTime != prevTime) {
+            for(int i = 0; i < globs.ctrlInfo.replayTable.propCount; i++) {
+                net_PropSample* sample = globs.ctrlInfo.replayTable.props[i].firstPt;
+
+                // CLEANUP: inline traversal
+                while(sample) {
+                    if(sample->timeStamp < globs.curTime) {
+                        break; }
+                    sample = sample->next;
+                }
+                globs.table.props[i].firstPt = sample;
             }
         }
     }
