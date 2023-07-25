@@ -9,6 +9,7 @@ import inputs
 from telemetryHelp import publishExpression
 import sim
 import timing
+from real import V2f
 
 
 
@@ -29,6 +30,10 @@ class Flymer(wpilib.TimedRobot):
         self.FRDrive = rev.CANSparkMax(1, brushlessMotor)
         self.BLDrive = rev.CANSparkMax(3, brushlessMotor)
         self.BRDrive = rev.CANSparkMax(2, brushlessMotor)
+
+        self.absoluteDrive = False #default is off, hit X to toggle
+
+        self.turningScalar = .2 #change for comp to about .3
 
         self.liftMotor = rev.CANSparkMax(7, brushedMotor)
         self.retractMotor = rev.CANSparkMax(6, brushedMotor)
@@ -84,13 +89,46 @@ class Flymer(wpilib.TimedRobot):
         self.telemTable.putBoolean("grabber", True if self.grabber.get() == wpilib.DoubleSolenoid.Value.kForward else False)
         self.telemTable.putBoolean("brakes", True if self.brakes.get() == wpilib.DoubleSolenoid.Value.kForward else False)
 
+        self.telemTable.putNumber("Gyro", self.gyro.getYaw())
+        self.telemTable.putBoolean("AbsoluteDrive", self.absoluteDrive)
+
+
+
+
+    def teleopInit(self) -> None:
+
+        self.gyro.reset()
+
+
+
+
+
     def teleopPeriodic(self) -> None:
 
         self.input = inputs.FlymerInputs(self.driveCtrlr, self.armCtrlr)
+        self.leftStickVector = V2f(self.input.driveX, self.input.driveY).rotateDegrees(-self.gyro.getYaw())
 
-        self.driveSpeeds = drive.mechController(self.input.driveX, self.input.driveY, self.input.turning)
-        self.driveSpeeds = drive.scaleSpeeds(self.driveSpeeds, 0.2)
+        speedControl = self.input.speedControl
+
+        if self.input.absoluteDriveToggle:
+            self.absoluteDrive = not self.absoluteDrive
+
+        if speedControl > .8:
+            speedControl = 1
+
+        if self.absoluteDrive:
+            self.driveSpeeds = drive.mechController(self.leftStickVector.x * speedControl, self.leftStickVector.y * speedControl, self.input.turning * self.turningScalar)
+        else:
+            self.driveSpeeds = drive.mechController(self.input.driveX * speedControl, self.input.driveY * speedControl, self.input.turning * self.turningScalar)
+
+        if self.input.speedControl > .7:
+            self.input.speedControl = 1
+
+        # self.driveSpeeds = drive.scaleSpeeds(self.driveSpeeds, 0.3)
         drive.setMotors(self.driveSpeeds, self.FLDrive, self.FRDrive, self.BLDrive, self.BRDrive)
+
+        if self.input.gyroReset:
+            self.gyro.reset()
 
         self.liftMotor.set(self.input.lift * 0.4)
         self.retractMotor.set(self.input.retract * 0.5)

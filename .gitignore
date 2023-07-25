@@ -9,5 +9,5 @@ CppSundial/sunLog.log
 
 *.o
 *.exe
-
+*.log
 

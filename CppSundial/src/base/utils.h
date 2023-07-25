@@ -154,6 +154,7 @@ V4f v4f_lerp(V4f a, V4f b, F32 t);
 
 inline void operator-=(V4f& a, const V4f& b) { a = a - b; }
 inline void operator+=(V4f& a, const V4f& b) { a = a + b; }
+inline void operator*=(V4f& a, const V4f& b) { a = a * b; }
 
 // CLEANUP: V4 operators not done lol
 inline V4f operator*(const V4f& a, F32 b) {

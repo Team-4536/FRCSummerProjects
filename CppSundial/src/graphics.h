@@ -179,7 +179,7 @@ bool gfx_loadOBJMesh(const char* path, BumpAlloc* scratch, gfx_VertexArray** out
 #include "stb_image/stb_image.h"
 #include <stdio.h>
 
-#define MAX_DRAW_CALL_COUNT 4000
+#define MAX_DRAW_CALL_COUNT 6000
 #define MAX_PASS_COUNT 16
 #define RES_SIZE 1000000
 
@@ -315,10 +315,10 @@ gfx_Texture* gfx_registerTexture(U8* data, int width, int height, gfx_TexPxType 
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     // NOTE: for pixely looks again, use -> GL_NEAREST as the mag/min filter
 
 

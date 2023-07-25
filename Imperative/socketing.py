@@ -33,13 +33,13 @@ class Server():
 
     inst = None
 
-    def __init__(self) -> None:
+    def __init__(self, isReal: bool) -> None:
 
         self.telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
 
-        # TODO: host from actual robot
         self.servSock = socket.socket(socket.AddressFamily.AF_INET, socket.SOCK_STREAM)
-        self.servSock.bind(("localhost", 7000))
+        if(not isReal): self.servSock.bind(("localhost", 7000))
+        else: self.servSock.bind(("10.45.36.2", 7000))
         self.servSock.listen(1) # client backlog
         self.servSock.setblocking(False)
 
@@ -101,7 +101,14 @@ class Server():
                 rlist, wlist, elist = select.select([self.cliSock], [], [], 0)
                 if(len(rlist) != 0):
 
-                    r = self.cliSock.recv(1024, 0)
+                    try:
+                        r = self.cliSock.recv(1024, 0)
+                    except Exception as e:
+                        self.cliSock.close()
+                        self.cliSock = None
+                        print(f"[SOCKETS] Client disconnected.")
+                        break
+
                     if(len(r) == 0):
                         self.cliSock.close()
                         self.cliSock = None
@@ -118,7 +125,6 @@ class Server():
                 self.recvBuf = self.recvBuf[consumed:]
 
                 if(msg != None):
-                    print("Message got")
                     if(msg.kind == MessageKind.UPDATE):
                         self.tracked.update({ msg.name : msg.data })
                     elif(msg.kind == MessageKind.EVENT):
@@ -156,7 +162,7 @@ class Server():
             # https://docs.python.org/3/library/struct.html
             valEncoded += struct.pack("!l", value)
 
-        elif(type(value) == float or type(value) == numpy.float64):
+        elif(type(value) == float or type(value) == numpy.float64 or type(value) == numpy.float32):
             valType = PropType.F64
             valEncoded += struct.pack("!d", value)
 
@@ -176,7 +182,7 @@ class Server():
 
 
         content += struct.pack("!B", kind.value)
-        # TODO: message name len capped at 255, bad for events
+        # TODO: data len capped at 255, bad for events
         content += struct.pack("!B", len(name))
         content += struct.pack("!B", valType.value)
         content += struct.pack("!B", len(valEncoded))
