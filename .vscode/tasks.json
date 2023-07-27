@@ -4,48 +4,21 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Run Py Sundial",
+            "label": "Run Sundial",
             "type": "shell",
             "command": "py -3 sundial/src/main.py",
             "problemMatcher": []
         },
-
         {
-            "label": "Build CSundial",
-            "group": "build",
+            "label": "Run robot sim",
             "type": "shell",
-            "options": { "cwd": "${workspaceFolder}\\cppsundial" },
-            "command": "build\\build.cmd",
+            "command": "py -3 robot/robot.py sim",
             "problemMatcher": []
         },
         {
-            "label": "Build CSundial dependencies",
-            "group": "build",
+            "label": "DEPLOY FLYMER HERE THIS ONE",
             "type": "shell",
-            "options": { "cwd": "${workspaceFolder}\\cppsundial" },
-            "command": "build\\builddeps.cmd",
-            "problemMatcher": []
-        },
-        {
-            "options": {
-                "shell": {
-                    "executable": "cmd.exe",
-                    "args": [
-                        "/d",
-                        "/c"
-                    ]
-                },
-                "cwd": "${workspaceFolder}\\cppsundial"
-            },
-            "label": "Build and run CSundial",
-            "group": {
-                "kind": "none"
-            },
-            "type": "shell",
-            "command": "build\\run.cmd",
-            "dependsOn": [
-                "Build CSundial"
-            ],
+            "command": "py -3 imperative/flymer.py deploy --nonstandard",
             "problemMatcher": []
         },
     ]
