@@ -857,6 +857,8 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
         draw_line(p, 1, col_darkGray, { 0, offset }, { width, offset });
         draw_line(p, 1, col_darkGray, { 0, offset + 1*scale}, { width, offset + 1*scale });
         draw_line(p, 1, col_darkGray, { 0, offset - 1*scale}, { width, offset - 1*scale });
+        V2f mousePos = blu_interactionFromWidget(a).mousePos;
+        draw_line(p, 1, col_darkGray, { mousePos.x, 0 }, { mousePos.x, height });
 
 
 

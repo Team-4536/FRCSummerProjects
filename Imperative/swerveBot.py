@@ -10,11 +10,13 @@ from swerveController import SwerveController
 from telemetryHelp import publishExpression
 from virtualGyro import VirtualGyro
 from swerveEstimation import SwerveEstimator
+from wpimath.controller import RamseteController
 import socketing
 import sim
 import timing
 from paths import getSpline2dPoints, getLinear2dPoints
 import wpimath.system.plant as plant
+from wpimath.geometry import Pose2d, Rotation2d
 
 
 WHEEL_DIA = 0.1016 # 4 in. in meters
@@ -144,8 +146,9 @@ class SwerveBot(wpilib.TimedRobot):
             V2f(0, 0), V2f(0.5, 90), V2f(1, -90)
         ], pointCount)
 
-
         self.pathIdx = 0
+
+        self.ramsete = RamseteController()
 
     def autonomousPeriodic(self) -> None:
 
@@ -153,21 +156,29 @@ class SwerveBot(wpilib.TimedRobot):
         if(self.pathIdx >= len(self.path)):
             self.pathIdx = 99
 
-        pose = self.estimator.estimatedPose
+        position = self.estimator.estimatedPose
 
         nextPt = self.path[self.pathIdx]
+        self.server.putUpdate("targetX", nextPt.x)
+        self.server.putUpdate("targetY", nextPt.y)
         speed = self.speedPath[self.pathIdx]
-        diff = (nextPt - pose)
-        if(diff.getLength() > 1): diff = diff.getNormalized()
-        move = diff * speed
+        self.server.putUpdate("targetSpeed", speed)
 
         nextAngle = self.anglePath[self.pathIdx]
-        turn = angleWrap(nextAngle - self.gyro.getYaw()) * 0.07
+        self.server.putUpdate("targetAngle", nextAngle)
 
-        if((pose - nextPt).getLength() < 0.6): self.pathIdx += 1
+        currentPose = Pose2d(position.x, position.y, math.radians(-self.gyro.getYaw()))
+        targetPose = Pose2d(nextPt.x, nextPt.y, math.radians(-nextAngle))
+        linVel = speed # m/s
+        angularVel = 1 # rads/s
+        out = self.ramsete.calculate(currentPose, targetPose, linVel, angularVel)
 
+        self.swerveController.tick(self.gyro.getYaw(), out.vx, out.vy, -math.degrees(out.omega), self.time.dt, False)
+        self.server.putUpdate("outX", out.vx)
+        self.server.putUpdate("outY", out.vy)
+        self.server.putUpdate("outA", -math.degrees(out.omega))
 
-        self.swerveController.tick(self.gyro.getYaw(), move.x, move.y, turn, self.time.dt, False)
+        if((position - nextPt).getLength() < 0.6): self.pathIdx += 1
 
 
 
