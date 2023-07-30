@@ -739,10 +739,11 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target) {
         net_getSample(STR("BRDrivePos"), net_propType_F64, &globs.table)
     };
 
-    net_PropSample* angle = net_getSample(STR("yaw"), net_propType_F64, &globs.table);
+    net_PropSample* angleSample = net_getSample(STR("yaw"), net_propType_F64, &globs.table);
+    float angle = 90;
+    if(angleSample) { angle += (F32)(angleSample->f64); }
 
     Mat4f temp;
-
 
     for(int i = 0; i < 4; i++) {
 
@@ -754,10 +755,8 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target) {
             t = temp * t;
         }
 
-        if(angle) {
-            matrixZRotation(-(F32)angle->f64, temp);
-            t = t * temp;
-        }
+        matrixZRotation(-angle, temp);
+        t = t * temp;
 
         // wheel
         gfx_UniformBlock* b = gfx_registerCall(p);
@@ -790,12 +789,9 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target) {
 
     }
 
-
-
     gfx_UniformBlock* b = gfx_registerCall(p);
     b->texture = globs.arrowTex;
-    if(angle) {
-        matrixZRotation(-(F32)angle->f64, b->model); }
+    matrixZRotation(-angle, b->model);
 
     matrixScale((F32)globs.arrowTex->width / globs.arrowTex->height, 1, 1, temp);
     b->model = temp * b->model;
@@ -857,8 +853,10 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
         draw_line(p, 1, col_darkGray, { 0, offset }, { width, offset });
         draw_line(p, 1, col_darkGray, { 0, offset + 1*scale}, { width, offset + 1*scale });
         draw_line(p, 1, col_darkGray, { 0, offset - 1*scale}, { width, offset - 1*scale });
-        V2f mousePos = blu_interactionFromWidget(a).mousePos;
-        draw_line(p, 1, col_darkGray, { mousePos.x, 0 }, { mousePos.x, height });
+
+        if(inter.hovered) {
+            draw_line(p, 1, col_darkGray, { inter.mousePos.x, 0 }, { inter.mousePos.x, height });
+        }
 
 
 
