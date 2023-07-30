@@ -17,6 +17,7 @@ import timing
 from paths import getSpline2dPoints, getLinear2dPoints
 import wpimath.system.plant as plant
 from wpimath.geometry import Pose2d, Rotation2d
+from wpimath.kinematics import ChassisSpeeds
 
 
 WHEEL_DIA = 0.1016 # 4 in. in meters
@@ -119,7 +120,7 @@ class SwerveBot(wpilib.TimedRobot):
             self.steerMotors,
             self.steerEncoders,
             self.gyro,
-            [ V2f(-1, 1), V2f(1, 1), V2f(-1, -1), V2f(1, -1) ],
+            [ V2f(1, 1), V2f(1, -1), V2f(-1, 1), V2f(-1, -1) ], # NOTE: left is forward, so FL should be up and right in world coords
             WHEEL_CIRC
         )
 
@@ -173,7 +174,6 @@ class SwerveBot(wpilib.TimedRobot):
         angularVel = 1 # rads/s
         out = self.ramsete.calculate(currentPose, targetPose, linVel, angularVel)
 
-        self.swerveController.tick(self.gyro.getYaw(), out.vx, out.vy, -math.degrees(out.omega), self.time.dt, False)
         self.server.putUpdate("outX", out.vx)
         self.server.putUpdate("outY", out.vy)
         self.server.putUpdate("outA", -math.degrees(out.omega))
@@ -186,17 +186,18 @@ class SwerveBot(wpilib.TimedRobot):
     def teleopPeriodic(self) -> None:
 
         self.input = FlymerInputs(self.driveCtrlr, self.armCtrlr)
+        self.server.putUpdate("driveX", self.input.driveX)
+        self.server.putUpdate("driveY", self.input.driveY)
+        self.server.putUpdate("turning", self.input.turning)
 
+        drive = V2f(self.input.driveX, self.input.driveY)
+        drive = drive.rotateDegrees(-self.gyro.getYaw() - 90)
         self.swerveController.tick(
-            self.gyro.getYaw(),
-            self.input.driveX,
-            self.input.driveY,
+            drive.x,
+            drive.y,
             self.input.turning,
             self.time.dt,
             self.input.brakeToggle)
-
-
-
 
 
 

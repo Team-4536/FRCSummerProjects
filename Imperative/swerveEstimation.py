@@ -47,28 +47,8 @@ class SwerveEstimator:
             self.wheelStates[i].angle = Rotation2d(-math.radians(anglesDEGCW[i]))
             self.wheelStates[i].distance = positionsM[i]
 
-
         nPose = self.est.updateWithTime(curTime, r, self.wheelStates)
-
-        posePos = [
-            [ 1, 0, 0, 0 ],
-            [ 0, 1, 0, 0 ],
-            [ 0, 0, 1, 0 ],
-            [ nPose.X(), nPose.Y(), 0, 1 ],
-        ]
-
-        # matrix to move from WPI coords to normal ppl coords
-        # CW+, X right, y up/forward
-        transform = [
-            [ 0, 1, 0, 0 ],
-            [-1, 0, 0, 0 ],
-            [ 0, 0, 1, 0 ],
-            [ 0, 0, 0, 1 ]
-        ]
-
-        transformed = numpy.matmul(posePos, transform)
-
-        self.estimatedPose = V2f(transformed[3][0], transformed[3][1])
+        self.estimatedPose = V2f(nPose.X(), nPose.Y())
         return self.estimatedPose
 
 # TODO: reset button from sundial

@@ -90,7 +90,7 @@ class SwerveSim:
 
             sim.state[1] *= 0.5
 
-            self.posDeltas.append((V2f(0, 1) * driveDelta).rotateDegrees(steerPos))
+            self.posDeltas.append((V2f(1, 0) * driveDelta).rotateDegrees(steerPos))
 
         posChange = (self.posDeltas[0] + self.posDeltas[1] + self.posDeltas[2] + self.posDeltas[3]) / 4
         self.position += posChange.rotateDegrees(self.rotation)

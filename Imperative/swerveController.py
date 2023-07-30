@@ -36,11 +36,10 @@ class SwerveController:
         self.turnEncoders = turnEncoders
         self.driveEncoders = driveEncoders
 
-    def tick(self, yaw, inputX, inputY, inputZ, dt, brakeButtonPressed) -> None:
-
-        # Y = Up/Down
-        # X = Left/Right
-        # Z = Turning
+    # Y = forward/back
+    # X = Left/Right
+    # Z = Turning, CW+
+    def tick(self, inputX, inputY, inputZ, dt, brakeButtonPressed) -> None:
 
         #brake input toggle
         if brakeButtonPressed == True:
@@ -53,9 +52,6 @@ class SwerveController:
         FRTurningVector = V2f(math.cos(45) * inputZ, -math.cos(45) * inputZ)
         BLTurningVector = V2f(-math.cos(45) * inputZ, math.cos(45) * inputZ)
         BRTurningVector = V2f(-math.cos(45) * inputZ, -math.cos(45) * inputZ)
-
-        #field oriented offset
-        leftStick = leftStick.rotateDegrees(-yaw)
 
         #joystick scalar (adjusts speed depending on how far you move the joysticks)
         inputScalar = leftStick.getLength() + abs(inputZ)
