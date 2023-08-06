@@ -32,8 +32,8 @@ struct Graph2dInfo {
     NTKey keys[GRAPH2D_LINECOUNT] = { 0 };
     V4f colors[GRAPH2D_LINECOUNT];
 
-    float yScale = 100;
-    float yOffset = 0;
+    float top = 0.9;
+    float bottom = -0.9;
 };
 void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target);
 void initGraph2dInfo(Graph2dInfo* info) {
@@ -225,6 +225,7 @@ static struct UIGlobs {
 
     gfx_Shader* sceneShader3d = nullptr;
     gfx_Shader* sceneShader2d = nullptr;
+    gfx_Shader* lineShader = nullptr;
     gfx_Texture* solidTex;
 
     float rightSize;
@@ -241,6 +242,9 @@ static struct UIGlobs {
     gfx_IndexBuffer* robotIB = nullptr;
     gfx_VertexArray* fieldVA = nullptr;
     gfx_IndexBuffer* fieldIB = nullptr;
+
+    gfx_VertexArray* lineVA = nullptr;
+    gfx_IndexBuffer* lineIB = nullptr;
 
     gfx_Texture* fieldTex = nullptr;
 
@@ -363,6 +367,9 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
     globs.arrowTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
 
 
+    globs.lineVA = gfx_registerVertexArray(gfx_vtype_POS2F, nullptr, 0, true);
+    globs.lineIB = gfx_registerIndexBuffer(nullptr, 0, true);
+
 
     globs.sceneShader2d = gfx_registerShader(gfx_vtype_POS2F_UV, "res/shaders/2d.vert", "res/shaders/2d.frag", frameArena);
 
@@ -418,6 +425,19 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
         gfx_bindIndexBuffer(pass, uniforms->ib);
     };
 
+
+    globs.lineShader = gfx_registerShader(gfx_vtype_POS2F, "res/shaders/line.vert", "res/shaders/line.frag", frameArena);
+    globs.lineShader->passUniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
+        int loc = glGetUniformLocation(pass->shader->id, "uVP");
+        glUniformMatrix4fv(loc, 1, false, &(uniforms->vp)[0]);
+    };
+    globs.lineShader->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
+        int loc = glGetUniformLocation(pass->shader->id, "uColor");
+        glUniform4f(loc, uniforms->color.x, uniforms->color.y, uniforms->color.z, uniforms->color.w);
+
+        gfx_bindVertexArray(pass, uniforms->va);
+        gfx_bindIndexBuffer(pass, uniforms->ib);
+    };
 }
 
 
@@ -484,6 +504,8 @@ void loadReplay(net_Table* table) {
 }
 
 // TODO: fix state bugs switching between sim and not sim
+    // segfault because of failing to update table
+    // faulty connection indicator because of the same issue
 // TODO: add pause/play button
 
 void draw_controls(ControlsInfo* info) {
@@ -802,22 +824,6 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target) {
 
 
 
-void draw_line(gfx_Pass* p, float thickness, V4f color, V2f start, V2f end) {
-    gfx_UniformBlock* b = gfx_registerCall(p);
-    b->texture = globs.solidTex;
-    b->color = color;
-
-    Transform t;
-
-    V2f center = (start+end) / 2;
-    t.x = center.x;
-    t.y = center.y;
-    t.sx = (end-start).length();
-    t.sy = 2;
-    t.rz = -v2fAngle(end-start);
-    b->model = matrixTransform(t);
-}
-
 void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
 
     blu_Area* a = blu_areaMake("graph2d", blu_areaFlags_DRAW_BACKGROUND);
@@ -835,21 +841,24 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
 
         gfx_Pass* p = gfx_registerPass();
         p->target = target;
-        p->shader = globs.sceneShader2d;
-        matrixOrtho(0, width, height, 0, 0, 100, p->passUniforms.vp);
-
+        p->isLines = true;
+        p->shader = globs.lineShader;
 
         blu_WidgetInteraction inter = blu_interactionFromWidget(a);
-        info->yScale += info->yScale * -inter.scrollDelta * 0.1;
-        info->yScale = max(0.001, info->yScale);
-        info->yOffset += inter.dragDelta.y;
 
-        float scale = -info->yScale;
-        float offset = info->yOffset + height/2;
-        float pointGap = width / (float)GRAPH2D_VCOUNT;
+        V2f change = V2f(-inter.dragDelta.y * 0.01);
+        info->top += change.x;
+        info->bottom += change.y;
+        // printf("%f, %f", info->top, info->bottom);
+        matrixOrtho(0, 1, info->bottom, info->top, 0, 100, p->passUniforms.vp);
+
+
+
+        float pointGap = 1 / (float)GRAPH2D_VCOUNT;
         float sampleGap = GRAPH2D_SAMPLE_WINDOW / GRAPH2D_VCOUNT;
 
-        // TODO: batch line calls
+        /*
+        // TODO: proper grid lines
         draw_line(p, 1, col_darkGray, { 0, offset }, { width, offset });
         draw_line(p, 1, col_darkGray, { 0, offset + 1*scale}, { width, offset + 1*scale });
         draw_line(p, 1, col_darkGray, { 0, offset - 1*scale}, { width, offset - 1*scale });
@@ -857,19 +866,21 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
         if(inter.hovered) {
             draw_line(p, 1, col_darkGray, { inter.mousePos.x, 0 }, { inter.mousePos.x, height });
         }
-
+        */
 
 
         for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
             if(info->keys[i].str.length == 0) { continue; }
+            float* pts = BUMP_PUSH_ARR(globs.scratch, GRAPH2D_VCOUNT * 2, float);
 
-            // TODO: bool graphing
+            // TODO: int/bool graphing
             float sHeight = 0;
             net_PropSample* sample = net_getSample(info->keys[i].str, net_propType_F64, globs.curTime, &globs.table);
             if(sample) { sHeight = (float)sample->f64; }
-            V2f lastPoint = V2f(width, sHeight * scale + offset);
-            for(int j = 1; j < GRAPH2D_VCOUNT; j++) {
+            pts[0] = 1;
+            pts[1] = sHeight;
 
+            for(int j = 1; j < GRAPH2D_VCOUNT; j++) {
                 V4f color = info->colors[i];
 
                 sHeight = 0;
@@ -884,10 +895,11 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
                 if(sample && sample->boo) { connected = true; }
                 if(sample && !connected) { color *= col_disconnect; }
 
-                V2f point = { width - j*pointGap, sHeight * scale + offset };
-                draw_line(p, 2, color, lastPoint, point);
-                lastPoint = point;
+                pts[j*2]   = 1-(j*pointGap);
+                pts[j*2+1] = sHeight;
             }
+
+            // TODO: make work again
         }
 
 

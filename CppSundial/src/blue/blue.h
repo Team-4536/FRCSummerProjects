@@ -48,6 +48,7 @@ THE CHECKLIST:
     [ ] batching
 
     [ ] documentation and examples
+    [ ] testing?
 
 TESTING CHECKLIST:
 [ ] test hashmap collsions

@@ -72,6 +72,7 @@ struct V2f {
     F32 y = 0;
 
     V2f() { }
+    V2f(F32 s): x(s), y(s) { }
     V2f(F32 x, F32 y): x(x), y(y) { }
     V2f(V2i b): x(b.x), y(b.y) { }
 
