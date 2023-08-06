@@ -37,6 +37,8 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 }
 
 
+gfx_VertexArray* blueVA;
+gfx_IndexBuffer* blueIB;
 int main() {
 
 
@@ -112,28 +114,24 @@ int main() {
 
     gfx_Shader* blueShader;
     {
-        blueShader = gfx_registerShader(gfx_vtype_POS2F_UV, "res/shaders/blue.vert", "res/shaders/blue.frag", &frameArena);
+        U32 ibData[] = { 0, 1, 2,   2, 3, 0 };
+        blueIB = gfx_registerIndexBuffer(ibData, sizeof(ibData) / sizeof(U32), false);
+        F32 vbData[] = { 0, 0,   0, 1,   1, 1,   1, 0 };
+        blueVA = gfx_registerVertexArray(gfx_vtype_POS2F, vbData, sizeof(vbData), false);
 
         // TODO: remove lambdas
+        blueShader = gfx_registerShader(gfx_vtype_POS2F, "res/shaders/blue.vert", "res/shaders/blue.frag", &frameArena);
         blueShader->passUniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
-            int loc;
-
-            loc = glGetUniformLocation(pass->shader->id, "uVP");
+            int loc = glGetUniformLocation(pass->shader->id, "uVP");
             glUniformMatrix4fv(loc, 1, false, &(uniforms->vp)[0]);
-
-            gfx_bindVertexArray(pass, gfx_getQuadVA());
-            gfx_bindIndexBuffer(pass, gfx_getQuadIB());
+            gfx_bindVertexArray(pass, blueVA);
+            gfx_bindIndexBuffer(pass, blueIB);
         };
-
         blueShader->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
-            int loc;
-
-            loc = glGetUniformLocation(pass->shader->id, "uBorderColor");
+            int loc = glGetUniformLocation(pass->shader->id, "uBorderColor");
             glUniform4f(loc, uniforms->borderColor.x, uniforms->borderColor.y, uniforms->borderColor.z, uniforms->borderColor.w);
-
             loc = glGetUniformLocation(pass->shader->id, "uBorderSize");
             glUniform1f(loc, uniforms->borderSize);
-
             loc = glGetUniformLocation(pass->shader->id, "uCornerRadius");
             glUniform1f(loc, uniforms->cornerRadius);
 
@@ -141,12 +139,10 @@ int main() {
             glUniform2f(loc, uniforms->dstStart.x, uniforms->dstStart.y);
             loc = glGetUniformLocation(pass->shader->id, "uDstEnd");
             glUniform2f(loc, uniforms->dstEnd.x, uniforms->dstEnd.y);
-
             loc = glGetUniformLocation(pass->shader->id, "uSrcStart");
             glUniform2f(loc, uniforms->srcStart.x, uniforms->srcStart.y);
             loc = glGetUniformLocation(pass->shader->id, "uSrcEnd");
             glUniform2f(loc, uniforms->srcEnd.x, uniforms->srcEnd.y);
-
             loc = glGetUniformLocation(pass->shader->id, "uClipStart");
             glUniform2f(loc, uniforms->clipStart.x, uniforms->clipStart.y);
             loc = glGetUniformLocation(pass->shader->id, "uClipEnd");

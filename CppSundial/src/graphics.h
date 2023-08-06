@@ -3,11 +3,9 @@
 #include "base/str.h"
 #include "base/utils.h"
 
-
-
 struct gfx_UniformBlock;
 struct gfx_Shader;
-
+struct gfx_Pass;
 
 enum gfx_TexPxType {
     gfx_texPxType_RGBA8,
@@ -25,9 +23,6 @@ struct gfx_Texture {
     gfx_TexPxType pixelLayout;
 };
 
-
-
-
 enum gfx_VType {
     gfx_vtype_NONE,
     gfx_vtype_POS2F,
@@ -35,7 +30,6 @@ enum gfx_VType {
     gfx_vtype_POS3F_UV
 };
 
-struct gfx_Pass; // >:(
 typedef void (*gfx_ShaderUniformBindFunc)(gfx_Pass* pass, gfx_UniformBlock* uniforms);
 struct gfx_Shader {
     U32 id = 0;
@@ -53,12 +47,10 @@ struct gfx_IndexBuffer {
 struct gfx_VertexArray {
     U32 id = 0;
     U32 vbId = 0;
-
     gfx_VType layoutType = gfx_vtype_NONE;
     // U32 count = 0;
     void* data = nullptr;
 };
-
 
 // NOTE: consider different formats for framebuffers
 // RN rgba and depth attachments are assumed
@@ -68,10 +60,6 @@ struct gfx_Framebuffer {
     U32 fbId = 0;
     U32 depthId = 0;
 };
-
-
-
-
 
 struct gfx_UniformBlock {
     float borderSize = 0;
@@ -101,7 +89,7 @@ struct gfx_UniformBlock {
 
     gfx_UniformBlock* _next;
 };
-// NOTE: unions fix a lot
+// TODO: unions fix a lot
 
 // target == nullptr indicates drawing to the screen
 struct gfx_Pass {
@@ -109,7 +97,7 @@ struct gfx_Pass {
     gfx_VertexArray* curVa;
     gfx_IndexBuffer* curIb;
 
-    bool isClearPass = false; // TODO: assert fail on adding calls to clear passes / refactor
+    bool isClearPass = false; // TODO: refactor
     bool isLines = false; // only appies if pass is not a clear pass
 
     gfx_Framebuffer* target = nullptr;
@@ -124,46 +112,34 @@ struct gfx_Pass {
 
 
 
+// TODO: multisample/antialias framebuffers
 
 void gfx_init();
-// CLEANUP: this
-gfx_VertexArray* gfx_getQuadVA();
-gfx_IndexBuffer* gfx_getQuadIB();
 
+gfx_Framebuffer* gfx_registerFramebuffer();
 gfx_Shader* gfx_registerShader(gfx_VType vertLayout, const char* vertPath, const char* fragPath, BumpAlloc* scratch);
 gfx_Texture* gfx_registerTexture(U8* data, int width, int height, gfx_TexPxType pixelLayout);
-
-// TODO: multisample/antialias framebuffers
-gfx_Framebuffer* gfx_registerFramebuffer();
-
 gfx_VertexArray* gfx_registerVertexArray(gfx_VType layout, void* data, U32 dataSize, bool dynamic);
 gfx_IndexBuffer* gfx_registerIndexBuffer(U32* data, U32 dataCount, bool dynamic);
+gfx_Pass* gfx_registerPass();
+// CLEANUP: this?
+// target = nullptr indicates drawing to screen
+gfx_Pass* gfx_registerClearPass(V4f color, gfx_Framebuffer* target);
+gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass);
 
 void gfx_updateVertexArray(gfx_VertexArray* va, void* data, U32 dataSize, bool dynamic);
 void gfx_updateIndexBuffer(gfx_IndexBuffer* ib, U32* data, U32 dataCount, bool dynamic);
-
 void gfx_resizeFramebuffer(gfx_Framebuffer* fb, int nw, int nh);
 
 // NOTE: use these for binding VAs/IBs otherwise it'll shit itself
 // NOTE: VERTEX ARRAY GOES FIRST DONT ASK
+// CLEANUP: fix this
 void gfx_bindVertexArray(gfx_Pass* pass, gfx_VertexArray* va);
 void gfx_bindIndexBuffer(gfx_Pass* pass, gfx_IndexBuffer* ib);
 
-gfx_Pass* gfx_registerPass();
-
-// CLEANUP: this?
-// target = nullptr indicates drawing to screen
-gfx_Pass* gfx_registerClearPass(V4f color, gfx_Framebuffer* target);
-
-gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass);
-
 // draws all passes, clears passes and calls after.
 void gfx_drawPasses(U32 scWidth, U32 scHeight);
-
 bool gfx_loadOBJMesh(const char* path, BumpAlloc* scratch, gfx_VertexArray** outVA, gfx_IndexBuffer** outIB);
-
-
-
 
 #ifdef GFX_IMPL
 
@@ -178,19 +154,13 @@ bool gfx_loadOBJMesh(const char* path, BumpAlloc* scratch, gfx_VertexArray** out
 
 
 struct gfx_Globs {
-
     BumpAlloc resArena = BumpAlloc();
-
     BumpAlloc passArena = BumpAlloc();
     gfx_Pass* passes = nullptr;
     U32 passCount = 0;
     // TODO: move passes to arenas outside of gfx
-
-    gfx_IndexBuffer* quadIb = nullptr;
-    gfx_VertexArray* quadVa = nullptr;
 };
 static gfx_Globs globs = gfx_Globs();
-
 
 // NOTE: requires opengl already setup
 void gfx_init() {
@@ -202,28 +172,7 @@ void gfx_init() {
     // preps passes to start
     globs.passes = BUMP_PUSH_ARR(&globs.passArena, MAX_PASS_COUNT, gfx_Pass);
     globs.passCount = 0;
-
-
-
-    U32 ibData[] = {
-        0, 1, 2,
-        2, 3, 0
-    };
-    globs.quadIb = gfx_registerIndexBuffer(ibData, sizeof(ibData) / sizeof(U32));
-
-    F32 vbData[] = {
-        0, 0,    0, 0, // BL
-        0,  1,    0, 1, // UL
-        1,  1,    1, 1, // UR
-        1, 0,    1, 0  // BR
-    };
-    globs.quadVa = gfx_registerVertexArray(gfx_vtype_POS2F_UV, vbData, sizeof(vbData), false);
 }
-
-
-gfx_VertexArray* gfx_getQuadVA() { return globs.quadVa; }
-gfx_IndexBuffer* gfx_getQuadIB() { return globs.quadIb; }
-
 
 gfx_Shader* gfx_registerShader(gfx_VType vertLayout, const char* vertPath, const char* fragPath, BumpAlloc* scratch) {
     int err = 0;
@@ -683,7 +632,7 @@ bool gfx_loadOBJMesh(const char* path, BumpAlloc* scratch, gfx_VertexArray** out
 
 
     *outVA = gfx_registerVertexArray(gfx_vtype_POS3F_UV, vaBuf, 5*3*faceCount*sizeof(float), false);
-    *outIB = gfx_registerIndexBuffer(ibBuf, 3*faceCount*sizeof(U32));
+    *outIB = gfx_registerIndexBuffer(ibBuf, 3*faceCount*sizeof(U32), false);
     return true;
 }
 

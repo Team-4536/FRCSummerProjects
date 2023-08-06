@@ -243,8 +243,8 @@ static struct UIGlobs {
     gfx_VertexArray* fieldVA = nullptr;
     gfx_IndexBuffer* fieldIB = nullptr;
 
-    gfx_VertexArray* lineVA = nullptr;
-    gfx_IndexBuffer* lineIB = nullptr;
+    gfx_VertexArray* quadVA = nullptr;
+    gfx_IndexBuffer* quadIB = nullptr;
 
     gfx_Texture* fieldTex = nullptr;
 
@@ -318,10 +318,8 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
     stbi_set_flip_vertically_on_load(1);
     U8* data;
 
-
     blu_style_borderColor(col_black, &borderStyle);
     blu_style_borderSize(1, &borderStyle);
-
 
     for(int i = 0; i < UI_VIEW_COUNT; i++) {
         View* v = &(globs.views[i]);
@@ -339,7 +337,6 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
 
     globs.ctrlInfo = ControlsInfo();
     bump_allocate(&globs.ctrlInfo.replayArena, 1000000);
-
 
 
     bool res = gfx_loadOBJMesh("res/models/Chassis2.obj", frameArena, &globs.robotVA, &globs.robotIB);
@@ -366,19 +363,19 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
     ASSERT(data);
     globs.arrowTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
 
-
-    globs.lineVA = gfx_registerVertexArray(gfx_vtype_POS2F, nullptr, 0, true);
-    globs.lineIB = gfx_registerIndexBuffer(nullptr, 0, true);
+    U32 ibData[] = { 0, 1, 2,   2, 3, 0 };
+    globs.quadIB = gfx_registerIndexBuffer(ibData, sizeof(ibData) / sizeof(U32), false);
+    F32 vbData[] = { 0, 0, 0, 0,   0, 1, 0, 1,   1, 1, 1, 1,   1, 0, 1, 0 };
+    globs.quadVA = gfx_registerVertexArray(gfx_vtype_POS2F_UV, vbData, sizeof(vbData), false);
 
 
     globs.sceneShader2d = gfx_registerShader(gfx_vtype_POS2F_UV, "res/shaders/2d.vert", "res/shaders/2d.frag", frameArena);
-
     globs.sceneShader2d->passUniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
         int loc = glGetUniformLocation(pass->shader->id, "uVP");
         glUniformMatrix4fv(loc, 1, false, &(uniforms->vp)[0]);
 
-        gfx_bindVertexArray(pass, gfx_getQuadVA());
-        gfx_bindIndexBuffer(pass, gfx_getQuadIB());
+        gfx_bindVertexArray(pass, globs.quadVA);
+        gfx_bindIndexBuffer(pass, globs.quadIB);
     };
     globs.sceneShader2d->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
 
@@ -400,11 +397,7 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
     };
 
 
-
-
-
     globs.sceneShader3d = gfx_registerShader(gfx_vtype_POS3F_UV, "res/shaders/3d.vert", "res/shaders/3d.frag", frameArena);
-
     globs.sceneShader3d->passUniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
         int loc = glGetUniformLocation(pass->shader->id, "uVP");
         glUniformMatrix4fv(loc, 1, false, &(uniforms->vp)[0]);
