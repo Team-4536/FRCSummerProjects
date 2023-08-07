@@ -84,8 +84,9 @@ struct ControlsInfo {
     bool usingSockets = true;
     bool sim = true;
 
-    BumpAlloc* replayArena;
+    BumpAlloc* replayArena = nullptr;
     net_Table replayTable;
+    bool refreshTableFlag = false; // set by build code to update global table
 };
 void draw_controls(ControlsInfo* info);
 
@@ -529,6 +530,7 @@ void draw_controls(ControlsInfo* info) {
                         globs.curTime = 0;
                         globs.table = globs.ctrlInfo.replayTable;
                     }
+                    // CLEANUP: only trigger on state change, and move to after UI build ends
                 }
             }
 
@@ -587,6 +589,7 @@ void draw_controls(ControlsInfo* info) {
 
                             globs.curTime = 0;
                             globs.table = globs.ctrlInfo.replayTable;
+                            globs.ctrlInfo.refreshTableFlag = true;
                         }
 
                         a = blu_areaMake("nav", blu_areaFlags_DRAW_BACKGROUND |
@@ -599,6 +602,7 @@ void draw_controls(ControlsInfo* info) {
                         if(i.held) {
                             a->cursor = blu_cursor_resizeH;
                             globs.curTime += i.dragDelta.x * 0.01f;
+                            globs.ctrlInfo.refreshTableFlag = true;
                         }
                         blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%f"), globs.curTime));
                     }
@@ -947,7 +951,6 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
                         a = blu_areaMake("text", blu_areaFlags_DRAW_TEXT);
                         blu_areaAddDisplayStr(a, info->keys[i].str);
                         a->style.sizes[blu_axis_X] = { blu_sizeKind_TEXT, 0 };
-
                         if(fadeChildren) { a->style.textColor *= col_disconnect; }
 
 
@@ -1298,7 +1301,6 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) 
     if(globs.ctrlInfo.usingSockets) {
         globs.curTime = curTime;
     }
-    float prevTime = globs.curTime;
 
     blu_Area* a;
 
@@ -1406,9 +1408,8 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) 
 
 
 
-
     if(!globs.ctrlInfo.usingSockets) {
-        if(globs.curTime != prevTime) {
+        if(globs.ctrlInfo.refreshTableFlag) {
             for(int i = 0; i < globs.ctrlInfo.replayTable.propCount; i++) {
                 net_PropSample* sample = globs.ctrlInfo.replayTable.props[i].firstPt;
 
@@ -1422,6 +1423,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) 
             }
         }
     }
+    globs.ctrlInfo.refreshTableFlag = false;
 
 
 
