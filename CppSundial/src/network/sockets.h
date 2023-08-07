@@ -9,7 +9,7 @@
 
 
 
-void nets_init(BumpAlloc* scratch);
+void nets_init(BumpAlloc* scratch, BumpAlloc* res);
 void nets_cleanup();
 
 
@@ -140,7 +140,7 @@ struct nets_Globs {
 
     net_PropSample* firstFreeSample = nullptr;
     BumpAlloc* scratch = nullptr;
-    BumpAlloc res;
+    BumpAlloc* res = nullptr;
 
     FILE* logFile = nullptr;
 };
@@ -148,7 +148,7 @@ struct nets_Globs {
 static nets_Globs globs = nets_Globs();
 
 // Asserts on failures
-void nets_init(BumpAlloc* scratch) {
+void nets_init(BumpAlloc* scratch, BumpAlloc* res) {
 
     globs.recvBuffer = (U8*)arr_allocate0(1, NETS_RECV_BUFFER_SIZE);
     bump_allocate(&globs.sendArena, NETS_SEND_BUFFER_SIZE);
@@ -161,7 +161,7 @@ void nets_init(BumpAlloc* scratch) {
     }
 
     globs.scratch = scratch;
-    bump_allocate(&globs.res, 1000000);
+    globs.res = res;
     globs.logFile = fopen("sunLog.log", "wb");
 }
 
@@ -299,7 +299,7 @@ net_PropSample* _nets_registerSample(net_Table* table, str propName, net_PropTyp
         return nullptr; }
     else if(!prop) {
         prop = ARR_APPEND(table->props, table->propCount, net_Prop());
-        prop->name = str_copy(propName, &globs.res);
+        prop->name = str_copy(propName, globs.res);
         prop->type = type;
 
         StrList log = StrList();
@@ -324,7 +324,7 @@ net_PropSample* _nets_registerSample(net_Table* table, str propName, net_PropTyp
         globs.firstFreeSample = sample->nextFree;
     }
     else {
-        sample = BUMP_PUSH_NEW(&globs.res, net_PropSample);
+        sample = BUMP_PUSH_NEW(globs.res, net_PropSample);
     }
 
     sample->next = prop->firstPt;
@@ -395,7 +395,7 @@ void _nets_processMessage(U8 isEvent, str name, U8* data, U8 dataType, U32 dataS
     else if(dataType == net_propType_BOOL) { flipWithEndiannes = false; }
     else if(dataType == net_propType_STR) {
         sample->str = { (const U8*)data, dataSize };
-        sample->str = str_copy(sample->str, BUMP_PUSH_ARR(&globs.res, dataSize, U8));
+        sample->str = str_copy(sample->str, BUMP_PUSH_ARR(globs.res, dataSize, U8));
         _nets_logUpdate(net_getProp(name, table));
         return;
     }

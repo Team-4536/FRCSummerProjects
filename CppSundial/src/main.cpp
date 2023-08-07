@@ -44,6 +44,8 @@ int main() {
 
     BumpAlloc frameArena;
     bump_allocate(&frameArena, 10000000);
+    BumpAlloc replayArena;
+    bump_allocate(&replayArena, 10000000);
 
 
     GLFWwindow* window = nullptr;
@@ -108,8 +110,8 @@ int main() {
     blu_init(solidTex);
     blu_loadFont("C:/windows/fonts/consola.ttf");
 
-    nets_init(&frameArena);
-    ui_init(&frameArena, solidTex);
+    nets_init(&frameArena, &replayArena);
+    ui_init(&frameArena, &replayArena, solidTex);
 
 
     gfx_Shader* blueShader;

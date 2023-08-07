@@ -108,10 +108,6 @@ struct gfx_Pass {
     gfx_UniformBlock* endCall = nullptr;
 };
 
-
-
-
-
 // TODO: multisample/antialias framebuffers
 
 void gfx_init();
@@ -122,6 +118,7 @@ gfx_Texture* gfx_registerTexture(U8* data, int width, int height, gfx_TexPxType 
 gfx_VertexArray* gfx_registerVertexArray(gfx_VType layout, void* data, U32 dataSize, bool dynamic);
 gfx_IndexBuffer* gfx_registerIndexBuffer(U32* data, U32 dataCount, bool dynamic);
 gfx_Pass* gfx_registerPass();
+
 // CLEANUP: this?
 // target = nullptr indicates drawing to screen
 gfx_Pass* gfx_registerClearPass(V4f color, gfx_Framebuffer* target);

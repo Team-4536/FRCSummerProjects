@@ -84,7 +84,7 @@ struct ControlsInfo {
     bool usingSockets = true;
     bool sim = true;
 
-    BumpAlloc replayArena;
+    BumpAlloc* replayArena;
     net_Table replayTable;
 };
 void draw_controls(ControlsInfo* info);
@@ -133,7 +133,6 @@ void areaAddFB(blu_Area* area, gfx_Framebuffer* target) {
     area->flags |= blu_areaFlags_DRAW_TEXTURE;
     area->texture = target->texture;
 
-    // CLEANUP: there are like 6 different instances of this exact piece of code
     int w = (int)area->calculatedSizes[blu_axis_X];
     int h = (int)area->calculatedSizes[blu_axis_Y];
     if(w != target->texture->width || h != target->texture->height) {
@@ -226,7 +225,6 @@ static struct UIGlobs {
     gfx_Shader* sceneShader3d = nullptr;
     gfx_Shader* sceneShader2d = nullptr;
     gfx_Shader* lineShader = nullptr;
-    gfx_Texture* solidTex;
 
     float rightSize;
     float downSizeL;
@@ -234,21 +232,18 @@ static struct UIGlobs {
 
     View views[UI_VIEW_COUNT];
 
+    gfx_Texture* solidTex;
     gfx_Texture* wheelTex = nullptr;
     gfx_Texture* treadTex = nullptr;
     gfx_Texture* arrowTex = nullptr;
+    gfx_Texture* fieldTex = nullptr;
 
     gfx_VertexArray* robotVA = nullptr;
     gfx_IndexBuffer* robotIB = nullptr;
     gfx_VertexArray* fieldVA = nullptr;
     gfx_IndexBuffer* fieldIB = nullptr;
-
     gfx_VertexArray* quadVA = nullptr;
     gfx_IndexBuffer* quadIB = nullptr;
-
-    gfx_Texture* fieldTex = nullptr;
-
-    NTKey* firstFreeNTKey = nullptr;
 
 
     ControlsInfo ctrlInfo;
@@ -306,7 +301,7 @@ void updateView(View* v) {
 blu_Style borderStyle;
 
 
-void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
+void ui_init(BumpAlloc* frameArena, BumpAlloc* replayArena, gfx_Texture* solidTex) {
 
     globs.rightSize = 400;
     globs.downSizeL = 100;
@@ -336,8 +331,7 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
     initView(&globs.views[3]);
 
     globs.ctrlInfo = ControlsInfo();
-    bump_allocate(&globs.ctrlInfo.replayArena, 1000000);
-
+    globs.ctrlInfo.replayArena = replayArena;
 
     bool res = gfx_loadOBJMesh("res/models/Chassis2.obj", frameArena, &globs.robotVA, &globs.robotIB);
     ASSERT(res);
@@ -427,7 +421,6 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
     globs.lineShader->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
         int loc = glGetUniformLocation(pass->shader->id, "uColor");
         glUniform4f(loc, uniforms->color.x, uniforms->color.y, uniforms->color.z, uniforms->color.w);
-
         gfx_bindVertexArray(pass, uniforms->va);
         gfx_bindIndexBuffer(pass, uniforms->ib);
     };
@@ -459,7 +452,7 @@ void loadReplay(net_Table* table) {
 
         if(split[0].length == 1 && split[0].chars[0] == 'p') {
             net_Prop* p = ARR_APPEND(table->props, table->propCount, net_Prop());
-            p->name = str_copy(split[1], &globs.ctrlInfo.replayArena);
+            p->name = str_copy(split[1], globs.ctrlInfo.replayArena);
 
             str typeStr = split[2];
             if(str_compare(typeStr, STR("s32"))) { p->type = net_propType_S32; }
@@ -469,7 +462,7 @@ void loadReplay(net_Table* table) {
             else { ASSERT(false); }
         }
         else if(split[0].length == 1 && split[0].chars[0] == 'u') {
-            net_PropSample* sample = BUMP_PUSH_NEW(&globs.ctrlInfo.replayArena, net_PropSample);
+            net_PropSample* sample = BUMP_PUSH_NEW(globs.ctrlInfo.replayArena, net_PropSample);
 
             net_Prop* p = net_getProp(split[1], table);
             ASSERT(p);
@@ -481,7 +474,7 @@ void loadReplay(net_Table* table) {
             const char* arg = (const char*)split[3].chars;
             if(p->type == net_propType_S32) { sample->s32 = atoi(arg); }
             else if(p->type == net_propType_F64) { sample->f64 = atof(arg); }
-            else if(p->type == net_propType_STR) { sample->str = str_copy(split[3], &globs.ctrlInfo.replayArena); }
+            else if(p->type == net_propType_STR) { sample->str = str_copy(split[3], globs.ctrlInfo.replayArena); }
             else if(p->type == net_propType_BOOL) {
                 bool end;
                 if(str_compare(split[3], STR("true"))) { sample->boo = true; }
@@ -496,9 +489,6 @@ void loadReplay(net_Table* table) {
     }
 }
 
-// TODO: fix state bugs switching between sim and not sim
-    // segfault because of failing to update table
-    // faulty connection indicator because of the same issue
 // TODO: add pause/play button
 
 void draw_controls(ControlsInfo* info) {
@@ -520,12 +510,24 @@ void draw_controls(ControlsInfo* info) {
                     blu_style_sizeX({blu_sizeKind_PERCENT, 1});
                     blu_style_sizeY({blu_sizeKind_REMAINDER, 1});
 
+                    bool resetTable = false;
                     if(makeButton(STR("LIVE"), !info->usingSockets?col_darkGray:col_darkBlue, col_lightGray).clicked) {
                         info->usingSockets = true;
+                        resetTable = true;
                     }
 
                     if(makeButton(STR("REPLAY"), info->usingSockets?col_darkGray:col_darkBlue, col_lightGray).clicked) {
                         info->usingSockets = false;
+                        resetTable = true;
+                    }
+
+                    if(resetTable) {
+                        memset(&globs.ctrlInfo.replayTable.props, 0, sizeof(globs.ctrlInfo.replayTable.props));
+                        globs.ctrlInfo.replayTable.propCount = 0;
+                        bump_clear(globs.ctrlInfo.replayArena);
+
+                        globs.curTime = 0;
+                        globs.table = globs.ctrlInfo.replayTable;
                     }
                 }
             }
@@ -577,7 +579,7 @@ void draw_controls(ControlsInfo* info) {
                     }
                     else {
                         if(makeButton(STR("load"), col_lightGray).clicked) {
-                            bump_clear(&globs.ctrlInfo.replayArena);
+                            bump_clear(globs.ctrlInfo.replayArena);
                             memset(&globs.ctrlInfo.replayTable.props, 0, sizeof(globs.ctrlInfo.replayTable.props));
                             globs.ctrlInfo.replayTable.propCount = 0;
 
