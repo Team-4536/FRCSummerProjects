@@ -4,6 +4,8 @@ import wpimath.system as sys
 import wpilib
 import navx
 import random
+from math import degrees, radians
+import math
 
 from virtualGyro import VirtualGyro
 from real import V2f, angleWrap
@@ -22,7 +24,7 @@ class EncoderSim:
         self.motorSpec = motorSpec
         self.inertia = inertia
         self.linearSys = plant.LinearSystemId.DCMotorSystem(self.motorSpec, self.inertia, gearing)
-        # NOTE: state[0] is position, state[1] is velocity
+        # NOTE: state[0] is position (in radians), state[1] is velocity (in rads/sec)
         self.state: list[float] = [ 0, 0 ]
 
     def update(self, dt: float):
@@ -30,7 +32,7 @@ class EncoderSim:
         inputVec = [self.motor.get() * self.motorSpec.nominalVoltage] # TODO: check if this is correct
         self.state = self.linearSys.calculateX(self.state, inputVec, dt)
 
-        self.encoder.setPosition(random.normalvariate(self.state[0], ENCODER_STD_DEV))
+        self.encoder.setPosition(random.normalvariate(self.state[0] / (2 * math.pi), ENCODER_STD_DEV))
 
 
 
@@ -50,12 +52,12 @@ class SwerveSim:
 
         self.driveSims: list[EncoderSim] = [ ]
         for i in range(4):
-           sim = EncoderSim(driveMotors[i], plant.DCMotor.NEO(1), driveEncoders[i], 0.1, 6.12)
+           sim = EncoderSim(driveMotors[i], plant.DCMotor.NEO(1), driveEncoders[i], 0.005, 6.12)
            self.driveSims.append(sim)
 
         self.steerSims: list[EncoderSim] = [ ]
         for i in range(4):
-           sim = EncoderSim(steeringMotors[i], plant.DCMotor.NEO(1), steeringEncoders[i], 0.03, 1)
+           sim = EncoderSim(steeringMotors[i], plant.DCMotor.NEO(1), steeringEncoders[i], 0.001, 1)
            # TODO: get real inertia vals
            # TODO: is this the corect gearing?
            self.steerSims.append(sim)
@@ -69,9 +71,7 @@ class SwerveSim:
 
         self.posDeltas: list[V2f] = [] # DEBUG
 
-    # TODO: add friction to wheel sims
-    # TODO: get measurements for wheel friction
-    # TODO: vary the "inertia" of each mechanism with speed/rotation speed of drive // add extra resistance when braking and going against current speed somehow
+    # TODO: add real friction to wheel sims
 
     def update(self, dt: float):
 
@@ -80,17 +80,17 @@ class SwerveSim:
         for i in range(0, 4):
             sim = self.driveSims[i]
             sim.update(dt)
-            driveDelta = sim.state[1] * dt
+            driveDelta = (sim.state[1] / (2 * math.pi)) * dt * self.wheelCirc # delta in meters
 
             sim.state[1] *= 0.9 # CLEANUP: friction hack
 
             sim = self.steerSims[i]
             sim.update(dt)
-            steerPos = sim.state[0]
+            steerPos = (sim.state[0] / (2 * math.pi)) * 360 # position in degrees
 
             sim.state[1] *= 0.5
 
-            self.posDeltas.append((V2f(0, 1) * driveDelta * self.wheelCirc).rotateDegrees(steerPos * 360))
+            self.posDeltas.append((V2f(1, 0) * driveDelta).rotateDegrees(steerPos))
 
         posChange = (self.posDeltas[0] + self.posDeltas[1] + self.posDeltas[2] + self.posDeltas[3]) / 4
         self.position += posChange.rotateDegrees(self.rotation)

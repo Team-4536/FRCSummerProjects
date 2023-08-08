@@ -3,17 +3,21 @@ import rev
 import ntcore
 import math
 import navx
-from inputs import FlymerInputs
 
-import sim
-from real import V2f
-import timing
+from inputs import FlymerInputs
+from real import V2f, angleWrap
 from swerveController import SwerveController
 from telemetryHelp import publishExpression
 from virtualGyro import VirtualGyro
 from swerveEstimation import SwerveEstimator
+from wpimath.controller import RamseteController
 import socketing
-from swervePathFollower import SwervePathFollower
+import sim
+import timing
+from paths import getSpline2dPoints, getLinear2dPoints
+import wpimath.system.plant as plant
+from wpimath.geometry import Pose2d, Rotation2d
+from wpimath.kinematics import ChassisSpeeds
 
 
 WHEEL_DIA = 0.1016 # 4 in. in meters
@@ -62,9 +66,13 @@ class SwerveBot(wpilib.TimedRobot):
             self.steerEncoders,
             self.driveEncoders)
 
+        m = rev.CANSparkMax(10, driveType)
+
 
     def robotPeriodic(self) -> None:
+
         self.time = timing.TimeData(self.time)
+
 
         self.server.putUpdate("time", self.time.timeSinceInit)
 
@@ -112,7 +120,7 @@ class SwerveBot(wpilib.TimedRobot):
             self.steerMotors,
             self.steerEncoders,
             self.gyro,
-            [ V2f(-1, 1), V2f(1, 1), V2f(-1, -1), V2f(1, -1) ],
+            [ V2f(1, 1), V2f(1, -1), V2f(-1, 1), V2f(-1, -1) ], # NOTE: left is forward, so FL should be up and right in world coords
             WHEEL_CIRC
         )
 
@@ -124,35 +132,72 @@ class SwerveBot(wpilib.TimedRobot):
 
 
     def autonomousInit(self) -> None:
-        self.pathFollower = SwervePathFollower([
-            (V2f(0, 0), 0),
-            (V2f(4, 0), 90),
-            (V2f(4, 4), 180),
-            (V2f(-4, -4), 0),
-            (V2f(0, 0), 0)
-        ])
+
+        pointCount = 100
+        self.path = getSpline2dPoints([
+            (V2f(0, 0), V2f(1, 2), V2f(3, 2), V2f(4, 0)),
+            (V2f(4, 0), V2f(3, -2), V2f(1, -2), V2f(0, 0))
+        ], pointCount)
+
+        self.speedPath = getLinear2dPoints([
+            V2f(0.8, 1), V2f(1, 0.4)
+        ], pointCount)
+
+        self.anglePath = getLinear2dPoints([
+            V2f(0, 0), V2f(0.5, 90), V2f(1, -90)
+        ], pointCount)
+
+        self.pathIdx = 0
+
+        self.ramsete = RamseteController()
 
     def autonomousPeriodic(self) -> None:
-        pose = self.estimator.estimatedPose
-        d, t = self.pathFollower.tick(pose, self.gyro.getYaw(), self.time.dt)
-        self.swerveController.tick(self.gyro.getYaw(), d.x, d.y, t, self.time.dt, False)
+
+        self.server.putUpdate("idx", self.pathIdx)
+        if(self.pathIdx >= len(self.path)):
+            self.pathIdx = 99
+
+        position = self.estimator.estimatedPose
+
+        nextPt = self.path[self.pathIdx]
+        self.server.putUpdate("targetX", nextPt.x)
+        self.server.putUpdate("targetY", nextPt.y)
+        speed = self.speedPath[self.pathIdx]
+        self.server.putUpdate("targetSpeed", speed)
+
+        nextAngle = self.anglePath[self.pathIdx]
+        self.server.putUpdate("targetAngle", nextAngle)
+
+        currentPose = Pose2d(position.x, position.y, math.radians(-self.gyro.getYaw()))
+        targetPose = Pose2d(nextPt.x, nextPt.y, math.radians(-nextAngle))
+        linVel = speed # m/s
+        angularVel = 1 # rads/s
+        out = self.ramsete.calculate(currentPose, targetPose, linVel, angularVel)
+
+        self.server.putUpdate("outX", out.vx)
+        self.server.putUpdate("outY", out.vy)
+        self.server.putUpdate("outA", -math.degrees(out.omega))
+
+        if((position - nextPt).getLength() < 0.6): self.pathIdx += 1
+
 
 
 
     def teleopPeriodic(self) -> None:
 
         self.input = FlymerInputs(self.driveCtrlr, self.armCtrlr)
+        self.server.putUpdate("driveX", self.input.driveX)
+        self.server.putUpdate("driveY", self.input.driveY)
+        self.server.putUpdate("turning", self.input.turning)
 
+        drive = V2f(self.input.driveX, self.input.driveY)
+        drive = drive.rotateDegrees(-self.gyro.getYaw() - 90)
         self.swerveController.tick(
-            self.gyro.getYaw(),
-            self.input.driveX,
-            self.input.driveY,
+            drive.x,
+            drive.y,
             self.input.turning,
             self.time.dt,
             self.input.brakeToggle)
-
-
-
 
 
 

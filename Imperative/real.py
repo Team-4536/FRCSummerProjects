@@ -24,10 +24,15 @@ class V2f:
         return float(length)
 
 
-    #angle
     def getAngle(self):
         angle = -(math.atan2(self.x, self.y)) * 57.2958 #radians to angle conversion factor
         return float(angle)
+
+    def getNormalized(self):
+        l = self.getLength()
+        if(l != 0): return self / l
+        else: return V2f()
+
 
 
     def __add__(self, b): return V2f(self.x + b.x, self.y + b.y)
