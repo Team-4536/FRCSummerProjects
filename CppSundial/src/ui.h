@@ -28,12 +28,14 @@ struct NTKey {
 #define GRAPH2D_LINECOUNT 6
 #define GRAPH2D_SAMPLE_WINDOW 5.0f
 struct Graph2dInfo {
-
     NTKey keys[GRAPH2D_LINECOUNT] = { 0 };
     V4f colors[GRAPH2D_LINECOUNT];
 
     float top = 0.9;
     float bottom = -0.9;
+
+    // allocated and removed per instance
+    gfx_VertexArray* lineVerts[GRAPH2D_LINECOUNT] = { 0 };
 };
 void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target);
 void initGraph2dInfo(Graph2dInfo* info) {
@@ -48,6 +50,15 @@ void initGraph2dInfo(Graph2dInfo* info) {
     info->colors[3] = col_yellow;
     info->colors[4] = col_black;
     info->colors[5] = col_white;
+
+    for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
+        info->lineVerts[i] = gfx_registerVertexArray(gfx_vtype_POS2F, nullptr, 0, true);
+    }
+}
+void deinitGraph2dInfo(Graph2dInfo* info) {
+    for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
+        gfx_freeVertexArray(info->lineVerts[i]);
+    }
 }
 
 struct FieldInfo {
@@ -86,7 +97,8 @@ struct ControlsInfo {
 
     BumpAlloc* replayArena = nullptr;
     net_Table replayTable;
-    bool refreshTableFlag = false; // set by build code to update global table
+    // signals to copy samples from replay table to main table at current time
+    bool refreshTableFlag = false;
 };
 void draw_controls(ControlsInfo* info);
 
@@ -246,6 +258,8 @@ static struct UIGlobs {
     gfx_VertexArray* quadVA = nullptr;
     gfx_IndexBuffer* quadIB = nullptr;
 
+    // stores indicies for drawing graphs, len == GRAPH2D_VCOUNT
+    gfx_IndexBuffer* lineIB = nullptr;
 
     ControlsInfo ctrlInfo;
 
@@ -358,10 +372,18 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* replayArena, gfx_Texture* solidTe
     ASSERT(data);
     globs.arrowTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
 
+
     U32 ibData[] = { 0, 1, 2,   2, 3, 0 };
     globs.quadIB = gfx_registerIndexBuffer(ibData, sizeof(ibData) / sizeof(U32), false);
     F32 vbData[] = { 0, 0, 0, 0,   0, 1, 0, 1,   1, 1, 1, 1,   1, 0, 1, 0 };
     globs.quadVA = gfx_registerVertexArray(gfx_vtype_POS2F_UV, vbData, sizeof(vbData), false);
+
+
+    U32 lineIBData[GRAPH2D_VCOUNT];
+    for(int i = 0; i < GRAPH2D_VCOUNT; i++) {
+        lineIBData[i] = i;
+    }
+    globs.lineIB = gfx_registerIndexBuffer(lineIBData, 2, false);
 
 
     globs.sceneShader2d = gfx_registerShader(gfx_vtype_POS2F_UV, "res/shaders/2d.vert", "res/shaders/2d.frag", frameArena);
@@ -421,9 +443,10 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* replayArena, gfx_Texture* solidTe
     };
     globs.lineShader->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
         int loc = glGetUniformLocation(pass->shader->id, "uColor");
+        glUniform4f(loc, 1, 1, 1, 1);
         glUniform4f(loc, uniforms->color.x, uniforms->color.y, uniforms->color.z, uniforms->color.w);
-        gfx_bindVertexArray(pass, uniforms->va);
         gfx_bindIndexBuffer(pass, uniforms->ib);
+        gfx_bindVertexArray(pass, uniforms->va);
     };
 }
 
@@ -840,7 +863,7 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
 
         gfx_Pass* p = gfx_registerPass();
         p->target = target;
-        p->isLines = true;
+        // p->isLines = true;
         p->shader = globs.lineShader;
 
         blu_WidgetInteraction inter = blu_interactionFromWidget(a);
@@ -898,7 +921,15 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
                 pts[j*2+1] = sHeight;
             }
 
-            // TODO: make work again
+            gfx_updateVertexArray(info->lineVerts[i], pts, sizeof(float) * GRAPH2D_VCOUNT * 2, true);
+
+            // TODO: coloring along each vert
+            //*
+            gfx_UniformBlock* b = gfx_registerCall(p);
+            b->color = info->colors[i];
+            b->va = info->lineVerts[i];
+            b->ib = globs.lineIB;
+            // */
         }
 
 
@@ -1272,6 +1303,12 @@ void makeView(const char* name, View* v) {
 
     blu_WidgetInteraction inter = blu_interactionFromWidget(a);
     if(inter.dropped) {
+
+        // CLEANUP: ew
+        if(v->type == viewType_graph2d) {
+            deinitGraph2dInfo(&v->data.graph2dInfo);
+        }
+
         v->type = (ViewType)(U64)inter.dropVal; // sorry
         initView(v);
     }
@@ -1365,7 +1402,6 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) 
 
         // TODO: everything is lagging by a frame
 
-
         a = blu_areaMake("XresizeBar", blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
         a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 3 };
 
@@ -1375,12 +1411,9 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) 
         globs.rightSize += -inter.dragDelta.x;
         a->cursor = blu_cursor_resizeH;
 
-
-
         a = blu_areaMake("rightParent", 0);
         a->style.sizes[blu_axis_X] = {blu_sizeKind_PX, globs.rightSize };
         a->style.childLayoutAxis = blu_axis_Y;
-
 
         blu_parentScope(a) {
 
@@ -1388,7 +1421,6 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) 
             blu_style_sizeY({ blu_sizeKind_REMAINDER, 0 });
                 makeView("top", &globs.views[2]);
             }
-
 
             a = blu_areaMake("YresizeBar", blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
             a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, 3 };

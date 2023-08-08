@@ -42,14 +42,16 @@ struct gfx_IndexBuffer {
     U32 id = 0;
     U32 count = 0;
     U32* data = nullptr;
+    gfx_IndexBuffer* nextFree = nullptr;
 };
 
 struct gfx_VertexArray {
     U32 id = 0;
     U32 vbId = 0;
     gfx_VType layoutType = gfx_vtype_NONE;
-    // U32 count = 0;
+    U32 size = 0;
     void* data = nullptr;
+    gfx_VertexArray* nextFree = nullptr;
 };
 
 // NOTE: consider different formats for framebuffers
@@ -119,6 +121,9 @@ gfx_VertexArray* gfx_registerVertexArray(gfx_VType layout, void* data, U32 dataS
 gfx_IndexBuffer* gfx_registerIndexBuffer(U32* data, U32 dataCount, bool dynamic);
 gfx_Pass* gfx_registerPass();
 
+void gfx_freeVertexArray(gfx_VertexArray* va);
+void gfx_freeIndexBuffer(gfx_IndexBuffer* ib);
+
 // CLEANUP: this?
 // target = nullptr indicates drawing to screen
 gfx_Pass* gfx_registerClearPass(V4f color, gfx_Framebuffer* target);
@@ -156,6 +161,9 @@ struct gfx_Globs {
     gfx_Pass* passes = nullptr;
     U32 passCount = 0;
     // TODO: move passes to arenas outside of gfx
+
+    gfx_VertexArray* firstFreeVA = nullptr;
+    gfx_IndexBuffer* firstFreeIB = nullptr;
 };
 static gfx_Globs globs = gfx_Globs();
 
@@ -317,8 +325,13 @@ void gfx_resizeFramebuffer(gfx_Framebuffer* fb, int nw, int nh) {
 
 gfx_VertexArray* gfx_registerVertexArray(gfx_VType layout, void* data, U32 dataSize, bool dynamic) {
 
-    gfx_VertexArray* va = BUMP_PUSH_NEW(&globs.resArena, gfx_VertexArray);
-    *va = gfx_VertexArray();
+    gfx_VertexArray* va = globs.firstFreeVA;
+    if(!va) {
+        va = BUMP_PUSH_NEW(&globs.resArena, gfx_VertexArray);
+    } else {
+        globs.firstFreeVA = va->nextFree;
+        *va = gfx_VertexArray();
+    }
 
     // VERTEX BUFFER AND ARR ====================================================
     {
@@ -328,6 +341,7 @@ gfx_VertexArray* gfx_registerVertexArray(gfx_VType layout, void* data, U32 dataS
         glGenBuffers(1, &va->vbId);
         glBindBuffer(GL_ARRAY_BUFFER, va->vbId);
         va->data = data;
+        va->size = dataSize;
         glBufferData(GL_ARRAY_BUFFER, dataSize, data, dynamic? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
     }
 
@@ -362,14 +376,24 @@ gfx_VertexArray* gfx_registerVertexArray(gfx_VType layout, void* data, U32 dataS
 
     return va;
 }
+
 void gfx_updateVertexArray(gfx_VertexArray* va, void* data, U32 dataSize, bool dynamic) {
     glBindVertexArray(va->id);
+    glBindBuffer(GL_ARRAY_BUFFER, va->vbId);
     glBufferData(GL_ARRAY_BUFFER, dataSize, data, dynamic? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
     va->data = data;
+    va->size = dataSize;
 }
 
 gfx_IndexBuffer* gfx_registerIndexBuffer(U32* data, U32 dataCount, bool dynamic) {
-    gfx_IndexBuffer* ib = BUMP_PUSH_NEW(&globs.resArena, gfx_IndexBuffer);
+    gfx_IndexBuffer* ib = globs.firstFreeIB;
+    if(!ib) {
+        ib = BUMP_PUSH_NEW(&globs.resArena, gfx_IndexBuffer);
+    } else {
+        globs.firstFreeIB = ib->nextFree;
+        *ib = gfx_IndexBuffer();
+    }
+
     glGenBuffers(1, &ib->id);
     gfx_updateIndexBuffer(ib, data, dataCount, dynamic);
     return ib;
@@ -380,6 +404,18 @@ void gfx_updateIndexBuffer(gfx_IndexBuffer* ib, U32* data, U32 dataCount, bool d
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, dataCount * sizeof(U32), data, dynamic? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
     ib->data = data;
     ib->count = dataCount;
+}
+
+
+void gfx_freeVertexArray(gfx_VertexArray* va) {
+    va->nextFree = globs.firstFreeVA;
+    globs.firstFreeVA = va;
+    glDeleteBuffers(1, &va->id);
+}
+void gfx_freeIndexBuffer(gfx_IndexBuffer* ib) {
+    ib->nextFree = globs.firstFreeIB;
+    globs.firstFreeIB = ib;
+    glDeleteBuffers(1, &ib->id);
 }
 
 
@@ -476,7 +512,7 @@ void gfx_drawPasses(U32 scWidth, U32 scHeight) {
             ASSERT(pass->shader->passUniformBindFunc);
             pass->shader->passUniformBindFunc(pass, &pass->passUniforms);
 
-            GLint type = pass->isLines? GL_LINES : GL_TRIANGLES;
+            GLint type = pass->isLines? GL_LINE_STRIP : GL_TRIANGLES;
 
             gfx_UniformBlock* curBlock = pass->startCall;
             while(curBlock) {

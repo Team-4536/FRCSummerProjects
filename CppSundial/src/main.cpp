@@ -95,10 +95,13 @@ int main() {
 
         glEnable(GL_MULTISAMPLE);
 
+        // glLineWidth(2);
+
         glEnable(GL_DEBUG_OUTPUT);
         glDebugMessageCallback(
         [](GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char* message, const void* userParam) {
-            printf("[GL] %s\n", message);
+            if(type == GL_DEBUG_TYPE_OTHER) { return; } // hides messages talking about buffer memory source which were getting spammed
+            printf("[GL] %i, %s\n", type, message);
         }, 0);
     }
 
