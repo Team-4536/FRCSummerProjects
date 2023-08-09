@@ -12,7 +12,7 @@ from wpimath.controller import RamseteController
 from real import V2f, angleWrap
 import socketing
 import timing
-from inputs import FlymerInputs
+from inputs import deadZone
 from virtualGyro import VirtualGyro
 from paths import getSpline2dPoints, getLinear2dPoints
 
@@ -22,6 +22,12 @@ from subsystems.swerve import SwerveState, SwerveController, SwerveSim
 WHEEL_DIA = 0.1016 # 4 in. in meters
 WHEEL_RADIUS = WHEEL_DIA / 2
 WHEEL_CIRC = WHEEL_DIA * math.pi
+
+class SwerveBotInputs():
+    def __init__(self, driveCtrlr: wpilib.XboxController, armCtrlr: wpilib.XboxController) -> None:
+        self.driveX = deadZone(driveCtrlr.getLeftX())
+        self.driveY = deadZone((-driveCtrlr.getLeftY()))
+        self.turning = deadZone(armCtrlr.getLeftX())
 
 
 class SwerveBot(wpilib.TimedRobot):
@@ -176,7 +182,7 @@ class SwerveBot(wpilib.TimedRobot):
 
     def teleopPeriodic(self) -> None:
 
-        self.input = FlymerInputs(self.driveCtrlr, self.armCtrlr)
+        self.input = SwerveBotInputs(self.driveCtrlr, self.armCtrlr)
         self.server.putUpdate("inputX", self.input.driveX)
         self.server.putUpdate("inputY", self.input.driveY)
         self.server.putUpdate("inputT", self.input.turning)

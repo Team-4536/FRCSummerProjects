@@ -2,7 +2,7 @@ import wpilib
 import navx
 
 import real
-import inputs
+from inputs import deadZone
 import timing
 import socketing
 
@@ -19,6 +19,12 @@ def tankController(drive: float, turning: float) -> list[float]:
 def arcadeController(l: float, r: float) -> list[float]:
     return [ l, r, l, r ]
 
+
+class DemoInputs():
+    def __init__(self, driveCtrlr: wpilib.XboxController) -> None:
+        self.drive = -deadZone(driveCtrlr.getLeftY())
+        self.turning = deadZone(driveCtrlr.getRightX())
+        self.turret = driveCtrlr.getRightTriggerAxis() - driveCtrlr.getLeftTriggerAxis()
 
 
 class DemoBot(wpilib.TimedRobot):
@@ -59,7 +65,7 @@ class DemoBot(wpilib.TimedRobot):
         self.server.update(self.time.timeSinceInit)
 
     def teleopPeriodic(self) -> None:
-        self.input = inputs.DemoInputs(self.driveCtrlr)
+        self.input = DemoInputs(self.driveCtrlr)
 
         self.driveSpeeds = tankController(self.input.drive * 0.8, self.input.turning)
         self.driveSpeeds = [s * 0.5 for s in self.driveSpeeds]
