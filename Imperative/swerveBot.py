@@ -55,10 +55,11 @@ class SwerveBot(wpilib.TimedRobot):
 
         # NOTE: X+ is forward, so FL should be up and right in world coords
         wheelPositions = [ V2f(1, 1), V2f(1, -1), V2f(-1, 1), V2f(-1, -1) ]
-        self.swerve = SwerveState(wheelPositions, WHEEL_RADIUS, driveMotors, steerMotors, driveEncoders, steerEncoders)
+        self.swerve = SwerveState(4.2, wheelPositions, WHEEL_RADIUS, driveMotors, steerMotors, driveEncoders, steerEncoders)
         self.swerveController = SwerveController()
 
         self.prevPos = self.swerve.estimatedPosition
+        self.prevAngle = self.gyro.getYaw()
 
     def robotPeriodic(self) -> None:
 
@@ -78,16 +79,18 @@ class SwerveBot(wpilib.TimedRobot):
         self.server.putUpdate("posY", float(self.sim.position.y))
         self.server.putUpdate("yaw", self.gyro.getYaw())
 
+        self.swerve.updateEstimation(self.time.timeSinceInit, self.gyro.getYaw())
+        self.server.putUpdate("estX", self.swerve.estimatedPosition.x)
+        self.server.putUpdate("estY", self.swerve.estimatedPosition.y)
+
         vel = (self.swerve.estimatedPosition - self.prevPos) / self.time.dt
         self.server.putUpdate("velX", vel.x)
         self.server.putUpdate("velY", vel.y)
         self.prevPos = self.swerve.estimatedPosition
 
-
-        self.swerve.updateEstimation(self.time.timeSinceInit, self.gyro.getYaw())
-        self.server.putUpdate("estX", self.swerve.estimatedPosition.x)
-        self.server.putUpdate("estY", self.swerve.estimatedPosition.y)
-
+        vel = (self.gyro.getYaw() - self.prevAngle) / self.time.dt
+        self.server.putUpdate("angVel", vel)
+        self.prevAngle = self.gyro.getYaw()
 
         #TODO: debug expression in cpp sundial
 
@@ -161,6 +164,7 @@ class SwerveBot(wpilib.TimedRobot):
         self.server.putUpdate("outX", out.vx)
         self.server.putUpdate("outY", out.vy)
         self.server.putUpdate("outA", -math.degrees(out.omega))
+        self.swerveController.tickReal(V2f(out.vx, out.vy).rotateDegrees(-self.gyro.getYaw()), -math.degrees(out.omega), self.time.dt, self.swerve, self.server)
 
         if((position - nextPt).getLength() < 0.6): self.pathIdx += 1
 
@@ -170,13 +174,22 @@ class SwerveBot(wpilib.TimedRobot):
     def teleopPeriodic(self) -> None:
 
         self.input = FlymerInputs(self.driveCtrlr, self.armCtrlr)
-        self.server.putUpdate("driveX", self.input.driveX)
-        self.server.putUpdate("driveY", self.input.driveY)
-        self.server.putUpdate("turning", self.input.turning)
+        self.server.putUpdate("inputX", self.input.driveX)
+        self.server.putUpdate("inputY", self.input.driveY)
+        self.server.putUpdate("inputT", self.input.turning)
 
         drive = V2f(self.input.driveX, self.input.driveY)
-        drive = drive.rotateDegrees(-self.gyro.getYaw() - 90)
-        self.swerveController.tick(drive.x, drive.y, self.input.turning, self.time.dt, self.input.brakeToggle, self.swerve)
+        drive *= 4.2
+        drive = drive.rotateDegrees(-self.gyro.getYaw())
+        self.server.putUpdate("driveX", drive.x)
+        self.server.putUpdate("driveY", drive.y)
+
+        turning = self.input.turning * 180
+        self.server.putUpdate("turning", turning)
+
+        self.swerveController.tickReal(drive, turning, self.time.dt, self.swerve, self.server)
+        # drive = drive.rotateDegrees(-self.gyro.getYaw() - 90)
+        # self.swerveController.tick(drive.x, drive.y, self.input.turning, self.time.dt, self.input.brakeToggle, self.swerve)
 
     def disabledInit(self) -> None:
         self.disabledPeriodic()

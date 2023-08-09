@@ -13,8 +13,8 @@
 #include "network/network.h"
 #include "network/sockets.h"
 
-
-
+// TODO: angle visualizer
+// TODO: vector visualizer
 
 // contains a string and a bunch of chars
 struct NTKey {

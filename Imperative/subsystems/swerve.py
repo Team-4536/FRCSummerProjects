@@ -14,17 +14,17 @@ from wpimath.kinematics import SwerveModulePosition;
 from wpimath.geometry import Translation2d, Pose2d, Rotation2d
 
 class SwerveState:
-    def __init__(self, wheelOffsets, wheelRadius, driveMotors, steerMotors, driveEncoders, steerEncoders) -> None:
+    def __init__(self, maxSpeed: float, wheelOffsets: list[V2f], wheelRadius: float, driveMotors, steerMotors, driveEncoders, steerEncoders) -> None:
 
         self.driveMotors: list[rev.CANSparkMax] = driveMotors
         self.steerMotors: list[rev.CANSparkMax] = steerMotors
         self.driveEncoders: list[rev.RelativeEncoder] = driveEncoders
         self.steerEncoders: list[rev.RelativeEncoder] = steerEncoders
 
-
+        self.maxSpeed = maxSpeed
         self.wheelRadius = wheelRadius
         self.wheelCirc = wheelRadius * 2 * math.pi
-        self.wheelOffsets = wheelOffsets
+        self.wheelOffsets: list[V2f] = wheelOffsets
         wheelTranslations = [Translation2d(w.x, w.y) for w in wheelOffsets]
 
         self.wheelStates = (
@@ -105,8 +105,7 @@ class SwerveSim:
         for i in range(0, 4):
             inital = swerve.wheelOffsets[i]
             new = inital + posDeltas[i]
-            angle = angleWrap(inital.getAngle() - new.getAngle())
-            angleDeltas.append(angle)
+            angleDeltas.append(angleWrap(new.getAngle() - inital.getAngle()))
 
         self.rotation += (angleDeltas[0] + angleDeltas[1] + angleDeltas[2] + angleDeltas[3]) / 4
         gyro.setYaw(self.rotation)
@@ -137,6 +136,40 @@ class SwerveController:
         self.FRPID = PIDController(kp, ki, kd)
         self.BLPID = PIDController(kp, ki, kd)
         self.BRPID = PIDController(kp, ki, kd)
+
+        self.pids = [PIDController(kp, ki, kd) for i in range(4)]
+
+
+    # X component is forward+ in M/s, y is left+, turning is CW+ in degs/sec
+    def tickReal(self, speed: V2f, turning: float, dt: float, swerve: SwerveState, server) -> None:
+
+        turningInRads = math.radians(turning)
+        turningVectors = [
+            V2f(1, -1),
+            V2f(-1, -1),
+            V2f(1, 1),
+            V2f(-1, 1)
+        ]
+
+        for i in range(4):
+            tv = turningVectors[i].getNormalized() * (turningInRads * swerve.wheelOffsets[i].getLength())
+            vec = speed + tv
+            wheelSpeed = vec.getLength()
+
+            if(wheelSpeed == 0):
+                swerve.steerMotors[i].set(0)
+                swerve.driveMotors[i].set(0)
+                continue
+
+            # TODO: fast flipping
+            error = angleWrap(vec.getAngle() - swerve.steerEncoders[i].getPosition()*360) / 360
+            swerve.steerMotors[i].set(self.pids[i].tickErr(error, dt))
+            swerve.driveMotors[i].set(wheelSpeed / swerve.maxSpeed)
+
+
+
+
+
 
     # forward = forward/back
     # right = Left/Right
