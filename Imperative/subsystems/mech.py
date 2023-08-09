@@ -1,3 +1,4 @@
+from real import normalizeWheelSpeeds
 
 def mechController(x: float, y: float, t: float) -> list[float]:
     speeds = [
@@ -7,10 +8,4 @@ def mechController(x: float, y: float, t: float) -> list[float]:
         (y + x - t), # BR
     ]
 
-    max = abs(speeds[0])
-    for i in range(0, 4):
-        if (max < abs(speeds[i])):
-            max = abs(speeds[i])
-
-    if max > 1: return [s / max for s in speeds]
-    else: return speeds
+    return normalizeWheelSpeeds(speeds)

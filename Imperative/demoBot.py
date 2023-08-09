@@ -1,10 +1,25 @@
 import wpilib
 import navx
 
-import drive
+import real
 import inputs
 import timing
 import socketing
+
+
+def tankController(drive: float, turning: float) -> list[float]:
+    speeds = [
+        drive + turning,
+        drive - turning,
+        drive + turning,
+        drive - turning
+    ]
+    return real.normalizeWheelSpeeds(speeds)
+
+def arcadeController(l: float, r: float) -> list[float]:
+    return [ l, r, l, r ]
+
+
 
 class DemoBot(wpilib.TimedRobot):
 
@@ -46,7 +61,7 @@ class DemoBot(wpilib.TimedRobot):
     def teleopPeriodic(self) -> None:
         self.input = inputs.DemoInputs(self.driveCtrlr)
 
-        self.driveSpeeds = drive.tankController(self.input.drive * 0.8, self.input.turning)
+        self.driveSpeeds = tankController(self.input.drive * 0.8, self.input.turning)
         self.driveSpeeds = [s * 0.5 for s in self.driveSpeeds]
         for i in range(4): self.motors[i].set(self.driveSpeeds[i])
 

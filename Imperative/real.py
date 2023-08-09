@@ -43,11 +43,18 @@ class V2f:
     def __ne__(self, other): return not (self == other)
 
 
-
-
-
 # CLEANUP: this
 def angleWrap(a: float) -> float:
     while a > 180: a -= 360
     while a < -180: a += 360
     return a
+
+
+def normalizeWheelSpeeds(l: list[float]) -> list[float]:
+    m = 0
+    for speed in l:
+        if abs(speed) > m: m = abs(speed)
+
+    if(m > 1):
+        return [s / m for s in l]
+    return l
