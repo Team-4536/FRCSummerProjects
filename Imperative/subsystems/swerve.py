@@ -4,7 +4,7 @@ import wpimath.system.plant as plant
 import math
 
 from virtualGyro import VirtualGyro
-from real import V2f, angleWrap
+from real import V2f, angleWrap, normalizeWheelSpeeds
 from encoderSim import EncoderSim
 from PIDController import PIDController
 
@@ -151,6 +151,7 @@ class SwerveController:
             V2f(-1, 1)
         ]
 
+        driveSpeeds = [ ]
         for i in range(4):
             tv = turningVectors[i].getNormalized() * (turningInRads * swerve.wheelOffsets[i].getLength())
             vec = speed + tv
@@ -167,8 +168,11 @@ class SwerveController:
                 wheelSpeed *= -1
 
             swerve.steerMotors[i].set(self.pids[i].tickErr(angleWrap(error)/360, dt))
-            swerve.driveMotors[i].set(wheelSpeed / swerve.maxSpeed)
+            driveSpeeds.append(wheelSpeed / swerve.maxSpeed)
 
+        driveSpeeds = normalizeWheelSpeeds(driveSpeeds)
+        for x in zip(driveSpeeds, swerve.driveMotors):
+            x[1].set(x[0])
 
 
 
