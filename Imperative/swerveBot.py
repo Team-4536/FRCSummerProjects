@@ -9,7 +9,7 @@ from wpimath.geometry import Pose2d, Rotation2d
 from wpimath.kinematics import ChassisSpeeds
 from wpimath.controller import RamseteController
 
-from real import V2f
+from real import V2f, angleWrap
 import socketing
 import timing
 from inputs import FlymerInputs
@@ -126,17 +126,18 @@ class SwerveBot(wpilib.TimedRobot):
             (V2f(4, 0), V2f(3, -2), V2f(1, -2), V2f(0, 0))
         ], pointCount)
 
-        self.speedPath = getLinear2dPoints([
-            V2f(0.8, 1), V2f(1, 0.4)
-        ], pointCount)
+        self.speedPath: list[V2f] = []
+        for i in range(pointCount-1):
+            val = (self.path[i+1] - self.path[i]).getNormalized() * 4
+            self.speedPath.append(val)
+        self.speedPath.append(V2f())
+
 
         self.anglePath = getLinear2dPoints([
             V2f(0, 0), V2f(0.5, 90), V2f(1, -90)
         ], pointCount)
 
         self.pathIdx = 0
-
-        self.ramsete = RamseteController()
 
     def autonomousPeriodic(self) -> None:
 
@@ -150,21 +151,23 @@ class SwerveBot(wpilib.TimedRobot):
         self.server.putUpdate("targetX", nextPt.x)
         self.server.putUpdate("targetY", nextPt.y)
         speed = self.speedPath[self.pathIdx]
-        self.server.putUpdate("targetSpeed", speed)
+        self.server.putUpdate("targetSpeedX", speed.x)
+        self.server.putUpdate("targetSpeedY", speed.y)
 
         nextAngle = self.anglePath[self.pathIdx]
         self.server.putUpdate("targetAngle", nextAngle)
 
-        currentPose = Pose2d(position.x, position.y, math.radians(-self.gyro.getYaw()))
-        targetPose = Pose2d(nextPt.x, nextPt.y, math.radians(-nextAngle))
-        linVel = speed # m/s
-        angularVel = 1 # rads/s
-        out = self.ramsete.calculate(currentPose, targetPose, linVel, angularVel)
 
-        self.server.putUpdate("outX", out.vx)
-        self.server.putUpdate("outY", out.vy)
-        self.server.putUpdate("outA", -math.degrees(out.omega))
-        self.swerveController.tickReal(V2f(out.vx, out.vy).rotateDegrees(-self.gyro.getYaw()), -math.degrees(out.omega), self.time.dt, self.swerve, self.server)
+        e = math.e**(-(nextPt - position).getLength())
+        out = speed * e
+        out = (nextPt - position).getNormalized() * 3 * (1/e)
+
+        outA = angleWrap(nextAngle - self.gyro.getYaw()) * 40
+
+        self.server.putUpdate("outX", out.x)
+        self.server.putUpdate("outY", out.y)
+        self.server.putUpdate("outA", outA)
+        self.swerveController.tickReal(V2f(out.x, out.y).rotateDegrees(-self.gyro.getYaw()), outA, self.time.dt, self.swerve, self.server)
 
         if((position - nextPt).getLength() < 0.6): self.pathIdx += 1
 
@@ -178,7 +181,7 @@ class SwerveBot(wpilib.TimedRobot):
         self.server.putUpdate("inputY", self.input.driveY)
         self.server.putUpdate("inputT", self.input.turning)
 
-        drive = V2f(self.input.driveX, self.input.driveY)
+        drive = V2f(self.input.driveX, self.input.driveY).getNormalized()
         drive *= 4.2
         drive = drive.rotateDegrees(-self.gyro.getYaw())
         self.server.putUpdate("driveX", drive.x)

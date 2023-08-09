@@ -161,9 +161,12 @@ class SwerveController:
                 swerve.driveMotors[i].set(0)
                 continue
 
-            # TODO: fast flipping
-            error = angleWrap(vec.getAngle() - swerve.steerEncoders[i].getPosition()*360) / 360
-            swerve.steerMotors[i].set(self.pids[i].tickErr(error, dt))
+            error = angleWrap(vec.getAngle() - swerve.steerEncoders[i].getPosition()*360)
+            if(abs(error) > 90):
+                error = error - 180
+                wheelSpeed *= -1
+
+            swerve.steerMotors[i].set(self.pids[i].tickErr(angleWrap(error)/360, dt))
             swerve.driveMotors[i].set(wheelSpeed / swerve.maxSpeed)
 
 
