@@ -24,21 +24,24 @@ class V2f:
         return float(length)
 
 
-    #angle
     def getAngle(self):
-        angle = -(math.atan2(self.x, self.y)) * 57.2958 #radians to angle conversion factor
+        angle = -(math.atan2(self.y, self.x)) * 57.2958 #radians to angle conversion factor
         return float(angle)
+
+    def getNormalized(self):
+        l = self.getLength()
+        if(l != 0): return self / l
+        else: return V2f()
+
 
 
     def __add__(self, b): return V2f(self.x + b.x, self.y + b.y)
     def __sub__(self, b): return V2f(self.x - b.x, self.y - b.y)
+    def __neg__(self): return V2f(-self.x, -self.y)
     def __mul__(self, s): return V2f(self.x * s, self.y * s)
     def __truediv__(self, s): return V2f(self.x / s, self.y / s)
     def __eq__(self, other): return (self.x == other.x) and (self.y == other.y)
     def __ne__(self, other): return not (self == other)
-
-
-
 
 
 # CLEANUP: this
@@ -46,3 +49,13 @@ def angleWrap(a: float) -> float:
     while a > 180: a -= 360
     while a < -180: a += 360
     return a
+
+
+def normalizeWheelSpeeds(l: list[float]) -> list[float]:
+    m = 0
+    for speed in l:
+        if abs(speed) > m: m = abs(speed)
+
+    if(m > 1):
+        return [s / m for s in l]
+    return l

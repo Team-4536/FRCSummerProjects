@@ -1,94 +1,80 @@
-import ntcore
 import wpilib
-import wpimath.system.plant as plant
-import rev
 import navx
 
-import drive
-import inputs
-from telemetryHelp import publishExpression
-import sim
+import real
+from inputs import deadZone
 import timing
 import socketing
 
 
+def tankController(drive: float, turning: float) -> list[float]:
+    speeds = [
+        drive + turning,
+        drive - turning,
+        drive + turning,
+        drive - turning
+    ]
+    return real.normalizeWheelSpeeds(speeds)
+
+def arcadeController(l: float, r: float) -> list[float]:
+    return [ l, r, l, r ]
 
 
-
+class DemoInputs():
+    def __init__(self, driveCtrlr: wpilib.XboxController) -> None:
+        self.drive = -deadZone(driveCtrlr.getLeftY())
+        self.turning = deadZone(driveCtrlr.getRightX())
+        self.turret = driveCtrlr.getRightTriggerAxis() - driveCtrlr.getLeftTriggerAxis()
 
 
 class DemoBot(wpilib.TimedRobot):
 
-
     def robotInit(self) -> None:
-
         self.server = socketing.Server(self.isReal())
 
-        # DRIVE MOTORS ==================================================
-        self.FLDrive = wpilib.Spark(2)
-        self.FRDrive = wpilib.Spark(3)
-        self.BLDrive = wpilib.Spark(1)
-        self.BRDrive = wpilib.Spark(4)
-        self.FRDrive.setInverted(True)
-        self.BRDrive.setInverted(True)
-
+        self.motors = [
+            wpilib.Spark(2),
+            wpilib.Spark(3),
+            wpilib.Spark(1),
+            wpilib.Spark(4)
+        ]
+        self.motors[1].setInverted(True)
+        self.motors[3].setInverted(True)
         self.turretMotor = wpilib.Spark(0)
-
         self.turretEncoder = wpilib.Encoder(0, 1)
 
-
-        # GYRO ==========================================================
         self.gyro = navx.AHRS(wpilib.SPI.Port.kMXP)
-
-        # CONTROLLERS ====================================================
 
         self.driveCtrlr = wpilib.XboxController(0)
         self.armCtrlr = wpilib.XboxController(1)
 
-        # TIME =========================================================
         self.time = timing.TimeData(None)
-
-
-
-    def _simulationInit(self) -> None:
-        pass
-
-    def _simulationPeriodic(self) -> None:
-        pass
-
-
-
-
 
     def robotPeriodic(self) -> None:
 
         self.time = timing.TimeData(self.time)
 
-        self.server.putUpdate("FLSpeed", self.FLDrive.get())
-        self.server.putUpdate("FRSpeed", self.FRDrive.get())
-        self.server.putUpdate("BLSpeed", self.BLDrive.get())
-        self.server.putUpdate("BRSpeed", self.BRDrive.get())
+        self.server.putUpdate("FLSpeed", self.motors[0].get())
+        self.server.putUpdate("FRSpeed", self.motors[1].get())
+        self.server.putUpdate("BLSpeed", self.motors[2].get())
+        self.server.putUpdate("BRSpeed", self.motors[3].get())
         self.server.putUpdate("TurretSpeed", self.turretMotor.get())
         self.server.putUpdate("enabled", self.isEnabled())
         self.server.putUpdate("turretPos", self.turretEncoder.get())
 
         self.server.update(self.time.timeSinceInit)
 
-
-
     def teleopPeriodic(self) -> None:
+        self.input = DemoInputs(self.driveCtrlr)
 
-        self.input = inputs.DemoInputs(self.driveCtrlr)
-
-        self.driveSpeeds = drive.tankController(self.input.drive * 0.8, self.input.turning)
-        self.driveSpeeds = drive.scaleSpeeds(self.driveSpeeds, 0.5)
-        drive.setMotors(self.driveSpeeds, self.FLDrive, self.FRDrive, self.BLDrive, self.BRDrive)
+        self.driveSpeeds = tankController(self.input.drive * 0.8, self.input.turning)
+        self.driveSpeeds = [s * 0.5 for s in self.driveSpeeds]
+        for i in range(4): self.motors[i].set(self.driveSpeeds[i])
 
         self.turretMotor.set(self.input.turret * 0.5)
 
-
     def disabledPeriodic(self) -> None:
-        drive.setMotors([0, 0, 0, 0], self.FLDrive, self.FRDrive, self.BLDrive, self.BRDrive)
+        for m in self.motors: m.set(0)
         self.turretMotor.set(0)
 
 

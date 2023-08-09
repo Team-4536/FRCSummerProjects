@@ -1,9 +1,5 @@
 
 
-
-
-
-
 class PIDController:
 
     def __init__(self, kp: float = 0, ki: float = 0, kd:float = 0) -> None:
