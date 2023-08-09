@@ -1,18 +1,130 @@
-import wpilib
+
+import rev
+import wpimath.system.plant as plant
 import math
+
+from virtualGyro import VirtualGyro
 from real import V2f, angleWrap
-from typing import Any
+from encoderSim import EncoderSim
 from PIDController import PIDController
 
-#next thing to do: change brake mode from toggle to happen until input received
+import wpimath.estimator
+import wpimath.kinematics
+from wpimath.kinematics import SwerveModulePosition;
+from wpimath.geometry import Translation2d, Pose2d, Rotation2d
 
-# TODO: One time, for no reason, this thing had a stroke and wouldnt move
+class SwerveState:
+    def __init__(self, wheelOffsets, wheelRadius, driveMotors, steerMotors, driveEncoders, steerEncoders) -> None:
+
+        self.driveMotors: list[rev.CANSparkMax] = driveMotors
+        self.steerMotors: list[rev.CANSparkMax] = steerMotors
+        self.driveEncoders: list[rev.RelativeEncoder] = driveEncoders
+        self.steerEncoders: list[rev.RelativeEncoder] = steerEncoders
 
 
+        self.wheelRadius = wheelRadius
+        self.wheelCirc = wheelRadius * 2 * math.pi
+        self.wheelOffsets = wheelOffsets
+        wheelTranslations = [Translation2d(w.x, w.y) for w in wheelOffsets]
+
+        self.wheelStates = (
+            SwerveModulePosition(0, Rotation2d(0)),
+            SwerveModulePosition(0, Rotation2d(0)),
+            SwerveModulePosition(0, Rotation2d(0)),
+            SwerveModulePosition(0, Rotation2d(0))
+        )
+        kine = wpimath.kinematics.SwerveDrive4Kinematics(*wheelTranslations)
+        self.estimatedPosition = V2f(0, 0)
+        self.est = wpimath.estimator.SwerveDrive4PoseEstimator(
+            kine,
+            Rotation2d(0),
+            self.wheelStates,
+            Pose2d(Translation2d(self.estimatedPosition.x, self.estimatedPosition.y), Rotation2d())
+            )
+
+    # TODO: reset states button to set conditions inside of WPI items reset PIDs
+    # TODO: reset button from sundial
+
+    # angle is in degs CW+
+    def updateEstimation(self, currentTime: float, currentAngle) -> None:
+        r = Rotation2d(math.radians(-currentAngle)) # wpi uses CCW angles
+
+        for i in range(0, 4):
+            self.wheelStates[i].angle = Rotation2d(-(self.steerEncoders[i].getPosition() * 2 * math.pi))
+            self.wheelStates[i].distance = self.driveEncoders[i].getPosition() * self.wheelCirc
+
+        nPose = self.est.updateWithTime(currentTime, r, self.wheelStates)
+        self.estimatedPosition = V2f(nPose.X(), nPose.Y())
+
+
+
+
+
+
+
+
+class SwerveSim:
+    def __init__(self) -> None:
+        self.driveSims: list[EncoderSim] = [
+            EncoderSim(plant.DCMotor.NEO(1), 0.005, 6.12) for i in range(4)
+            ]
+
+        # TODO: get real inertia vals
+        # TODO: is this the corect gearing?
+        self.steerSims: list[EncoderSim] = [
+            EncoderSim(plant.DCMotor.NEO(1), 0.001, 1) for i in range(4)
+            ]
+
+        self.position = V2f(0, 0)
+        self.rotation: float = 0.0
+
+    # TODO: add real friction to wheel sims
+    # NOTE: updates hardware given inside of swerveState
+    def update(self, dt: float, gyro: VirtualGyro, swerve: SwerveState):
+        posDeltas: list[V2f] = []
+
+        for i in range(0, 4):
+            sim = self.driveSims[i]
+            sim.update(dt, swerve.driveMotors[i], swerve.driveEncoders[i])
+            driveDelta = (sim.state[1] / (2 * math.pi)) * dt * swerve.wheelCirc # delta in meters
+            sim.state[1] *= 0.9 # CLEANUP: friction hack
+
+            sim = self.steerSims[i]
+            sim.update(dt, swerve.steerMotors[i], swerve.steerEncoders[i])
+            steerPos = (sim.state[0] / (2 * math.pi)) * 360 # position in degrees
+            sim.state[1] *= 0.5
+
+            posDeltas.append((V2f(1, 0) * driveDelta).rotateDegrees(steerPos))
+
+        posChange = (posDeltas[0] + posDeltas[1] + posDeltas[2] + posDeltas[3]) / 4
+        self.position += posChange.rotateDegrees(self.rotation)
+
+        # TODO: right now position and angle are beign updated via averaging wheel deltas. Find out if this is correct
+
+        angleDeltas: list[float] = [ ]
+        for i in range(0, 4):
+            inital = swerve.wheelOffsets[i]
+            new = inital + posDeltas[i]
+            angle = angleWrap(inital.getAngle() - new.getAngle())
+            angleDeltas.append(angle)
+
+        self.rotation += (angleDeltas[0] + angleDeltas[1] + angleDeltas[2] + angleDeltas[3]) / 4
+        gyro.setYaw(self.rotation)
+
+
+
+
+
+
+
+
+
+
+
+
+# TODO: change brake mode from toggle to happen until input received
 class SwerveController:
-
-    def __init__(self, turnList, driveList, turnEncoders, driveEncoders) -> None:
-
+    def __init__(self) -> None:
         self.brakes = 1
 
         #choose between brake or hold position when no input is given (if false brake will be a toggle on button "A")
@@ -26,35 +138,24 @@ class SwerveController:
         self.BLPID = PIDController(kp, ki, kd)
         self.BRPID = PIDController(kp, ki, kd)
 
-        assert len(turnList) == 4
-        assert len(driveList) == 4
-        assert len(turnEncoders) == 4
-        assert len(driveEncoders) == 4
-
-        self.turnList = turnList
-        self.driveList = driveList
-        self.turnEncoders = turnEncoders
-        self.driveEncoders = driveEncoders
-
-    # Y = forward/back
-    # X = Left/Right
-    # Z = Turning, CW+
-    def tick(self, inputX, inputY, inputZ, dt, brakeButtonPressed) -> None:
-
+    # forward = forward/back
+    # right = Left/Right
+    # turning is CW+
+    def tick(self, forward: float, right: float, turn: float, dt: float, brakeButtonPressed, swerve: SwerveState) -> None:
         #brake input toggle
         if brakeButtonPressed == True:
             self.brakes = self.brakes * -1
 
         #assign inputs to vectors
-        leftStick = V2f(inputX, inputY)
+        leftStick = V2f(forward, right)
 
-        FLTurningVector = V2f(math.cos(45) * inputZ, math.cos(45) * inputZ)
-        FRTurningVector = V2f(math.cos(45) * inputZ, -math.cos(45) * inputZ)
-        BLTurningVector = V2f(-math.cos(45) * inputZ, math.cos(45) * inputZ)
-        BRTurningVector = V2f(-math.cos(45) * inputZ, -math.cos(45) * inputZ)
+        FLTurningVector = V2f(math.cos(45) * turn, math.cos(45) * turn)
+        FRTurningVector = V2f(math.cos(45) * turn, -math.cos(45) * turn)
+        BLTurningVector = V2f(-math.cos(45) * turn, math.cos(45) * turn)
+        BRTurningVector = V2f(-math.cos(45) * turn, -math.cos(45) * turn)
 
         #joystick scalar (adjusts speed depending on how far you move the joysticks)
-        inputScalar = leftStick.getLength() + abs(inputZ)
+        inputScalar = leftStick.getLength() + abs(turn)
         if inputScalar > 1:
             inputScalar = 1
 
@@ -66,10 +167,10 @@ class SwerveController:
         """-----------------------------------------"""
 
         #read encoder positions and set them angles
-        FLPosAngle = (self.turnEncoders[0].getPosition() % 1) * 360
-        FRPosAngle = (self.turnEncoders[1].getPosition() % 1) * 360
-        BLPosAngle = (self.turnEncoders[2].getPosition() % 1) * 360
-        BRPosAngle = (self.turnEncoders[3].getPosition() % 1) * 360
+        FLPosAngle = (swerve.steerEncoders[0].getPosition() % 1) * 360
+        FRPosAngle = (swerve.steerEncoders[1].getPosition() % 1) * 360
+        BLPosAngle = (swerve.steerEncoders[2].getPosition() % 1) * 360
+        BRPosAngle = (swerve.steerEncoders[3].getPosition() % 1) * 360
 
         #wrap angles (0, 90, 180, -90)
         if FLPosAngle > 180:
@@ -106,7 +207,7 @@ class SwerveController:
                 BLPower = 0
                 BRPower = 0
         else:
-            if inputX == 0 and inputY == 0 and inputZ == 0:
+            if forward == 0 and right == 0 and turn == 0:
                 FLTarget = 135
                 FRTarget = 225
                 BLTarget = 45
@@ -179,7 +280,6 @@ class SwerveController:
         else:
             powerScalar = 1 / maxPowerInput
 
-
         #steering scalar
         #FL vs FR
         if abs(FLSteeringPower) > abs(FRSteeringPower):
@@ -214,16 +314,15 @@ class SwerveController:
         BRSteeringPower = BRSteeringPower * steeringScalar
 
         """============================================="""
-        
+
         #drive values (power)
-        self.driveList[0].set(FLPower)
-        self.driveList[1].set(FRPower)
-        self.driveList[2].set(BLPower)
-        self.driveList[3].set(BRPower)
+        swerve.driveMotors[0].set(FLPower)
+        swerve.driveMotors[1].set(FRPower)
+        swerve.driveMotors[2].set(BLPower)
+        swerve.driveMotors[3].set(BRPower)
 
         #target steering values (in rotaions)
-        self.turnList[0].set(FLSteeringPower)
-        self.turnList[1].set(FRSteeringPower)
-        self.turnList[2].set(BLSteeringPower)
-        self.turnList[3].set(BRSteeringPower)
-        
+        swerve.steerMotors[0].set(FLSteeringPower)
+        swerve.steerMotors[1].set(FRSteeringPower)
+        swerve.steerMotors[2].set(BLSteeringPower)
+        swerve.steerMotors[3].set(BRSteeringPower)

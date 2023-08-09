@@ -334,7 +334,7 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
     initView(&globs.views[3]);
 
     globs.ctrlInfo = ControlsInfo();
-    bump_allocate(&globs.ctrlInfo.replayArena, 1000000);
+    bump_allocate(&globs.ctrlInfo.replayArena, 10000000);
 
 
 

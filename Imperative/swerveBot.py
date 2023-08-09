@@ -4,20 +4,19 @@ import ntcore
 import math
 import navx
 
-from inputs import FlymerInputs
-from real import V2f, angleWrap
-from swerveController import SwerveController
-from telemetryHelp import publishExpression
-from virtualGyro import VirtualGyro
-from swerveEstimation import SwerveEstimator
-from wpimath.controller import RamseteController
-import socketing
-import sim
-import timing
-from paths import getSpline2dPoints, getLinear2dPoints
 import wpimath.system.plant as plant
 from wpimath.geometry import Pose2d, Rotation2d
 from wpimath.kinematics import ChassisSpeeds
+from wpimath.controller import RamseteController
+
+from real import V2f
+import socketing
+import timing
+from inputs import FlymerInputs
+from virtualGyro import VirtualGyro
+from paths import getSpline2dPoints, getLinear2dPoints
+
+from subsystems.swerve import SwerveState, SwerveController, SwerveSim
 
 
 WHEEL_DIA = 0.1016 # 4 in. in meters
@@ -38,36 +37,28 @@ class SwerveBot(wpilib.TimedRobot):
         self.gyro = VirtualGyro()
         # self.gyro = navx.AHRS(wpilib.SPI.Port.kMXP)
 
-
         driveType = rev.CANSparkMax.MotorType.kBrushless
-
-        self.driveMotors = [
+        driveMotors = [
             rev.CANSparkMax(0, driveType),
             rev.CANSparkMax(1, driveType),
             rev.CANSparkMax(2, driveType),
             rev.CANSparkMax(3, driveType)
         ]
-        self.driveEncoders: list[rev.RelativeEncoder] = [x.getEncoder() for x in self.driveMotors]
-
-        self.steerMotors = [
+        driveEncoders: list[rev.RelativeEncoder] = [x.getEncoder() for x in driveMotors]
+        steerMotors = [
             rev.CANSparkMax(4, driveType),
             rev.CANSparkMax(5, driveType),
             rev.CANSparkMax(6, driveType),
             rev.CANSparkMax(7, driveType)
         ]
-        self.steerEncoders: list[rev.RelativeEncoder] = [x.getEncoder() for x in self.steerMotors]
+        steerEncoders: list[rev.RelativeEncoder] = [x.getEncoder() for x in steerMotors]
 
-        self.estimator = SwerveEstimator()
+        # NOTE: X+ is forward, so FL should be up and right in world coords
+        wheelPositions = [ V2f(1, 1), V2f(1, -1), V2f(-1, 1), V2f(-1, -1) ]
+        self.swerve = SwerveState(wheelPositions, WHEEL_RADIUS, driveMotors, steerMotors, driveEncoders, steerEncoders)
+        self.swerveController = SwerveController()
 
-
-        self.swerveController = SwerveController(
-            self.steerMotors,
-            self.driveMotors,
-            self.steerEncoders,
-            self.driveEncoders)
-
-        m = rev.CANSparkMax(10, driveType)
-
+        self.prevPos = self.swerve.estimatedPosition
 
     def robotPeriodic(self) -> None:
 
@@ -78,22 +69,24 @@ class SwerveBot(wpilib.TimedRobot):
 
         prefs = ["FL", "FR", "BL", "BR"]
         for i in range(0, 4):
-            self.server.putUpdate(prefs[i] + "DriveSpeed", self.driveMotors[i].get())
-            self.server.putUpdate(prefs[i] + "DrivePos", self.driveEncoders[i].getPosition())
-            self.server.putUpdate(prefs[i] + "SteerSpeed", self.steerMotors[i].get())
-            self.server.putUpdate(prefs[i] + "SteerPos", self.steerEncoders[i].getPosition())
+            self.server.putUpdate(prefs[i] + "DriveSpeed", self.swerve.driveMotors[i].get())
+            self.server.putUpdate(prefs[i] + "DrivePos", self.swerve.driveEncoders[i].getPosition())
+            self.server.putUpdate(prefs[i] + "SteerSpeed", self.swerve.steerMotors[i].get())
+            self.server.putUpdate(prefs[i] + "SteerPos", self.swerve.steerEncoders[i].getPosition())
 
         self.server.putUpdate("posX", float(self.sim.position.x))
         self.server.putUpdate("posY", float(self.sim.position.y))
         self.server.putUpdate("yaw", self.gyro.getYaw())
 
-        estimatedPose = self.estimator.update(self.time.timeSinceInit, self.gyro.getYaw(),
-            [self.driveEncoders[i].getPosition() * WHEEL_CIRC for i in range(0, 4)],
-            [self.steerEncoders[i].getPosition() * 360 for i in range(0, 4)]
-            )
+        vel = (self.swerve.estimatedPosition - self.prevPos) / self.time.dt
+        self.server.putUpdate("velX", vel.x)
+        self.server.putUpdate("velY", vel.y)
+        self.prevPos = self.swerve.estimatedPosition
 
-        self.server.putUpdate("estX", estimatedPose.x)
-        self.server.putUpdate("estY", estimatedPose.y)
+
+        self.swerve.updateEstimation(self.time.timeSinceInit, self.gyro.getYaw())
+        self.server.putUpdate("estX", self.swerve.estimatedPosition.x)
+        self.server.putUpdate("estY", self.swerve.estimatedPosition.y)
 
 
         #TODO: debug expression in cpp sundial
@@ -114,19 +107,10 @@ class SwerveBot(wpilib.TimedRobot):
 
 
     def _simulationInit(self) -> None:
-        self.sim = sim.SwerveSim(
-            self.driveMotors,
-            self.driveEncoders,
-            self.steerMotors,
-            self.steerEncoders,
-            self.gyro,
-            [ V2f(1, 1), V2f(1, -1), V2f(-1, 1), V2f(-1, -1) ], # NOTE: left is forward, so FL should be up and right in world coords
-            WHEEL_CIRC
-        )
+        self.sim = SwerveSim()
 
     def _simulationPeriodic(self) -> None:
-        self.sim.update(self.time.dt)
-
+        self.sim.update(self.time.dt, self.gyro, self.swerve)
 
 
 
@@ -157,7 +141,7 @@ class SwerveBot(wpilib.TimedRobot):
         if(self.pathIdx >= len(self.path)):
             self.pathIdx = 99
 
-        position = self.estimator.estimatedPose
+        position = self.swerve.estimatedPosition
 
         nextPt = self.path[self.pathIdx]
         self.server.putUpdate("targetX", nextPt.x)
@@ -192,24 +176,15 @@ class SwerveBot(wpilib.TimedRobot):
 
         drive = V2f(self.input.driveX, self.input.driveY)
         drive = drive.rotateDegrees(-self.gyro.getYaw() - 90)
-        self.swerveController.tick(
-            drive.x,
-            drive.y,
-            self.input.turning,
-            self.time.dt,
-            self.input.brakeToggle)
-
-
-
-
+        self.swerveController.tick(drive.x, drive.y, self.input.turning, self.time.dt, self.input.brakeToggle, self.swerve)
 
     def disabledInit(self) -> None:
         self.disabledPeriodic()
 
     def disabledPeriodic(self) -> None:
         for i in range(0, 4):
-            self.driveMotors[i].stopMotor()
-            self.steerMotors[i].stopMotor()
+            self.swerve.driveMotors[i].stopMotor()
+            self.swerve.steerMotors[i].stopMotor()
 
 
 if __name__ == "__main__":
