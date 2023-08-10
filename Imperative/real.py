@@ -1,5 +1,9 @@
-
+from __future__ import annotations
 import math
+
+def lerp(a: float, b: float, t: float) -> float:
+    return a + (b-a)*t
+
 
 
 class V2f:
@@ -42,6 +46,14 @@ class V2f:
     def __truediv__(self, s): return V2f(self.x / s, self.y / s)
     def __eq__(self, other): return (self.x == other.x) and (self.y == other.y)
     def __ne__(self, other): return not (self == other)
+
+    @staticmethod
+    def lerp(a: V2f, b: V2f, t: float) -> V2f:
+        return V2f(lerp(a.x, b.x, t), lerp(a.y, b.y, t))
+
+
+
+
 
 
 # CLEANUP: this
