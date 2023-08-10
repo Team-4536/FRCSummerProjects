@@ -4,6 +4,8 @@ import math
 def lerp(a: float, b: float, t: float) -> float:
     return a + (b-a)*t
 
+def invLerp(a, b, pt):
+    return (pt-a)/(b-a)
 
 
 class V2f:

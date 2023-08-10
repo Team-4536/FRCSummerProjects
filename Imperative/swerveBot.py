@@ -14,7 +14,7 @@ import socketing
 import timing
 from inputs import deadZone
 from virtualGyro import VirtualGyro
-from paths import getSpline2dPoints, getLinear2dPoints
+from paths import getSpline2dSample, getLinear2dSample
 
 from subsystems.swerve import SwerveState, SwerveController, SwerveSim
 
@@ -61,6 +61,7 @@ class SwerveBot(wpilib.TimedRobot):
 
         # NOTE: X+ is forward, so FL should be up and right in world coords
         wheelPositions = [ V2f(1, 1), V2f(1, -1), V2f(-1, 1), V2f(-1, -1) ]
+        wheelPositions = [p.getNormalized() * 0.5 for p in wheelPositions]
         self.swerve = SwerveState(4.2, wheelPositions, WHEEL_RADIUS, driveMotors, steerMotors, driveEncoders, steerEncoders)
         self.swerveController = SwerveController()
 
@@ -125,37 +126,27 @@ class SwerveBot(wpilib.TimedRobot):
 
 
     def autonomousInit(self) -> None:
-
-        pointCount = 100
-        self.path = getSpline2dPoints([
+        self.path = [
             (V2f(0, 0), V2f(1, 2), V2f(3, 2), V2f(4, 0)),
             (V2f(4, 0), V2f(3, -2), V2f(1, -2), V2f(0, 0))
-        ], pointCount)
+        ]
+        self.speedPath = [ V2f(0, 4.2), V2f(0.9, 4.2), V2f(1, 1) ]
 
-        self.speedPath: list[V2f] = []
-        for i in range(pointCount-1):
-            val = (self.path[i+1] - self.path[i]).getNormalized() * 4.2
-            self.speedPath.append(val)
-        self.speedPath.append(V2f())
-
-
-        self.anglePath = getLinear2dPoints([
-            V2f(0, 0), V2f(0.5, 90), V2f(1, -90)
-        ], pointCount)
-
-        self.pathIdx = 0
+        self.anglePath = [ V2f(0, 0), V2f(0.5, 90), V2f(1, -90) ]
+        self.pathStart = self.time.timeSinceInit
+        self.pathLength = 2.8 # in seconds
 
 
     def autonomousPeriodic(self) -> None:
 
-        self.server.putUpdate("idx", self.pathIdx)
-        if(self.pathIdx >= len(self.path)):
-            self.pathIdx = 99
+        t = (self.time.timeSinceInit - self.pathStart) / self.pathLength
+        t = min(1, t)
+        self.server.putUpdate("t", t)
 
         position = self.swerve.estimatedPosition
-        nextPt = self.path[self.pathIdx]
-        speed = self.speedPath[self.pathIdx]
-        nextAngle = self.anglePath[self.pathIdx]
+        nextPt = getSpline2dSample(self.path, t)
+        speed = (getSpline2dSample(self.path, min(1, t+0.001)) - nextPt).getNormalized() * getLinear2dSample(self.speedPath, t)
+        nextAngle = getLinear2dSample(self.anglePath, t)
         self.server.putUpdate("targetX", nextPt.x)
         self.server.putUpdate("targetY", nextPt.y)
         self.server.putUpdate("targetSpeedX", speed.x)
@@ -178,8 +169,6 @@ class SwerveBot(wpilib.TimedRobot):
         self.server.putUpdate("outX", out.x)
         self.server.putUpdate("outY", out.y)
         self.server.putUpdate("outA", outA)
-
-        if((position - nextPt).getLength() < 0.2): self.pathIdx += 1
 
 
 
