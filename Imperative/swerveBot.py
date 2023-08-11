@@ -4,25 +4,30 @@ import ntcore
 import math
 import navx
 
-from inputs import FlymerInputs
-from real import V2f, angleWrap
-from swerveController import SwerveController
-from telemetryHelp import publishExpression
-from virtualGyro import VirtualGyro
-from swerveEstimation import SwerveEstimator
-from wpimath.controller import RamseteController
-import socketing
-import sim
-import timing
-from paths import getSpline2dPoints, getLinear2dPoints
 import wpimath.system.plant as plant
 from wpimath.geometry import Pose2d, Rotation2d
 from wpimath.kinematics import ChassisSpeeds
+from wpimath.controller import RamseteController
+
+from real import V2f, angleWrap
+import socketing
+import timing
+from inputs import deadZone
+from virtualGyro import VirtualGyro
+from paths import getSpline2dSample, getLinear2dSample
+
+from subsystems.swerve import SwerveState, SwerveController, SwerveSim
 
 
 WHEEL_DIA = 0.1016 # 4 in. in meters
 WHEEL_RADIUS = WHEEL_DIA / 2
 WHEEL_CIRC = WHEEL_DIA * math.pi
+
+class SwerveBotInputs():
+    def __init__(self, driveCtrlr: wpilib.XboxController, armCtrlr: wpilib.XboxController) -> None:
+        self.driveX = deadZone(driveCtrlr.getLeftX())
+        self.driveY = deadZone((-driveCtrlr.getLeftY()))
+        self.turning = deadZone(armCtrlr.getLeftX())
 
 
 class SwerveBot(wpilib.TimedRobot):
@@ -38,36 +43,30 @@ class SwerveBot(wpilib.TimedRobot):
         self.gyro = VirtualGyro()
         # self.gyro = navx.AHRS(wpilib.SPI.Port.kMXP)
 
-
         driveType = rev.CANSparkMax.MotorType.kBrushless
-
-        self.driveMotors = [
+        driveMotors = [
             rev.CANSparkMax(0, driveType),
             rev.CANSparkMax(1, driveType),
             rev.CANSparkMax(2, driveType),
             rev.CANSparkMax(3, driveType)
         ]
-        self.driveEncoders: list[rev.RelativeEncoder] = [x.getEncoder() for x in self.driveMotors]
-
-        self.steerMotors = [
+        driveEncoders: list[rev.RelativeEncoder] = [x.getEncoder() for x in driveMotors]
+        steerMotors = [
             rev.CANSparkMax(4, driveType),
             rev.CANSparkMax(5, driveType),
             rev.CANSparkMax(6, driveType),
             rev.CANSparkMax(7, driveType)
         ]
-        self.steerEncoders: list[rev.RelativeEncoder] = [x.getEncoder() for x in self.steerMotors]
+        steerEncoders: list[rev.RelativeEncoder] = [x.getEncoder() for x in steerMotors]
 
-        self.estimator = SwerveEstimator()
+        # NOTE: X+ is forward, so FL should be up and right in world coords
+        wheelPositions = [ V2f(1, 1), V2f(1, -1), V2f(-1, 1), V2f(-1, -1) ]
+        wheelPositions = [p.getNormalized() * 0.5 for p in wheelPositions]
+        self.swerve = SwerveState(4.2, wheelPositions, WHEEL_RADIUS, driveMotors, steerMotors, driveEncoders, steerEncoders)
+        self.swerveController = SwerveController()
 
-
-        self.swerveController = SwerveController(
-            self.steerMotors,
-            self.driveMotors,
-            self.steerEncoders,
-            self.driveEncoders)
-
-        m = rev.CANSparkMax(10, driveType)
-
+        self.prevPos = self.swerve.estimatedPosition
+        self.prevAngle = self.gyro.getYaw()
 
     def robotPeriodic(self) -> None:
 
@@ -78,23 +77,27 @@ class SwerveBot(wpilib.TimedRobot):
 
         prefs = ["FL", "FR", "BL", "BR"]
         for i in range(0, 4):
-            self.server.putUpdate(prefs[i] + "DriveSpeed", self.driveMotors[i].get())
-            self.server.putUpdate(prefs[i] + "DrivePos", self.driveEncoders[i].getPosition())
-            self.server.putUpdate(prefs[i] + "SteerSpeed", self.steerMotors[i].get())
-            self.server.putUpdate(prefs[i] + "SteerPos", self.steerEncoders[i].getPosition())
+            self.server.putUpdate(prefs[i] + "DriveSpeed", self.swerve.driveMotors[i].get())
+            self.server.putUpdate(prefs[i] + "DrivePos", self.swerve.driveEncoders[i].getPosition())
+            self.server.putUpdate(prefs[i] + "SteerSpeed", self.swerve.steerMotors[i].get())
+            self.server.putUpdate(prefs[i] + "SteerPos", self.swerve.steerEncoders[i].getPosition())
 
         self.server.putUpdate("posX", float(self.sim.position.x))
         self.server.putUpdate("posY", float(self.sim.position.y))
         self.server.putUpdate("yaw", self.gyro.getYaw())
 
-        estimatedPose = self.estimator.update(self.time.timeSinceInit, self.gyro.getYaw(),
-            [self.driveEncoders[i].getPosition() * WHEEL_CIRC for i in range(0, 4)],
-            [self.steerEncoders[i].getPosition() * 360 for i in range(0, 4)]
-            )
+        self.swerve.updateEstimation(self.time.timeSinceInit, self.gyro.getYaw())
+        self.server.putUpdate("estX", self.swerve.estimatedPosition.x)
+        self.server.putUpdate("estY", self.swerve.estimatedPosition.y)
 
-        self.server.putUpdate("estX", estimatedPose.x)
-        self.server.putUpdate("estY", estimatedPose.y)
+        vel = (self.swerve.estimatedPosition - self.prevPos) / self.time.dt
+        self.server.putUpdate("velX", vel.x)
+        self.server.putUpdate("velY", vel.y)
+        self.prevPos = self.swerve.estimatedPosition
 
+        vel = (self.gyro.getYaw() - self.prevAngle) / self.time.dt
+        self.server.putUpdate("angVel", vel)
+        self.prevAngle = self.gyro.getYaw()
 
         #TODO: debug expression in cpp sundial
 
@@ -114,102 +117,89 @@ class SwerveBot(wpilib.TimedRobot):
 
 
     def _simulationInit(self) -> None:
-        self.sim = sim.SwerveSim(
-            self.driveMotors,
-            self.driveEncoders,
-            self.steerMotors,
-            self.steerEncoders,
-            self.gyro,
-            [ V2f(1, 1), V2f(1, -1), V2f(-1, 1), V2f(-1, -1) ], # NOTE: left is forward, so FL should be up and right in world coords
-            WHEEL_CIRC
-        )
+        self.sim = SwerveSim()
 
     def _simulationPeriodic(self) -> None:
-        self.sim.update(self.time.dt)
-
+        self.sim.update(self.time.dt, self.gyro, self.swerve)
 
 
 
 
     def autonomousInit(self) -> None:
-
-        pointCount = 100
-        self.path = getSpline2dPoints([
+        self.path = [
             (V2f(0, 0), V2f(1, 2), V2f(3, 2), V2f(4, 0)),
             (V2f(4, 0), V2f(3, -2), V2f(1, -2), V2f(0, 0))
-        ], pointCount)
+        ]
+        self.speedPath = [ V2f(0, 4.2), V2f(0.9, 4.2), V2f(1, 1) ]
 
-        self.speedPath = getLinear2dPoints([
-            V2f(0.8, 1), V2f(1, 0.4)
-        ], pointCount)
+        self.anglePath = [ V2f(0, 0), V2f(0.5, 90), V2f(1, -90) ]
+        self.pathStart = self.time.timeSinceInit
+        self.pathLength = 2.8 # in seconds
 
-        self.anglePath = getLinear2dPoints([
-            V2f(0, 0), V2f(0.5, 90), V2f(1, -90)
-        ], pointCount)
-
-        self.pathIdx = 0
-
-        self.ramsete = RamseteController()
 
     def autonomousPeriodic(self) -> None:
 
-        self.server.putUpdate("idx", self.pathIdx)
-        if(self.pathIdx >= len(self.path)):
-            self.pathIdx = 99
+        t = (self.time.timeSinceInit - self.pathStart) / self.pathLength
+        t = min(1, t)
+        self.server.putUpdate("t", t)
 
-        position = self.estimator.estimatedPose
-
-        nextPt = self.path[self.pathIdx]
+        position = self.swerve.estimatedPosition
+        nextPt = getSpline2dSample(self.path, t)
+        speed = (getSpline2dSample(self.path, min(1, t+0.001)) - nextPt).getNormalized() * getLinear2dSample(self.speedPath, t)
+        nextAngle = getLinear2dSample(self.anglePath, t)
         self.server.putUpdate("targetX", nextPt.x)
         self.server.putUpdate("targetY", nextPt.y)
-        speed = self.speedPath[self.pathIdx]
-        self.server.putUpdate("targetSpeed", speed)
-
-        nextAngle = self.anglePath[self.pathIdx]
+        self.server.putUpdate("targetSpeedX", speed.x)
+        self.server.putUpdate("targetSpeedY", speed.y)
         self.server.putUpdate("targetAngle", nextAngle)
 
-        currentPose = Pose2d(position.x, position.y, math.radians(-self.gyro.getYaw()))
-        targetPose = Pose2d(nextPt.x, nextPt.y, math.radians(-nextAngle))
-        linVel = speed # m/s
-        angularVel = 1 # rads/s
-        out = self.ramsete.calculate(currentPose, targetPose, linVel, angularVel)
+        recoveryDist = 4
+        recoveryTime = 0.2
+        l = (nextPt - position).getLength()
+        l = max(0, min(l, recoveryDist))
+        e = (1-(l/recoveryDist))**(2.4)
+        e = 1-e
+        correction = (nextPt - position) / recoveryTime
+        trajectory = speed
+        out = V2f.lerp(trajectory, correction, e)
+        self.server.putUpdate("e", e)
 
-        self.server.putUpdate("outX", out.vx)
-        self.server.putUpdate("outY", out.vy)
-        self.server.putUpdate("outA", -math.degrees(out.omega))
-
-        if((position - nextPt).getLength() < 0.6): self.pathIdx += 1
+        outA = angleWrap(nextAngle - self.gyro.getYaw()) * 40
+        self.swerveController.tickReal(V2f(out.x, out.y).rotateDegrees(-self.gyro.getYaw()), outA, self.time.dt, self.swerve, self.server)
+        self.server.putUpdate("outX", out.x)
+        self.server.putUpdate("outY", out.y)
+        self.server.putUpdate("outA", outA)
 
 
 
 
     def teleopPeriodic(self) -> None:
 
-        self.input = FlymerInputs(self.driveCtrlr, self.armCtrlr)
-        self.server.putUpdate("driveX", self.input.driveX)
-        self.server.putUpdate("driveY", self.input.driveY)
-        self.server.putUpdate("turning", self.input.turning)
+        self.input = SwerveBotInputs(self.driveCtrlr, self.armCtrlr)
+        self.server.putUpdate("inputX", self.input.driveX)
+        self.server.putUpdate("inputY", self.input.driveY)
+        self.server.putUpdate("inputT", self.input.turning)
 
-        drive = V2f(self.input.driveX, self.input.driveY)
-        drive = drive.rotateDegrees(-self.gyro.getYaw() - 90)
-        self.swerveController.tick(
-            drive.x,
-            drive.y,
-            self.input.turning,
-            self.time.dt,
-            self.input.brakeToggle)
+        drive = V2f(self.input.driveX, self.input.driveY).getNormalized()
+        drive *= 4.2
+        drive = drive.rotateDegrees(-self.gyro.getYaw())
+        self.server.putUpdate("driveX", drive.x)
+        self.server.putUpdate("driveY", drive.y)
 
+        turning = self.input.turning * 180
+        self.server.putUpdate("turning", turning)
 
-
-
+        self.swerveController.tickReal(drive, turning, self.time.dt, self.swerve, self.server)
+        # drive = drive.rotateDegrees(-self.gyro.getYaw() - 90)
+        # self.swerveController.tick(drive.x, drive.y, self.input.turning, self.time.dt, self.input.brakeToggle, self.swerve)
 
     def disabledInit(self) -> None:
         self.disabledPeriodic()
 
     def disabledPeriodic(self) -> None:
         for i in range(0, 4):
-            self.driveMotors[i].stopMotor()
-            self.steerMotors[i].stopMotor()
+            self.swerve.driveMotors[i].stopMotor()
+            self.swerve.steerMotors[i].stopMotor()
 
 
 if __name__ == "__main__":

@@ -4,14 +4,35 @@ import wpimath.system.plant as plant
 import rev
 import navx
 
-import drive
-import inputs
-from telemetryHelp import publishExpression
-import sim
 import timing
 from real import V2f
+from subsystems.mech import mechController
+import socketing
+from inputs import deadZone
 
 
+
+
+class FlymerInputs():
+
+    # TODO: switch keyboard/controller modes from sundial
+
+    def __init__(self, driveCtrlr: wpilib.XboxController, armCtrlr: wpilib.XboxController) -> None:
+        self.driveX = deadZone(driveCtrlr.getLeftX())
+        self.driveY = deadZone((-driveCtrlr.getLeftY()))
+        self.turning = deadZone(driveCtrlr.getRightX())
+        self.speedControl = driveCtrlr.getRightTriggerAxis() + .2
+
+        self.gyroReset = driveCtrlr.getYButtonPressed()
+
+        self.absoluteDriveToggle = driveCtrlr.getXButtonPressed()
+
+        self.brakeToggle = driveCtrlr.getBButtonPressed()
+
+        self.lift = deadZone(armCtrlr.getLeftY())
+        self.turret = deadZone(armCtrlr.getLeftX())
+        self.retract = deadZone(armCtrlr.getRightY())
+        self.grabToggle = armCtrlr.getAButtonPressed()
 
 
 class Flymer(wpilib.TimedRobot):
@@ -19,7 +40,7 @@ class Flymer(wpilib.TimedRobot):
 
     def robotInit(self) -> None:
 
-        self.telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
+        self.server = socketing.Server(self.isReal())
 
         # DRIVE MOTORS ==================================================
 
@@ -61,51 +82,33 @@ class Flymer(wpilib.TimedRobot):
         # TIME =========================================================
         self.time = timing.TimeData(None)
 
-
-
-    def _simulationInit(self) -> None:
-        pass
-
-    def _simulationPeriodic(self) -> None:
-        pass
-
-
-
-
-
     def robotPeriodic(self) -> None:
 
         self.time = timing.TimeData(self.time)
 
-        self.telemTable.putNumber("FLSpeed", self.FLDrive.get())
-        self.telemTable.putNumber("FRSpeed", self.FRDrive.get())
-        self.telemTable.putNumber("BLSpeed", self.BLDrive.get())
-        self.telemTable.putNumber("BRSpeed", self.BRDrive.get())
+        self.server.putUpdate("FLSpeed", self.FLDrive.get())
+        self.server.putUpdate("FRSpeed", self.FRDrive.get())
+        self.server.putUpdate("BLSpeed", self.BLDrive.get())
+        self.server.putUpdate("BRSpeed", self.BRDrive.get())
 
-        self.telemTable.putNumber("LiftSpeed", self.liftMotor.get())
-        self.telemTable.putNumber("RetractSpeed", self.retractMotor.get())
-        self.telemTable.putNumber("TurretSpeed", self.turretMotor.get())
+        self.server.putUpdate("LiftSpeed", self.liftMotor.get())
+        self.server.putUpdate("RetractSpeed", self.retractMotor.get())
+        self.server.putUpdate("TurretSpeed", self.turretMotor.get())
 
-        self.telemTable.putBoolean("grabber", True if self.grabber.get() == wpilib.DoubleSolenoid.Value.kForward else False)
-        self.telemTable.putBoolean("brakes", True if self.brakes.get() == wpilib.DoubleSolenoid.Value.kForward else False)
+        self.server.putUpdate("grabber", True if self.grabber.get() == wpilib.DoubleSolenoid.Value.kForward else False)
+        self.server.putUpdate("brakes", True if self.brakes.get() == wpilib.DoubleSolenoid.Value.kForward else False)
 
-        self.telemTable.putNumber("Gyro", self.gyro.getYaw())
-        self.telemTable.putBoolean("AbsoluteDrive", self.absoluteDrive)
+        self.server.putUpdate("Gyro", self.gyro.getYaw())
+        self.server.putUpdate("AbsoluteDrive", self.absoluteDrive)
 
-
-
+        self.server.update(self.time.timeSinceInit)
 
     def teleopInit(self) -> None:
-
         self.gyro.reset()
-
-
-
-
 
     def teleopPeriodic(self) -> None:
 
-        self.input = inputs.FlymerInputs(self.driveCtrlr, self.armCtrlr)
+        self.input = FlymerInputs(self.driveCtrlr, self.armCtrlr)
         self.leftStickVector = V2f(self.input.driveX, self.input.driveY).rotateDegrees(-self.gyro.getYaw())
 
         speedControl = self.input.speedControl
@@ -117,15 +120,18 @@ class Flymer(wpilib.TimedRobot):
             speedControl = 1
 
         if self.absoluteDrive:
-            self.driveSpeeds = drive.mechController(self.leftStickVector.x * speedControl, self.leftStickVector.y * speedControl, self.input.turning * self.turningScalar)
+            self.driveSpeeds = mechController(self.leftStickVector.x * speedControl, self.leftStickVector.y * speedControl, self.input.turning * self.turningScalar)
         else:
-            self.driveSpeeds = drive.mechController(self.input.driveX * speedControl, self.input.driveY * speedControl, self.input.turning * self.turningScalar)
+            self.driveSpeeds = mechController(self.input.driveX * speedControl, self.input.driveY * speedControl, self.input.turning * self.turningScalar)
 
         if self.input.speedControl > .7:
             self.input.speedControl = 1
 
         # self.driveSpeeds = drive.scaleSpeeds(self.driveSpeeds, 0.3)
-        drive.setMotors(self.driveSpeeds, self.FLDrive, self.FRDrive, self.BLDrive, self.BRDrive)
+        self.FLDrive.set(self.driveSpeeds[0])
+        self.FRDrive.set(self.driveSpeeds[1])
+        self.BLDrive.set(self.driveSpeeds[2])
+        self.BRDrive.set(self.driveSpeeds[3])
 
         if self.input.gyroReset:
             self.gyro.reset()
@@ -142,7 +148,10 @@ class Flymer(wpilib.TimedRobot):
 
 
     def disabledPeriodic(self) -> None:
-        drive.setMotors([0, 0, 0, 0], self.FLDrive, self.FRDrive, self.BLDrive, self.BRDrive)
+        self.FLDrive.set(0)
+        self.FRDrive.set(0)
+        self.BLDrive.set(0)
+        self.BRDrive.set(0)
 
         self.liftMotor.set(0)
         self.retractMotor.set(0)
