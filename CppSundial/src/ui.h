@@ -36,6 +36,8 @@ struct Graph2dInfo {
 
     // allocated and removed per instance
     gfx_VertexArray* lineVerts[GRAPH2D_LINECOUNT] = { 0 };
+    gfx_VertexArray* gridVerts;
+    gfx_IndexBuffer* gridIdxs;
 };
 void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target);
 void initGraph2dInfo(Graph2dInfo* info) {
@@ -54,11 +56,15 @@ void initGraph2dInfo(Graph2dInfo* info) {
     for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
         info->lineVerts[i] = gfx_registerVertexArray(gfx_vtype_POS2F, nullptr, 0, true);
     }
+    info->gridVerts = gfx_registerVertexArray(gfx_vtype_POS2F, nullptr, 0, true);
+    info->gridIdxs = gfx_registerIndexBuffer(nullptr, 0, false);
 }
 void deinitGraph2dInfo(Graph2dInfo* info) {
     for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
         gfx_freeVertexArray(info->lineVerts[i]);
     }
+    gfx_freeVertexArray(info->gridVerts);
+    gfx_freeIndexBuffer(info->gridIdxs);
 }
 
 struct FieldInfo {
@@ -881,22 +887,40 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
             info->bottom += change.y;
         }
         matrixOrtho(0, 1, info->bottom, info->top, 0, 100, p->passUniforms.vp);
-        // printf("%f, %f\n", info->top, info->bottom);
-
 
         float pointGap = 1 / (float)GRAPH2D_VCOUNT;
         float sampleGap = GRAPH2D_SAMPLE_WINDOW / GRAPH2D_VCOUNT;
 
-        /*
-        // TODO: proper grid lines
-        draw_line(p, 1, col_darkGray, { 0, offset }, { width, offset });
-        draw_line(p, 1, col_darkGray, { 0, offset + 1*scale}, { width, offset + 1*scale });
-        draw_line(p, 1, col_darkGray, { 0, offset - 1*scale}, { width, offset - 1*scale });
-
-        if(inter.hovered) {
-            draw_line(p, 1, col_darkGray, { inter.mousePos.x, 0 }, { inter.mousePos.x, height });
+        // value lines
+        int vLineCount = 10;
+        float* grid = BUMP_PUSH_ARR(globs.scratch, vLineCount * 2 * 2, float);
+        for(int i = 0; i < vLineCount; i++) {
+            float yVal = i;
+            bool even = i%2==0;
+            grid[i*4+0] = even;
+            grid[i*4+1] = yVal;
+            grid[i*4+2] = !even;
+            grid[i*4+3] = yVal;
         }
-        */
+        gfx_updateVertexArray(info->gridVerts, grid, vLineCount*2*2*sizeof(float), true);
+
+        U32* idxs = BUMP_PUSH_ARR(globs.scratch, vLineCount*2, U32);
+        for(int i = 0; i < vLineCount*2; i++) {
+            idxs[i] = i;
+        }
+        gfx_updateIndexBuffer(info->gridIdxs, idxs, vLineCount*2, true);
+
+        gfx_UniformBlock* b = gfx_registerCall(p);
+        b->color = col_darkGray;
+        b->ib = info->gridIdxs;
+        b->va = info->gridVerts;
+
+
+        // time lines
+        // hover line
+        if(inter.hovered) {
+
+        }
 
 
         float* pts = BUMP_PUSH_ARR(globs.scratch, GRAPH2D_VCOUNT * 2, float);
@@ -945,7 +969,7 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
         // all calls are being passed to opengl and the vert data looks ok
         // it doesn't make sense
         // h elp me
-        gfx_UniformBlock* b = gfx_registerCall(p);
+        b = gfx_registerCall(p);
         b->color = V4f(0, 0, 0, 0);
         b->va = info->lineVerts[0];
         b->ib = globs.lineIB;
