@@ -383,7 +383,7 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* replayArena, gfx_Texture* solidTe
     for(int i = 0; i < GRAPH2D_VCOUNT; i++) {
         lineIBData[i] = i;
     }
-    globs.lineIB = gfx_registerIndexBuffer(lineIBData, 2, false);
+    globs.lineIB = gfx_registerIndexBuffer(lineIBData, GRAPH2D_VCOUNT, false);
 
 
     globs.sceneShader2d = gfx_registerShader(gfx_vtype_POS2F_UV, "res/shaders/2d.vert", "res/shaders/2d.frag", frameArena);
@@ -863,7 +863,7 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
 
         gfx_Pass* p = gfx_registerPass();
         p->target = target;
-        // p->isLines = true;
+        p->isLines = true;
         p->shader = globs.lineShader;
 
         blu_WidgetInteraction inter = blu_interactionFromWidget(a);
@@ -891,9 +891,9 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
         */
 
 
+        float* pts = BUMP_PUSH_ARR(globs.scratch, GRAPH2D_VCOUNT * 2, float);
         for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
             if(info->keys[i].str.length == 0) { continue; }
-            float* pts = BUMP_PUSH_ARR(globs.scratch, GRAPH2D_VCOUNT * 2, float);
 
             // TODO: int/bool graphing
             float sHeight = 0;
@@ -932,6 +932,15 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
             // */
         }
 
+        //TODO: what the actual fuck
+        // The last line will not appear unless there is a call after it
+        // all calls are being passed to opengl and the vert data looks ok
+        // it doesn't make sense
+        // h elp me
+        gfx_UniformBlock* b = gfx_registerCall(p);
+        b->color = V4f(0, 0, 0, 0);
+        b->va = info->lineVerts[0];
+        b->ib = globs.lineIB;
 
         a = blu_areaMake("lowerBit", blu_areaFlags_FLOATING);
         blu_style_sizeY({ blu_sizeKind_PERCENT, 1 }, &a->style);

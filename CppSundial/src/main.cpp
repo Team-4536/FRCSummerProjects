@@ -95,7 +95,7 @@ int main() {
 
         glEnable(GL_MULTISAMPLE);
 
-        // glLineWidth(2);
+        glLineWidth(3);
 
         glEnable(GL_DEBUG_OUTPUT);
         glDebugMessageCallback(
