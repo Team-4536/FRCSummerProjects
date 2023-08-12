@@ -868,12 +868,20 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
 
         blu_WidgetInteraction inter = blu_interactionFromWidget(a);
 
-        V2f change = V2f(-inter.dragDelta.y * 0.01);
-        info->top += change.x;
-        info->bottom += change.y;
-        // printf("%f, %f", info->top, info->bottom);
-        matrixOrtho(0, 1, info->bottom, info->top, 0, 100, p->passUniforms.vp);
+        if(height != 0 && inter.hovered) {
+            float viewSize = info->top - info->bottom;
+            V2f change = V2f(inter.dragDelta.y * (viewSize / height));
 
+            float scaleChange = inter.scrollDelta * viewSize * 0.05;
+            float pct = (inter.mousePos.y / height);
+
+            change += V2f(pct * scaleChange, (1-pct) * -scaleChange);
+
+            info->top += change.x;
+            info->bottom += change.y;
+        }
+        matrixOrtho(0, 1, info->bottom, info->top, 0, 100, p->passUniforms.vp);
+        // printf("%f, %f\n", info->top, info->bottom);
 
 
         float pointGap = 1 / (float)GRAPH2D_VCOUNT;
