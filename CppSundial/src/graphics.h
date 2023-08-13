@@ -3,11 +3,9 @@
 #include "base/str.h"
 #include "base/utils.h"
 
-
-
 struct gfx_UniformBlock;
 struct gfx_Shader;
-
+struct gfx_Pass;
 
 enum gfx_TexPxType {
     gfx_texPxType_RGBA8,
@@ -25,16 +23,13 @@ struct gfx_Texture {
     gfx_TexPxType pixelLayout;
 };
 
-
-
-
 enum gfx_VType {
     gfx_vtype_NONE,
+    gfx_vtype_POS2F,
     gfx_vtype_POS2F_UV,
     gfx_vtype_POS3F_UV
 };
 
-struct gfx_Pass; // >:(
 typedef void (*gfx_ShaderUniformBindFunc)(gfx_Pass* pass, gfx_UniformBlock* uniforms);
 struct gfx_Shader {
     U32 id = 0;
@@ -47,17 +42,22 @@ struct gfx_IndexBuffer {
     U32 id = 0;
     U32 count = 0;
     U32* data = nullptr;
+    gfx_IndexBuffer* nextFree = nullptr;
+};
+
+struct gfx_SSBO {
+    U32 id;
+    gfx_SSBO* nextFree;
 };
 
 struct gfx_VertexArray {
     U32 id = 0;
     U32 vbId = 0;
-
     gfx_VType layoutType = gfx_vtype_NONE;
-    // U32 count = 0;
+    U32 size = 0;
     void* data = nullptr;
+    gfx_VertexArray* nextFree = nullptr;
 };
-
 
 // NOTE: consider different formats for framebuffers
 // RN rgba and depth attachments are assumed
@@ -68,15 +68,7 @@ struct gfx_Framebuffer {
     U32 depthId = 0;
 };
 
-
-
-
-
-// CLEANUP: better name?
 struct gfx_UniformBlock {
-
-    // CALL UNIS =========================
-
     float borderSize = 0;
     V4f borderColor = V4f();
 
@@ -100,27 +92,29 @@ struct gfx_UniformBlock {
     gfx_VertexArray* va = nullptr;
     gfx_IndexBuffer* ib = nullptr;
 
-    // PASS UNIS ========================
-
     Mat4f vp = Mat4f(1);
 
-    //
+    V2f resolution = V2f(0, 0);
+    float thickness = 0;
+    gfx_SSBO* ssbo = nullptr;
+    U32 segmentCount = 0;
+
+    // Used to tell gl how many verts to draw
+    // required to be set
+    U32 vertCount = -1;
 
     gfx_UniformBlock* _next;
 };
-// NOTE: consider making into a union
-// NOTE: figure out a way to make this work without editing gfx src.
+// TODO: unions fix a lot
 
-
-// CLEANUP: make public members clearer
-// CLEANUP: all ctors or no?
 // target == nullptr indicates drawing to the screen
 struct gfx_Pass {
 
     gfx_VertexArray* curVa;
     gfx_IndexBuffer* curIb;
 
-    bool isClearPass = false; // TODO: assert fail on adding calls to clear passes / refactor
+    bool isClearPass = false; // TODO: refactor
+    bool drawIndexed = true;
 
     gfx_Framebuffer* target = nullptr;
     gfx_Shader* shader = nullptr;
@@ -130,47 +124,41 @@ struct gfx_Pass {
     gfx_UniformBlock* endCall = nullptr;
 };
 
-
-
-
-
+// TODO: multisample/antialias framebuffers
 
 void gfx_init();
-// CLEANUP: this
-gfx_VertexArray* gfx_getQuadVA();
-gfx_IndexBuffer* gfx_getQuadIB();
 
+gfx_Framebuffer* gfx_registerFramebuffer();
 gfx_Shader* gfx_registerShader(gfx_VType vertLayout, const char* vertPath, const char* fragPath, BumpAlloc* scratch);
 gfx_Texture* gfx_registerTexture(U8* data, int width, int height, gfx_TexPxType pixelLayout);
-
-// TODO: multisample/antialias framebuffers
-gfx_Framebuffer* gfx_registerFramebuffer();
-
 gfx_VertexArray* gfx_registerVertexArray(gfx_VType layout, void* data, U32 dataSize, bool dynamic);
-gfx_IndexBuffer* gfx_registerIndexBuffer(U32* data, U32 dataCount);
-
-void gfx_resizeFramebuffer(gfx_Framebuffer* fb, int nw, int nh);
-
-// NOTE: use these for binding VAs/IBs otherwise it'll shit itself
-// NOTE: VERTEX ARRAY GOES FIRST DONT ASK
-void gfx_bindVertexArray(gfx_Pass* pass, gfx_VertexArray* va);
-void gfx_bindIndexBuffer(gfx_Pass* pass, gfx_IndexBuffer* ib);
-
+gfx_IndexBuffer* gfx_registerIndexBuffer(U32* data, U32 dataCount, bool dynamic);
 gfx_Pass* gfx_registerPass();
+gfx_SSBO* gfx_registerSSBO(void* data, U32 dataSize, bool dynamic);
+
+void gfx_freeVertexArray(gfx_VertexArray* va);
+void gfx_freeIndexBuffer(gfx_IndexBuffer* ib);
+void gfx_freeSSBO(gfx_SSBO* ssbo);
 
 // CLEANUP: this?
 // target = nullptr indicates drawing to screen
 gfx_Pass* gfx_registerClearPass(V4f color, gfx_Framebuffer* target);
-
 gfx_UniformBlock* gfx_registerCall(gfx_Pass* pass);
+
+void gfx_updateVertexArray(gfx_VertexArray* va, void* data, U32 dataSize, bool dynamic);
+void gfx_updateIndexBuffer(gfx_IndexBuffer* ib, U32* data, U32 dataCount, bool dynamic);
+void gfx_resizeFramebuffer(gfx_Framebuffer* fb, int nw, int nh);
+void gfx_updateSSBO(gfx_SSBO* ss, void* data, U32 dataSize, bool dynamic);
+
+// NOTE: use these for binding VAs/IBs otherwise it'll shit itself
+// NOTE: VERTEX ARRAY GOES FIRST DONT ASK
+// CLEANUP: fix this
+void gfx_bindVertexArray(gfx_Pass* pass, gfx_VertexArray* va);
+void gfx_bindIndexBuffer(gfx_Pass* pass, gfx_IndexBuffer* ib);
 
 // draws all passes, clears passes and calls after.
 void gfx_drawPasses(U32 scWidth, U32 scHeight);
-
 bool gfx_loadOBJMesh(const char* path, BumpAlloc* scratch, gfx_VertexArray** outVA, gfx_IndexBuffer** outIB);
-
-
-
 
 #ifdef GFX_IMPL
 
@@ -185,19 +173,17 @@ bool gfx_loadOBJMesh(const char* path, BumpAlloc* scratch, gfx_VertexArray** out
 
 
 struct gfx_Globs {
-
     BumpAlloc resArena = BumpAlloc();
-
     BumpAlloc passArena = BumpAlloc();
     gfx_Pass* passes = nullptr;
     U32 passCount = 0;
     // TODO: move passes to arenas outside of gfx
 
-    gfx_IndexBuffer* quadIb = nullptr;
-    gfx_VertexArray* quadVa = nullptr;
+    gfx_VertexArray* firstFreeVA = nullptr;
+    gfx_IndexBuffer* firstFreeIB = nullptr;
+    gfx_SSBO* firstFreeSSBO = nullptr;
 };
 static gfx_Globs globs = gfx_Globs();
-
 
 // NOTE: requires opengl already setup
 void gfx_init() {
@@ -209,28 +195,7 @@ void gfx_init() {
     // preps passes to start
     globs.passes = BUMP_PUSH_ARR(&globs.passArena, MAX_PASS_COUNT, gfx_Pass);
     globs.passCount = 0;
-
-
-
-    U32 ibData[] = {
-        0, 1, 2,
-        2, 3, 0
-    };
-    globs.quadIb = gfx_registerIndexBuffer(ibData, sizeof(ibData) / sizeof(U32));
-
-    F32 vbData[] = {
-        0, 0,    0, 0, // BL
-        0,  1,    0, 1, // UL
-        1,  1,    1, 1, // UR
-        1, 0,    1, 0  // BR
-    };
-    globs.quadVa = gfx_registerVertexArray(gfx_vtype_POS2F_UV, vbData, sizeof(vbData), false);
 }
-
-
-gfx_VertexArray* gfx_getQuadVA() { return globs.quadVa; }
-gfx_IndexBuffer* gfx_getQuadIB() { return globs.quadIb; }
-
 
 gfx_Shader* gfx_registerShader(gfx_VType vertLayout, const char* vertPath, const char* fragPath, BumpAlloc* scratch) {
     int err = 0;
@@ -378,8 +343,13 @@ void gfx_resizeFramebuffer(gfx_Framebuffer* fb, int nw, int nh) {
 
 gfx_VertexArray* gfx_registerVertexArray(gfx_VType layout, void* data, U32 dataSize, bool dynamic) {
 
-    gfx_VertexArray* va = BUMP_PUSH_NEW(&globs.resArena, gfx_VertexArray);
-    *va = gfx_VertexArray();
+    gfx_VertexArray* va = globs.firstFreeVA;
+    if(!va) {
+        va = BUMP_PUSH_NEW(&globs.resArena, gfx_VertexArray);
+    } else {
+        globs.firstFreeVA = va->nextFree;
+        *va = gfx_VertexArray();
+    }
 
     // VERTEX BUFFER AND ARR ====================================================
     {
@@ -388,16 +358,22 @@ gfx_VertexArray* gfx_registerVertexArray(gfx_VType layout, void* data, U32 dataS
 
         glGenBuffers(1, &va->vbId);
         glBindBuffer(GL_ARRAY_BUFFER, va->vbId);
-
         va->data = data;
+        va->size = dataSize;
         glBufferData(GL_ARRAY_BUFFER, dataSize, data, dynamic? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
-
     }
 
     // ATTRIBS ================================================================
     {
-        if(layout == gfx_vtype_POS2F_UV) {
-            va->layoutType = gfx_vtype_POS2F_UV;
+        va->layoutType = layout;
+        if(layout == gfx_vtype_NONE) {
+        }
+        else if(layout == gfx_vtype_POS2F) {
+            U32 vertSize = 2 * sizeof(F32);
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, vertSize, (void*)(0));
+            glEnableVertexAttribArray(0);
+        }
+        else if(layout == gfx_vtype_POS2F_UV) {
             U32 vertSize = 4 * sizeof(F32);
             glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, vertSize, (void*)(0));
             glEnableVertexAttribArray(0);
@@ -405,7 +381,6 @@ gfx_VertexArray* gfx_registerVertexArray(gfx_VType layout, void* data, U32 dataS
             glEnableVertexAttribArray(1);
         }
         else if(layout == gfx_vtype_POS3F_UV) {
-            va->layoutType = gfx_vtype_POS3F_UV;
             U32 vertSize = 5 * sizeof(F32);
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertSize, (void*)(0));
             glEnableVertexAttribArray(0);
@@ -420,19 +395,47 @@ gfx_VertexArray* gfx_registerVertexArray(gfx_VType layout, void* data, U32 dataS
     return va;
 }
 
-gfx_IndexBuffer* gfx_registerIndexBuffer(U32* data, U32 dataCount) {
-    gfx_IndexBuffer* ib = BUMP_PUSH_NEW(&globs.resArena, gfx_IndexBuffer);
-    *ib = gfx_IndexBuffer();
+void gfx_updateVertexArray(gfx_VertexArray* va, void* data, U32 dataSize, bool dynamic) {
+    glBindVertexArray(va->id);
+    glBindBuffer(GL_ARRAY_BUFFER, va->vbId);
+    glBufferData(GL_ARRAY_BUFFER, dataSize, data, dynamic? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
+    va->data = data;
+    va->size = dataSize;
+}
 
+gfx_IndexBuffer* gfx_registerIndexBuffer(U32* data, U32 dataCount, bool dynamic) {
+    gfx_IndexBuffer* ib = globs.firstFreeIB;
+    if(!ib) {
+        ib = BUMP_PUSH_NEW(&globs.resArena, gfx_IndexBuffer);
+    } else {
+        globs.firstFreeIB = ib->nextFree;
+        *ib = gfx_IndexBuffer();
+    }
 
     glGenBuffers(1, &ib->id);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->id);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, dataCount * sizeof(U32), data, GL_STATIC_DRAW);
-    ib->data = data;
-    ib->count = dataCount;
-
+    gfx_updateIndexBuffer(ib, data, dataCount, dynamic);
     return ib;
 }
+
+void gfx_updateIndexBuffer(gfx_IndexBuffer* ib, U32* data, U32 dataCount, bool dynamic) {
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->id);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, dataCount * sizeof(U32), data, dynamic? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
+    ib->data = data;
+    ib->count = dataCount;
+}
+
+
+void gfx_freeVertexArray(gfx_VertexArray* va) {
+    va->nextFree = globs.firstFreeVA;
+    globs.firstFreeVA = va;
+    glDeleteBuffers(1, &va->id);
+}
+void gfx_freeIndexBuffer(gfx_IndexBuffer* ib) {
+    ib->nextFree = globs.firstFreeIB;
+    globs.firstFreeIB = ib;
+    glDeleteBuffers(1, &ib->id);
+}
+
 
 // CLEANUP: make binding more consistent
 void gfx_bindVertexArray(gfx_Pass* pass, gfx_VertexArray* va) {
@@ -449,6 +452,28 @@ void gfx_bindIndexBuffer(gfx_Pass* pass, gfx_IndexBuffer* ib) {
 
 
 
+gfx_SSBO* gfx_registerSSBO(void* data, U32 dataSize, bool dynamic) {
+    gfx_SSBO* ss = globs.firstFreeSSBO;
+    if(!ss) {
+        ss = BUMP_PUSH_NEW(&globs.resArena, gfx_SSBO);
+    } else {
+        globs.firstFreeSSBO = ss->nextFree;
+        *ss = gfx_SSBO();
+    }
+
+    glGenBuffers(1, &ss->id);
+    gfx_updateSSBO(ss, data, dataSize, dynamic);
+    return ss;
+}
+void gfx_updateSSBO(gfx_SSBO* ss, void* data, U32 dataSize, bool dynamic) {
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ss->id);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, dataSize, data, dynamic? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
+}
+void gfx_freeSSBO(gfx_SSBO* ssbo) {
+    ssbo->nextFree = globs.firstFreeSSBO;
+    globs.firstFreeSSBO = ssbo;
+    glDeleteBuffers(1, &ssbo->id);
+}
 
 
 
@@ -529,14 +554,18 @@ void gfx_drawPasses(U32 scWidth, U32 scHeight) {
 
             gfx_UniformBlock* curBlock = pass->startCall;
             while(curBlock) {
-
                 ASSERT(pass->shader->uniformBindFunc);
                 pass->shader->uniformBindFunc(pass, curBlock);
-
-                ASSERT(pass->curIb);
                 ASSERT(pass->curVa);
+                ASSERT(curBlock->vertCount >= 0);
 
-                glDrawElements(GL_TRIANGLES, pass->curIb->count, GL_UNSIGNED_INT, nullptr);
+                if(pass->drawIndexed) {
+                    ASSERT(pass->curIb);
+                    glDrawElements(GL_TRIANGLES, curBlock->vertCount, GL_UNSIGNED_INT, nullptr);
+                }
+                else {
+                    glDrawArrays(GL_TRIANGLES, 0, curBlock->vertCount);
+                }
 
                 curBlock = curBlock->_next;
             }
@@ -680,7 +709,7 @@ bool gfx_loadOBJMesh(const char* path, BumpAlloc* scratch, gfx_VertexArray** out
 
 
     *outVA = gfx_registerVertexArray(gfx_vtype_POS3F_UV, vaBuf, 5*3*faceCount*sizeof(float), false);
-    *outIB = gfx_registerIndexBuffer(ibBuf, 3*faceCount*sizeof(U32));
+    *outIB = gfx_registerIndexBuffer(ibBuf, 3*faceCount*sizeof(U32), false);
     return true;
 }
 

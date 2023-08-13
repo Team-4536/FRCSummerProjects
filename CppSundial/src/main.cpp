@@ -37,11 +37,15 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 }
 
 
+gfx_VertexArray* blueVA;
+gfx_IndexBuffer* blueIB;
 int main() {
 
 
     BumpAlloc frameArena;
     bump_allocate(&frameArena, 10000000);
+    BumpAlloc replayArena;
+    bump_allocate(&replayArena, 10000000);
 
 
     GLFWwindow* window = nullptr;
@@ -91,10 +95,13 @@ int main() {
 
         glEnable(GL_MULTISAMPLE);
 
+        glLineWidth(3);
+
         glEnable(GL_DEBUG_OUTPUT);
         glDebugMessageCallback(
         [](GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char* message, const void* userParam) {
-            printf("[GL] %s\n", message);
+            if(type == GL_DEBUG_TYPE_OTHER) { return; } // hides messages talking about buffer memory source which were getting spammed
+            printf("[GL] %i, %s\n", type, message);
         }, 0);
     }
 
@@ -106,34 +113,30 @@ int main() {
     blu_init(solidTex);
     blu_loadFont("C:/windows/fonts/consola.ttf");
 
-    nets_init(&frameArena);
-    ui_init(&frameArena, solidTex);
+    nets_init(&frameArena, &replayArena);
+    ui_init(&frameArena, &replayArena, solidTex);
 
 
     gfx_Shader* blueShader;
     {
-        blueShader = gfx_registerShader(gfx_vtype_POS2F_UV, "res/shaders/blue.vert", "res/shaders/blue.frag", &frameArena);
+        U32 ibData[] = { 0, 1, 2,   2, 3, 0 };
+        blueIB = gfx_registerIndexBuffer(ibData, sizeof(ibData) / sizeof(U32), false);
+        F32 vbData[] = { 0, 0,   0, 1,   1, 1,   1, 0 };
+        blueVA = gfx_registerVertexArray(gfx_vtype_POS2F, vbData, sizeof(vbData), false);
 
         // TODO: remove lambdas
+        blueShader = gfx_registerShader(gfx_vtype_POS2F, "res/shaders/blue.vert", "res/shaders/blue.frag", &frameArena);
         blueShader->passUniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
-            int loc;
-
-            loc = glGetUniformLocation(pass->shader->id, "uVP");
+            int loc = glGetUniformLocation(pass->shader->id, "uVP");
             glUniformMatrix4fv(loc, 1, false, &(uniforms->vp)[0]);
-
-            gfx_bindVertexArray(pass, gfx_getQuadVA());
-            gfx_bindIndexBuffer(pass, gfx_getQuadIB());
+            gfx_bindVertexArray(pass, blueVA);
+            gfx_bindIndexBuffer(pass, blueIB);
         };
-
         blueShader->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
-            int loc;
-
-            loc = glGetUniformLocation(pass->shader->id, "uBorderColor");
+            int loc = glGetUniformLocation(pass->shader->id, "uBorderColor");
             glUniform4f(loc, uniforms->borderColor.x, uniforms->borderColor.y, uniforms->borderColor.z, uniforms->borderColor.w);
-
             loc = glGetUniformLocation(pass->shader->id, "uBorderSize");
             glUniform1f(loc, uniforms->borderSize);
-
             loc = glGetUniformLocation(pass->shader->id, "uCornerRadius");
             glUniform1f(loc, uniforms->cornerRadius);
 
@@ -141,12 +144,10 @@ int main() {
             glUniform2f(loc, uniforms->dstStart.x, uniforms->dstStart.y);
             loc = glGetUniformLocation(pass->shader->id, "uDstEnd");
             glUniform2f(loc, uniforms->dstEnd.x, uniforms->dstEnd.y);
-
             loc = glGetUniformLocation(pass->shader->id, "uSrcStart");
             glUniform2f(loc, uniforms->srcStart.x, uniforms->srcStart.y);
             loc = glGetUniformLocation(pass->shader->id, "uSrcEnd");
             glUniform2f(loc, uniforms->srcEnd.x, uniforms->srcEnd.y);
-
             loc = glGetUniformLocation(pass->shader->id, "uClipStart");
             glUniform2f(loc, uniforms->clipStart.x, uniforms->clipStart.y);
             loc = glGetUniformLocation(pass->shader->id, "uClipEnd");
@@ -164,9 +165,10 @@ int main() {
             glUniform1i(loc, 1);
             glActiveTexture(GL_TEXTURE0 + 1);
             glBindTexture(GL_TEXTURE_2D, uniforms->fontTexture->id);
+
+            uniforms->vertCount = blueIB->count;
         };
     }
-
 
     F64 prevTime = glfwGetTime();
     while(!glfwWindowShouldClose(window)) {

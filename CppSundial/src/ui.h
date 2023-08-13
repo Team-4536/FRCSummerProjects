@@ -28,12 +28,16 @@ struct NTKey {
 #define GRAPH2D_LINECOUNT 6
 #define GRAPH2D_SAMPLE_WINDOW 5.0f
 struct Graph2dInfo {
-
     NTKey keys[GRAPH2D_LINECOUNT] = { 0 };
     V4f colors[GRAPH2D_LINECOUNT];
 
-    float yScale = 100;
-    float yOffset = 0;
+    float top = 0.9;
+    float bottom = -0.9;
+
+    // allocated and removed per instance
+    gfx_SSBO* lineVerts[GRAPH2D_LINECOUNT] = { 0 };
+    gfx_SSBO* gridVerts;
+    gfx_SSBO* timeVerts;
 };
 void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target);
 void initGraph2dInfo(Graph2dInfo* info) {
@@ -48,6 +52,19 @@ void initGraph2dInfo(Graph2dInfo* info) {
     info->colors[3] = col_yellow;
     info->colors[4] = col_black;
     info->colors[5] = col_white;
+
+    for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
+        info->lineVerts[i] = gfx_registerSSBO(nullptr, 0, true);
+    }
+    info->gridVerts = gfx_registerSSBO(nullptr, 0, true);
+    info->timeVerts = gfx_registerSSBO(nullptr, 0, true);
+}
+void deinitGraph2dInfo(Graph2dInfo* info) {
+    for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
+        gfx_freeSSBO(info->lineVerts[i]);
+    }
+    gfx_freeSSBO(info->gridVerts);
+    gfx_freeSSBO(info->timeVerts);
 }
 
 struct FieldInfo {
@@ -84,8 +101,10 @@ struct ControlsInfo {
     bool usingSockets = true;
     bool sim = true;
 
-    BumpAlloc replayArena;
+    BumpAlloc* replayArena = nullptr;
     net_Table replayTable;
+    // signals to copy samples from replay table to main table at current time
+    bool refreshTableFlag = false;
 };
 void draw_controls(ControlsInfo* info);
 
@@ -133,7 +152,6 @@ void areaAddFB(blu_Area* area, gfx_Framebuffer* target) {
     area->flags |= blu_areaFlags_DRAW_TEXTURE;
     area->texture = target->texture;
 
-    // CLEANUP: there are like 6 different instances of this exact piece of code
     int w = (int)area->calculatedSizes[blu_axis_X];
     int h = (int)area->calculatedSizes[blu_axis_Y];
     if(w != target->texture->width || h != target->texture->height) {
@@ -225,7 +243,7 @@ static struct UIGlobs {
 
     gfx_Shader* sceneShader3d = nullptr;
     gfx_Shader* sceneShader2d = nullptr;
-    gfx_Texture* solidTex;
+    gfx_Shader* lineShader = nullptr;
 
     float rightSize;
     float downSizeL;
@@ -233,19 +251,20 @@ static struct UIGlobs {
 
     View views[UI_VIEW_COUNT];
 
+    gfx_Texture* solidTex;
     gfx_Texture* wheelTex = nullptr;
     gfx_Texture* treadTex = nullptr;
     gfx_Texture* arrowTex = nullptr;
+    gfx_Texture* fieldTex = nullptr;
 
     gfx_VertexArray* robotVA = nullptr;
     gfx_IndexBuffer* robotIB = nullptr;
     gfx_VertexArray* fieldVA = nullptr;
     gfx_IndexBuffer* fieldIB = nullptr;
+    gfx_VertexArray* quadVA = nullptr;
+    gfx_IndexBuffer* quadIB = nullptr;
 
-    gfx_Texture* fieldTex = nullptr;
-
-    NTKey* firstFreeNTKey = nullptr;
-
+    gfx_VertexArray* emptyVA = nullptr;
 
     ControlsInfo ctrlInfo;
 
@@ -302,7 +321,7 @@ void updateView(View* v) {
 blu_Style borderStyle;
 
 
-void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
+void ui_init(BumpAlloc* frameArena, BumpAlloc* replayArena, gfx_Texture* solidTex) {
 
     globs.rightSize = 400;
     globs.downSizeL = 100;
@@ -314,10 +333,8 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
     stbi_set_flip_vertically_on_load(1);
     U8* data;
 
-
     blu_style_borderColor(col_black, &borderStyle);
     blu_style_borderSize(1, &borderStyle);
-
 
     for(int i = 0; i < UI_VIEW_COUNT; i++) {
         View* v = &(globs.views[i]);
@@ -334,9 +351,7 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
     initView(&globs.views[3]);
 
     globs.ctrlInfo = ControlsInfo();
-    bump_allocate(&globs.ctrlInfo.replayArena, 10000000);
-
-
+    globs.ctrlInfo.replayArena = replayArena;
 
     bool res = gfx_loadOBJMesh("res/models/Chassis3.obj", frameArena, &globs.robotVA, &globs.robotIB);
     ASSERT(res);
@@ -363,15 +378,22 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
     globs.arrowTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
 
 
+    U32 ibData[] = { 0, 1, 2,   2, 3, 0 };
+    globs.quadIB = gfx_registerIndexBuffer(ibData, sizeof(ibData) / sizeof(U32), false);
+    F32 vbData[] = { 0, 0, 0, 0,   0, 1, 0, 1,   1, 1, 1, 1,   1, 0, 1, 0 };
+    globs.quadVA = gfx_registerVertexArray(gfx_vtype_POS2F_UV, vbData, sizeof(vbData), false);
+
+
+    globs.emptyVA = gfx_registerVertexArray(gfx_vtype_NONE, nullptr, 0, false);
+
 
     globs.sceneShader2d = gfx_registerShader(gfx_vtype_POS2F_UV, "res/shaders/2d.vert", "res/shaders/2d.frag", frameArena);
-
     globs.sceneShader2d->passUniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
         int loc = glGetUniformLocation(pass->shader->id, "uVP");
         glUniformMatrix4fv(loc, 1, false, &(uniforms->vp)[0]);
 
-        gfx_bindVertexArray(pass, gfx_getQuadVA());
-        gfx_bindIndexBuffer(pass, gfx_getQuadIB());
+        gfx_bindVertexArray(pass, globs.quadVA);
+        gfx_bindIndexBuffer(pass, globs.quadIB);
     };
     globs.sceneShader2d->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
 
@@ -390,14 +412,12 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
         glUniform1i(loc, 0);
         glActiveTexture(GL_TEXTURE0 + 0);
         glBindTexture(GL_TEXTURE_2D, uniforms->texture->id);
+
+        uniforms->vertCount = globs.quadIB->count;
     };
 
 
-
-
-
     globs.sceneShader3d = gfx_registerShader(gfx_vtype_POS3F_UV, "res/shaders/3d.vert", "res/shaders/3d.frag", frameArena);
-
     globs.sceneShader3d->passUniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
         int loc = glGetUniformLocation(pass->shader->id, "uVP");
         glUniformMatrix4fv(loc, 1, false, &(uniforms->vp)[0]);
@@ -416,8 +436,28 @@ void ui_init(BumpAlloc* frameArena, gfx_Texture* solidTex) {
 
         gfx_bindVertexArray(pass, uniforms->va);
         gfx_bindIndexBuffer(pass, uniforms->ib);
+        uniforms->vertCount = uniforms->ib->count;
     };
 
+
+    globs.lineShader = gfx_registerShader(gfx_vtype_NONE, "res/shaders/line.vert", "res/shaders/line.frag", frameArena);
+    globs.lineShader->passUniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
+        int loc = glGetUniformLocation(pass->shader->id, "uVP");
+        glUniformMatrix4fv(loc, 1, false, &(uniforms->vp)[0]);
+
+        loc = glGetUniformLocation(pass->shader->id, "uResolution");
+        glUniform2f(loc, uniforms->resolution.x, uniforms->resolution.y);
+    };
+    globs.lineShader->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
+        int loc = glGetUniformLocation(pass->shader->id, "uColor");
+        glUniform4f(loc, uniforms->color.x, uniforms->color.y, uniforms->color.z, uniforms->color.w);
+
+        loc = glGetUniformLocation(pass->shader->id, "uThickness");
+        glUniform1f(loc, uniforms->thickness);
+
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, uniforms->ssbo->id);
+        gfx_bindVertexArray(pass, globs.emptyVA);
+    };
 }
 
 
@@ -446,7 +486,7 @@ void loadReplay(net_Table* table) {
 
         if(split[0].length == 1 && split[0].chars[0] == 'p') {
             net_Prop* p = ARR_APPEND(table->props, table->propCount, net_Prop());
-            p->name = str_copy(split[1], &globs.ctrlInfo.replayArena);
+            p->name = str_copy(split[1], globs.ctrlInfo.replayArena);
 
             str typeStr = split[2];
             if(str_compare(typeStr, STR("s32"))) { p->type = net_propType_S32; }
@@ -456,7 +496,7 @@ void loadReplay(net_Table* table) {
             else { ASSERT(false); }
         }
         else if(split[0].length == 1 && split[0].chars[0] == 'u') {
-            net_PropSample* sample = BUMP_PUSH_NEW(&globs.ctrlInfo.replayArena, net_PropSample);
+            net_PropSample* sample = BUMP_PUSH_NEW(globs.ctrlInfo.replayArena, net_PropSample);
 
             net_Prop* p = net_getProp(split[1], table);
             ASSERT(p);
@@ -468,7 +508,7 @@ void loadReplay(net_Table* table) {
             const char* arg = (const char*)split[3].chars;
             if(p->type == net_propType_S32) { sample->s32 = atoi(arg); }
             else if(p->type == net_propType_F64) { sample->f64 = atof(arg); }
-            else if(p->type == net_propType_STR) { sample->str = str_copy(split[3], &globs.ctrlInfo.replayArena); }
+            else if(p->type == net_propType_STR) { sample->str = str_copy(split[3], globs.ctrlInfo.replayArena); }
             else if(p->type == net_propType_BOOL) {
                 bool end;
                 if(str_compare(split[3], STR("true"))) { sample->boo = true; }
@@ -483,7 +523,6 @@ void loadReplay(net_Table* table) {
     }
 }
 
-// TODO: fix state bugs switching between sim and not sim
 // TODO: add pause/play button
 
 void draw_controls(ControlsInfo* info) {
@@ -505,13 +544,26 @@ void draw_controls(ControlsInfo* info) {
                     blu_style_sizeX({blu_sizeKind_PERCENT, 1});
                     blu_style_sizeY({blu_sizeKind_REMAINDER, 1});
 
+                    bool resetTable = false;
                     if(makeButton(STR("LIVE"), !info->usingSockets?col_darkGray:col_darkBlue, col_lightGray).clicked) {
                         info->usingSockets = true;
+                        resetTable = true;
                     }
 
                     if(makeButton(STR("REPLAY"), info->usingSockets?col_darkGray:col_darkBlue, col_lightGray).clicked) {
                         info->usingSockets = false;
+                        resetTable = true;
                     }
+
+                    if(resetTable) {
+                        memset(&globs.ctrlInfo.replayTable.props, 0, sizeof(globs.ctrlInfo.replayTable.props));
+                        globs.ctrlInfo.replayTable.propCount = 0;
+                        bump_clear(globs.ctrlInfo.replayArena);
+
+                        globs.curTime = 0;
+                        globs.table = globs.ctrlInfo.replayTable;
+                    }
+                    // CLEANUP: only trigger on state change, and move to after UI build ends
                 }
             }
 
@@ -562,7 +614,7 @@ void draw_controls(ControlsInfo* info) {
                     }
                     else {
                         if(makeButton(STR("load"), col_lightGray).clicked) {
-                            bump_clear(&globs.ctrlInfo.replayArena);
+                            bump_clear(globs.ctrlInfo.replayArena);
                             memset(&globs.ctrlInfo.replayTable.props, 0, sizeof(globs.ctrlInfo.replayTable.props));
                             globs.ctrlInfo.replayTable.propCount = 0;
 
@@ -570,6 +622,7 @@ void draw_controls(ControlsInfo* info) {
 
                             globs.curTime = 0;
                             globs.table = globs.ctrlInfo.replayTable;
+                            globs.ctrlInfo.refreshTableFlag = true;
                         }
 
                         a = blu_areaMake("nav", blu_areaFlags_DRAW_BACKGROUND |
@@ -582,6 +635,7 @@ void draw_controls(ControlsInfo* info) {
                         if(i.held) {
                             a->cursor = blu_cursor_resizeH;
                             globs.curTime += i.dragDelta.x * 0.01f;
+                            globs.ctrlInfo.refreshTableFlag = true;
                         }
                         blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%f"), globs.curTime));
                     }
@@ -802,22 +856,6 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target) {
 
 
 
-void draw_line(gfx_Pass* p, float thickness, V4f color, V2f start, V2f end) {
-    gfx_UniformBlock* b = gfx_registerCall(p);
-    b->texture = globs.solidTex;
-    b->color = color;
-
-    Transform t;
-
-    V2f center = (start+end) / 2;
-    t.x = center.x;
-    t.y = center.y;
-    t.sx = (end-start).length();
-    t.sy = 2;
-    t.rz = -v2fAngle(end-start);
-    b->model = matrixTransform(t);
-}
-
 void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
 
     blu_Area* a = blu_areaMake("graph2d", blu_areaFlags_DRAW_BACKGROUND);
@@ -835,41 +873,102 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
 
         gfx_Pass* p = gfx_registerPass();
         p->target = target;
-        p->shader = globs.sceneShader2d;
-        matrixOrtho(0, width, height, 0, 0, 100, p->passUniforms.vp);
-
+        p->shader = globs.lineShader;
+        p->passUniforms.resolution = a->rect.end - a->rect.start;
+        p->drawIndexed = false;
 
         blu_WidgetInteraction inter = blu_interactionFromWidget(a);
-        info->yScale += info->yScale * -inter.scrollDelta * 0.1;
-        info->yScale = max(0.001, info->yScale);
-        info->yOffset += inter.dragDelta.y;
 
-        float scale = -info->yScale;
-        float offset = info->yOffset + height/2;
-        float pointGap = width / (float)GRAPH2D_VCOUNT;
+        if(height != 0 && inter.hovered) {
+            float viewSize = info->top - info->bottom;
+            V2f change = V2f(inter.dragDelta.y * (viewSize / height));
+
+            float scaleChange = inter.scrollDelta * viewSize * 0.05;
+            float pct = (inter.mousePos.y / height);
+
+            change += V2f(pct * scaleChange, (1-pct) * -scaleChange);
+
+            info->top += change.x;
+            info->bottom += change.y;
+        }
+        matrixOrtho(0, 1, info->bottom, info->top, 0, 100, p->passUniforms.vp);
+
+        float pointGap = 1 / (float)GRAPH2D_VCOUNT;
         float sampleGap = GRAPH2D_SAMPLE_WINDOW / GRAPH2D_VCOUNT;
 
-        // TODO: batch line calls
-        draw_line(p, 1, col_darkGray, { 0, offset }, { width, offset });
-        draw_line(p, 1, col_darkGray, { 0, offset + 1*scale}, { width, offset + 1*scale });
-        draw_line(p, 1, col_darkGray, { 0, offset - 1*scale}, { width, offset - 1*scale });
 
-        if(inter.hovered) {
-            draw_line(p, 1, col_darkGray, { inter.mousePos.x, 0 }, { inter.mousePos.x, height });
+
+        // time lines
+        {
+            int lineCount = 10;
+            int vertCount = lineCount * 2;
+            V4f* gridPts = BUMP_PUSH_ARR(globs.scratch, vertCount+2, V4f);
+            float ypts[] = { info->bottom, info->top };
+
+            for(int i = 0; i < lineCount; i++) {
+                V4f* v = &gridPts[i*2+1];
+                bool even = i%2 == 0;
+
+                float x = ((i-fmodf(globs.curTime, 1)) / GRAPH2D_SAMPLE_WINDOW);
+                v[0] = V4f(x, ypts[even], 0, 1);
+                v[1] = V4f(x, ypts[!even], 0, 1);
+            }
+            gridPts[0] = V4f(0, 0, 0, 1);
+            gridPts[vertCount+1] = V4f(0, 0, 0, 1);
+            gfx_updateSSBO(info->timeVerts, gridPts, sizeof(V4f) * (vertCount+2), true);
+
+            gfx_UniformBlock* b = gfx_registerCall(p);
+            b->color = col_darkGray;
+            b->thickness = 1;
+            b->ssbo = info->timeVerts;
+            b->vertCount = 6*(vertCount-1);
         }
 
+        // hover line
+
+        // value lines
+        {
+            int lineCount = 3;
+            int vertCount = lineCount * 2;
+            V4f* gridPts = BUMP_PUSH_ARR(globs.scratch, vertCount+2, V4f);
+            float xpts[] = { -0.1, 1.1 };
+
+            for(int i = 0; i < lineCount; i++) {
+                V4f* v = &gridPts[i*2+1];
+                bool even = i%2 == 0;
+                float y = i - (lineCount/2);
+                v[0] = V4f(xpts[even], y, 0, 1);
+                v[1] = V4f(xpts[!even], y, 0, 1);
+            }
+            gridPts[0] = V4f(0, 0, 0, 1);
+            gridPts[vertCount+1] = V4f(0, 0, 0, 1);
+            gfx_updateSSBO(info->gridVerts, gridPts, sizeof(V4f) * (vertCount+2), true);
+
+            gfx_UniformBlock* b = gfx_registerCall(p);
+            b->color = col_darkGray;
+            b->thickness = 1;
+            b->ssbo = info->gridVerts;
+            b->vertCount = 6*(vertCount-1);
+        }
+
+        // TODO: labels
 
 
+
+
+        float* pts = BUMP_PUSH_ARR(globs.scratch, GRAPH2D_VCOUNT * 4, float);
         for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
             if(info->keys[i].str.length == 0) { continue; }
 
-            // TODO: bool graphing
+            // TODO: int/bool graphing
             float sHeight = 0;
             net_PropSample* sample = net_getSample(info->keys[i].str, net_propType_F64, globs.curTime, &globs.table);
             if(sample) { sHeight = (float)sample->f64; }
-            V2f lastPoint = V2f(width, sHeight * scale + offset);
-            for(int j = 1; j < GRAPH2D_VCOUNT; j++) {
+            pts[0] = 1;
+            pts[1] = sHeight;
+            pts[3] = 1;
 
+            for(int j = 1; j < GRAPH2D_VCOUNT; j++) {
                 V4f color = info->colors[i];
 
                 sHeight = 0;
@@ -884,12 +983,21 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
                 if(sample && sample->boo) { connected = true; }
                 if(sample && !connected) { color *= col_disconnect; }
 
-                V2f point = { width - j*pointGap, sHeight * scale + offset };
-                draw_line(p, 2, color, lastPoint, point);
-                lastPoint = point;
+                pts[j*4]   = 1-(j*pointGap);
+                pts[j*4+1] = sHeight;
+                pts[j*4+3] = 1;
+                // CLEANUP: should this rely on zeroing from push_arr?
             }
-        }
 
+            gfx_updateSSBO(info->lineVerts[i], pts, sizeof(float) * GRAPH2D_VCOUNT * 4, true);
+
+            // TODO: coloring along each vert
+            gfx_UniformBlock* b = gfx_registerCall(p);
+            b->color = info->colors[i];
+            b->thickness = 2;
+            b->ssbo = info->lineVerts[i];
+            b->vertCount = 6*(GRAPH2D_VCOUNT-1);
+        }
 
         a = blu_areaMake("lowerBit", blu_areaFlags_FLOATING);
         blu_style_sizeY({ blu_sizeKind_PERCENT, 1 }, &a->style);
@@ -940,7 +1048,6 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
                         a = blu_areaMake("text", blu_areaFlags_DRAW_TEXT);
                         blu_areaAddDisplayStr(a, info->keys[i].str);
                         a->style.sizes[blu_axis_X] = { blu_sizeKind_TEXT, 0 };
-
                         if(fadeChildren) { a->style.textColor *= col_disconnect; }
 
 
@@ -1279,6 +1386,12 @@ void makeView(const char* name, View* v) {
 
     blu_WidgetInteraction inter = blu_interactionFromWidget(a);
     if(inter.dropped) {
+
+        // CLEANUP: ew
+        if(v->type == viewType_graph2d) {
+            deinitGraph2dInfo(&v->data.graph2dInfo);
+        }
+
         v->type = (ViewType)(U64)inter.dropVal; // sorry
         initView(v);
     }
@@ -1308,7 +1421,6 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) 
     if(globs.ctrlInfo.usingSockets) {
         globs.curTime = curTime;
     }
-    float prevTime = globs.curTime;
 
     blu_Area* a;
 
@@ -1373,7 +1485,6 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) 
 
         // TODO: everything is lagging by a frame
 
-
         a = blu_areaMake("XresizeBar", blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
         a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, 3 };
 
@@ -1383,12 +1494,9 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) 
         globs.rightSize += -inter.dragDelta.x;
         a->cursor = blu_cursor_resizeH;
 
-
-
         a = blu_areaMake("rightParent", 0);
         a->style.sizes[blu_axis_X] = {blu_sizeKind_PX, globs.rightSize };
         a->style.childLayoutAxis = blu_axis_Y;
-
 
         blu_parentScope(a) {
 
@@ -1396,7 +1504,6 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) 
             blu_style_sizeY({ blu_sizeKind_REMAINDER, 0 });
                 makeView("top", &globs.views[2]);
             }
-
 
             a = blu_areaMake("YresizeBar", blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_BACKGROUND);
             a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, 3 };
@@ -1416,9 +1523,8 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) 
 
 
 
-
     if(!globs.ctrlInfo.usingSockets) {
-        if(globs.curTime != prevTime) {
+        if(globs.ctrlInfo.refreshTableFlag) {
             for(int i = 0; i < globs.ctrlInfo.replayTable.propCount; i++) {
                 net_PropSample* sample = globs.ctrlInfo.replayTable.props[i].firstPt;
 
@@ -1432,6 +1538,7 @@ void ui_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime) 
             }
         }
     }
+    globs.ctrlInfo.refreshTableFlag = false;
 
 
 
