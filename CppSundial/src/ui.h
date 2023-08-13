@@ -37,6 +37,7 @@ struct Graph2dInfo {
     // allocated and removed per instance
     gfx_SSBO* lineVerts[GRAPH2D_LINECOUNT] = { 0 };
     gfx_SSBO* gridVerts;
+    gfx_SSBO* timeVerts;
 };
 void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target);
 void initGraph2dInfo(Graph2dInfo* info) {
@@ -56,12 +57,14 @@ void initGraph2dInfo(Graph2dInfo* info) {
         info->lineVerts[i] = gfx_registerSSBO(nullptr, 0, true);
     }
     info->gridVerts = gfx_registerSSBO(nullptr, 0, true);
+    info->timeVerts = gfx_registerSSBO(nullptr, 0, true);
 }
 void deinitGraph2dInfo(Graph2dInfo* info) {
     for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
         gfx_freeSSBO(info->lineVerts[i]);
     }
     gfx_freeSSBO(info->gridVerts);
+    gfx_freeSSBO(info->timeVerts);
 }
 
 struct FieldInfo {
@@ -895,9 +898,62 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
 
 
 
-        // value lines
         // time lines
+        {
+            int lineCount = 10;
+            int vertCount = lineCount * 2;
+            V4f* gridPts = BUMP_PUSH_ARR(globs.scratch, vertCount+2, V4f);
+            float ypts[] = { info->bottom, info->top };
+
+            for(int i = 0; i < lineCount; i++) {
+                V4f* v = &gridPts[i*2+1];
+                bool even = i%2 == 0;
+
+                float x = ((i-fmodf(globs.curTime, 1)) / GRAPH2D_SAMPLE_WINDOW);
+                v[0] = V4f(x, ypts[even], 0, 1);
+                v[1] = V4f(x, ypts[!even], 0, 1);
+            }
+            gridPts[0] = V4f(0, 0, 0, 1);
+            gridPts[vertCount+1] = V4f(0, 0, 0, 1);
+            gfx_updateSSBO(info->timeVerts, gridPts, sizeof(V4f) * (vertCount+2), true);
+
+            gfx_UniformBlock* b = gfx_registerCall(p);
+            b->color = col_darkGray;
+            b->thickness = 1;
+            b->ssbo = info->timeVerts;
+            b->vertCount = 6*(vertCount-1);
+        }
+
         // hover line
+
+        // value lines
+        {
+            int lineCount = 3;
+            int vertCount = lineCount * 2;
+            V4f* gridPts = BUMP_PUSH_ARR(globs.scratch, vertCount+2, V4f);
+            float xpts[] = { -0.1, 1.1 };
+
+            for(int i = 0; i < lineCount; i++) {
+                V4f* v = &gridPts[i*2+1];
+                bool even = i%2 == 0;
+                float y = i - (lineCount/2);
+                v[0] = V4f(xpts[even], y, 0, 1);
+                v[1] = V4f(xpts[!even], y, 0, 1);
+            }
+            gridPts[0] = V4f(0, 0, 0, 1);
+            gridPts[vertCount+1] = V4f(0, 0, 0, 1);
+            gfx_updateSSBO(info->gridVerts, gridPts, sizeof(V4f) * (vertCount+2), true);
+
+            gfx_UniformBlock* b = gfx_registerCall(p);
+            b->color = col_darkGray;
+            b->thickness = 1;
+            b->ssbo = info->gridVerts;
+            b->vertCount = 6*(vertCount-1);
+        }
+
+        // TODO: labels
+
+
 
 
         float* pts = BUMP_PUSH_ARR(globs.scratch, GRAPH2D_VCOUNT * 4, float);

@@ -170,7 +170,6 @@ int main() {
         };
     }
 
-
     F64 prevTime = glfwGetTime();
     while(!glfwWindowShouldClose(window)) {
 
