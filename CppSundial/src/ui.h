@@ -35,9 +35,8 @@ struct Graph2dInfo {
     float bottom = -0.9;
 
     // allocated and removed per instance
-    gfx_VertexArray* lineVerts[GRAPH2D_LINECOUNT] = { 0 };
-    gfx_VertexArray* gridVerts;
-    gfx_IndexBuffer* gridIdxs;
+    gfx_SSBO* lineVerts[GRAPH2D_LINECOUNT] = { 0 };
+    gfx_SSBO* gridVerts;
 };
 void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target);
 void initGraph2dInfo(Graph2dInfo* info) {
@@ -54,17 +53,15 @@ void initGraph2dInfo(Graph2dInfo* info) {
     info->colors[5] = col_white;
 
     for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
-        info->lineVerts[i] = gfx_registerVertexArray(gfx_vtype_POS2F, nullptr, 0, true);
+        info->lineVerts[i] = gfx_registerSSBO(nullptr, 0, true);
     }
-    info->gridVerts = gfx_registerVertexArray(gfx_vtype_POS2F, nullptr, 0, true);
-    info->gridIdxs = gfx_registerIndexBuffer(nullptr, 0, false);
+    info->gridVerts = gfx_registerSSBO(nullptr, 0, true);
 }
 void deinitGraph2dInfo(Graph2dInfo* info) {
     for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
-        gfx_freeVertexArray(info->lineVerts[i]);
+        gfx_freeSSBO(info->lineVerts[i]);
     }
-    gfx_freeVertexArray(info->gridVerts);
-    gfx_freeIndexBuffer(info->gridIdxs);
+    gfx_freeSSBO(info->gridVerts);
 }
 
 struct FieldInfo {
@@ -264,8 +261,7 @@ static struct UIGlobs {
     gfx_VertexArray* quadVA = nullptr;
     gfx_IndexBuffer* quadIB = nullptr;
 
-    // stores indicies for drawing graphs, len == GRAPH2D_VCOUNT
-    gfx_IndexBuffer* lineIB = nullptr;
+    gfx_VertexArray* emptyVA = nullptr;
 
     ControlsInfo ctrlInfo;
 
@@ -385,11 +381,7 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* replayArena, gfx_Texture* solidTe
     globs.quadVA = gfx_registerVertexArray(gfx_vtype_POS2F_UV, vbData, sizeof(vbData), false);
 
 
-    U32 lineIBData[GRAPH2D_VCOUNT];
-    for(int i = 0; i < GRAPH2D_VCOUNT; i++) {
-        lineIBData[i] = i;
-    }
-    globs.lineIB = gfx_registerIndexBuffer(lineIBData, GRAPH2D_VCOUNT, false);
+    globs.emptyVA = gfx_registerVertexArray(gfx_vtype_NONE, nullptr, 0, false);
 
 
     globs.sceneShader2d = gfx_registerShader(gfx_vtype_POS2F_UV, "res/shaders/2d.vert", "res/shaders/2d.frag", frameArena);
@@ -417,6 +409,8 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* replayArena, gfx_Texture* solidTe
         glUniform1i(loc, 0);
         glActiveTexture(GL_TEXTURE0 + 0);
         glBindTexture(GL_TEXTURE_2D, uniforms->texture->id);
+
+        uniforms->vertCount = globs.quadIB->count;
     };
 
 
@@ -439,20 +433,27 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* replayArena, gfx_Texture* solidTe
 
         gfx_bindVertexArray(pass, uniforms->va);
         gfx_bindIndexBuffer(pass, uniforms->ib);
+        uniforms->vertCount = uniforms->ib->count;
     };
 
 
-    globs.lineShader = gfx_registerShader(gfx_vtype_POS2F, "res/shaders/line.vert", "res/shaders/line.frag", frameArena);
+    globs.lineShader = gfx_registerShader(gfx_vtype_NONE, "res/shaders/line.vert", "res/shaders/line.frag", frameArena);
     globs.lineShader->passUniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
         int loc = glGetUniformLocation(pass->shader->id, "uVP");
         glUniformMatrix4fv(loc, 1, false, &(uniforms->vp)[0]);
+
+        loc = glGetUniformLocation(pass->shader->id, "uResolution");
+        glUniform2f(loc, uniforms->resolution.x, uniforms->resolution.y);
     };
     globs.lineShader->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
         int loc = glGetUniformLocation(pass->shader->id, "uColor");
-        glUniform4f(loc, 1, 1, 1, 1);
         glUniform4f(loc, uniforms->color.x, uniforms->color.y, uniforms->color.z, uniforms->color.w);
-        gfx_bindIndexBuffer(pass, uniforms->ib);
-        gfx_bindVertexArray(pass, uniforms->va);
+
+        loc = glGetUniformLocation(pass->shader->id, "uThickness");
+        glUniform1f(loc, uniforms->thickness);
+
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, uniforms->ssbo->id);
+        gfx_bindVertexArray(pass, globs.emptyVA);
     };
 }
 
@@ -869,8 +870,9 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
 
         gfx_Pass* p = gfx_registerPass();
         p->target = target;
-        p->isLines = true;
         p->shader = globs.lineShader;
+        p->passUniforms.resolution = a->rect.end - a->rect.start;
+        p->drawIndexed = false;
 
         blu_WidgetInteraction inter = blu_interactionFromWidget(a);
 
@@ -891,39 +893,14 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
         float pointGap = 1 / (float)GRAPH2D_VCOUNT;
         float sampleGap = GRAPH2D_SAMPLE_WINDOW / GRAPH2D_VCOUNT;
 
+
+
         // value lines
-        int vLineCount = 10;
-        float* grid = BUMP_PUSH_ARR(globs.scratch, vLineCount * 2 * 2, float);
-        for(int i = 0; i < vLineCount; i++) {
-            float yVal = i;
-            bool even = i%2==0;
-            grid[i*4+0] = even;
-            grid[i*4+1] = yVal;
-            grid[i*4+2] = !even;
-            grid[i*4+3] = yVal;
-        }
-        gfx_updateVertexArray(info->gridVerts, grid, vLineCount*2*2*sizeof(float), true);
-
-        U32* idxs = BUMP_PUSH_ARR(globs.scratch, vLineCount*2, U32);
-        for(int i = 0; i < vLineCount*2; i++) {
-            idxs[i] = i;
-        }
-        gfx_updateIndexBuffer(info->gridIdxs, idxs, vLineCount*2, true);
-
-        gfx_UniformBlock* b = gfx_registerCall(p);
-        b->color = col_darkGray;
-        b->ib = info->gridIdxs;
-        b->va = info->gridVerts;
-
-
         // time lines
         // hover line
-        if(inter.hovered) {
-
-        }
 
 
-        float* pts = BUMP_PUSH_ARR(globs.scratch, GRAPH2D_VCOUNT * 2, float);
+        float* pts = BUMP_PUSH_ARR(globs.scratch, GRAPH2D_VCOUNT * 4, float);
         for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
             if(info->keys[i].str.length == 0) { continue; }
 
@@ -933,6 +910,7 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
             if(sample) { sHeight = (float)sample->f64; }
             pts[0] = 1;
             pts[1] = sHeight;
+            pts[3] = 1;
 
             for(int j = 1; j < GRAPH2D_VCOUNT; j++) {
                 V4f color = info->colors[i];
@@ -949,30 +927,21 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
                 if(sample && sample->boo) { connected = true; }
                 if(sample && !connected) { color *= col_disconnect; }
 
-                pts[j*2]   = 1-(j*pointGap);
-                pts[j*2+1] = sHeight;
+                pts[j*4]   = 1-(j*pointGap);
+                pts[j*4+1] = sHeight;
+                pts[j*4+3] = 1;
+                // CLEANUP: should this rely on zeroing from push_arr?
             }
 
-            gfx_updateVertexArray(info->lineVerts[i], pts, sizeof(float) * GRAPH2D_VCOUNT * 2, true);
+            gfx_updateSSBO(info->lineVerts[i], pts, sizeof(float) * GRAPH2D_VCOUNT * 4, true);
 
             // TODO: coloring along each vert
-            //*
             gfx_UniformBlock* b = gfx_registerCall(p);
             b->color = info->colors[i];
-            b->va = info->lineVerts[i];
-            b->ib = globs.lineIB;
-            // */
+            b->thickness = 2;
+            b->ssbo = info->lineVerts[i];
+            b->vertCount = 6*(GRAPH2D_VCOUNT-1);
         }
-
-        //TODO: what the actual fuck
-        // The last line will not appear unless there is a call after it
-        // all calls are being passed to opengl and the vert data looks ok
-        // it doesn't make sense
-        // h elp me
-        b = gfx_registerCall(p);
-        b->color = V4f(0, 0, 0, 0);
-        b->va = info->lineVerts[0];
-        b->ib = globs.lineIB;
 
         a = blu_areaMake("lowerBit", blu_areaFlags_FLOATING);
         blu_style_sizeY({ blu_sizeKind_PERCENT, 1 }, &a->style);

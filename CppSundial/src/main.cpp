@@ -165,6 +165,8 @@ int main() {
             glUniform1i(loc, 1);
             glActiveTexture(GL_TEXTURE0 + 1);
             glBindTexture(GL_TEXTURE_2D, uniforms->fontTexture->id);
+
+            uniforms->vertCount = blueIB->count;
         };
     }
 
