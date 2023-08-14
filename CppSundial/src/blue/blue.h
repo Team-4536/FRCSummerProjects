@@ -171,16 +171,14 @@ struct blu_Area {
 
     // builder provided /////////////////////////////
     U32 flags = 0;
-    str displayString = { nullptr, 0 };
-
     blu_Style style;
 
+    str displayString = { nullptr, 0 };
     gfx_Texture* texture = nullptr;
-
     V2f offset = { 0, 0 };
     V2f viewOffset = { 0, 0 };
-
     blu_Cursor cursor = blu_cursor_norm;
+    float textScale = 1;
 
     // CLEANUP: do these need to be reset every frame? (not rn)
     // masks which events are recieved
@@ -605,12 +603,12 @@ void blu_beginFrame() {
 
 
 
-float _blu_sizeOfString(str s, int axis) {
-    if(axis == blu_axis_Y) { return globs.fontHeight; }
+float _blu_sizeOfString(str s, float scale, int axis) {
+    if(axis == blu_axis_Y) { return globs.fontHeight * scale; }
 
     float size = 0;
     for(int i = 0; i < s.length; i++) {
-        size += globs.fontGlyphs[s.chars[i] - BLU_FONT_FIRST].advance; // CLEANUP: out of bounds char rendering
+        size += globs.fontGlyphs[s.chars[i] - BLU_FONT_FIRST].advance * scale; // CLEANUP: out of bounds char rendering
     }
     return size;
 }
@@ -635,7 +633,7 @@ void __blu_calculateStandaloneSizesRecurse(blu_Area* parent, int axis) {
 
             float pad = elem->style.textPadding.x * 2;
             if(axis == blu_axis_Y) { pad = elem->style.textPadding.y * 2; }
-            elem->calculatedSizes[axis] = _blu_sizeOfString(elem->displayString, axis) + pad;
+            elem->calculatedSizes[axis] = _blu_sizeOfString(elem->displayString, elem->textScale, axis) + pad;
         }
 
         __blu_calculateStandaloneSizesRecurse(elem, axis);
@@ -821,10 +819,10 @@ void blu_layout(V2f scSize) {
 
 // NOTE: start is UL of text, not baseline
 // CLEANUP: that lol ^^^^^^^^^^^^^^^^^^^^^
-void _blu_renderString(str string, V2f start, Rect2f clip, V4f color, gfx_Pass* pass) {
+void _blu_renderString(str string, V2f start, float scale, Rect2f clip, V4f color, gfx_Pass* pass) {
 
 
-    V2f cursor = start + V2f(0, +globs.fontAscent);
+    V2f cursor = start + V2f(0, +globs.fontAscent * scale);
     for(int i = 0; i < string.length; i++) {
 
         U8 c = string.chars[i] - BLU_FONT_FIRST;
@@ -844,13 +842,13 @@ void _blu_renderString(str string, V2f start, Rect2f clip, V4f color, gfx_Pass* 
 
         block->srcStart = data.startUV;
         block->srcEnd = data.endUV;
-        block->dstStart = V2f(cursor.x + data.xBearing, cursor.y - data.yBearing);
-        block->dstEnd = block->dstStart + V2f(data.width, data.height);
+        block->dstStart = V2f(cursor.x + data.xBearing * scale, cursor.y - data.yBearing * scale);
+        block->dstEnd = block->dstStart + V2f(data.width * scale, data.height * scale);
 
         block->clipStart = clip.start;
         block->clipEnd = clip.end;
 
-        cursor.x += data.advance;
+        cursor.x += data.advance * scale;
     }
 }
 
@@ -880,13 +878,14 @@ void _blu_genRenderCallsRecurse(blu_Area* area, gfx_Pass* pass) {
 
             if(area->flags & blu_areaFlags_CENTER_TEXT) {
                 float size = area->calculatedSizes[blu_axis_X];
-                float strSize = _blu_sizeOfString(area->displayString, blu_axis_X);
+                float strSize = _blu_sizeOfString(area->displayString, area->textScale, blu_axis_X);
                 off.x = (size - strSize) / 2;
             }
 
             _blu_renderString(
                 area->displayString,
                 off + area->rect.start,
+                area->textScale,
                 area->clipRect,
                 area->style.textColor,
                 pass);

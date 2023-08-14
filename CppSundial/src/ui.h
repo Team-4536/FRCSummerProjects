@@ -957,7 +957,17 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
             b->vertCount = 6*(vertCount-1);
         }
 
-        // TODO: labels
+        // TODO: value labels
+
+        float timeOffset = fmodf(globs.curTime, 1);
+        for(int i = 0; i < 10; i++) {
+            a = blu_areaMake(str_format(globs.scratch, STR("%i"), i), blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
+            blu_style_sizeX({ blu_sizeKind_TEXT, 0 }, &a->style);
+            blu_style_sizeY({ blu_sizeKind_TEXT, 0 }, &a->style);
+            a->offset =  { (1-((i+timeOffset) / GRAPH2D_SAMPLE_WINDOW)) * width - a->calculatedSizes[blu_axis_X] / 2, height - BLU_FONT_SIZE };
+            a->textScale = 0.5f;
+            blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%i"), (int)(globs.curTime-i)));
+        }
 
 
 
@@ -1356,6 +1366,7 @@ void makeViewSrc(const char* name, ViewType type) {
     blu_Area* a = blu_areaMake(name,
         blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CLICKABLE | blu_areaFlags_DRAW_BACKGROUND);
     blu_areaAddDisplayStr(a, name);
+    a->textScale = 0.75;
     a->style.backgroundColor = v4f_lerp(col_darkGray, col_lightGray, a->target_hoverAnim);
 
     a->dropType = dropMasks_VIEW_TYPE;
