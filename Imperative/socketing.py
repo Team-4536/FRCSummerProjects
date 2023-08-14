@@ -1,7 +1,6 @@
 import struct
 import ntcore
 import socket
-import numpy
 from enum import IntEnum
 import select
 from typing import Any
@@ -162,7 +161,7 @@ class Server():
             # https://docs.python.org/3/library/struct.html
             valEncoded += struct.pack("!l", value)
 
-        elif(type(value) == float or type(value) == numpy.float64 or type(value) == numpy.float32):
+        elif(type(value) == float):
             valType = PropType.F64
             valEncoded += struct.pack("!d", value)
 
