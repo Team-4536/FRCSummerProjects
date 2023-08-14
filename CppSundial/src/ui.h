@@ -959,14 +959,24 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
 
         // TODO: value labels
 
-        float timeOffset = fmodf(globs.curTime, 1);
-        for(int i = 0; i < 10; i++) {
-            a = blu_areaMake(str_format(globs.scratch, STR("%i"), i), blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
-            blu_style_sizeX({ blu_sizeKind_TEXT, 0 }, &a->style);
-            blu_style_sizeY({ blu_sizeKind_TEXT, 0 }, &a->style);
-            a->offset =  { (1-((i+timeOffset) / GRAPH2D_SAMPLE_WINDOW)) * width - a->calculatedSizes[blu_axis_X] / 2, height - BLU_FONT_SIZE };
-            a->textScale = 0.5f;
-            blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%i"), (int)(globs.curTime-i)));
+        blu_styleScope(blu_Style()) {
+        blu_style_sizeX({ blu_sizeKind_TEXT, 0 });
+        blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
+            float timeOffset = fmodf(globs.curTime, 1);
+
+            for(int i = 0; i < 10; i++) {
+                a = blu_areaMake(str_format(globs.scratch, STR("%i"), i), blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
+                a->offset =  { (1-((i+timeOffset) / GRAPH2D_SAMPLE_WINDOW)) * width - a->calculatedSizes[blu_axis_X] / 2, height - BLU_FONT_SIZE };
+                a->textScale = 0.5f;
+                blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%i"), (int)(globs.curTime-i)));
+            }
+
+            if(inter.hovered) {
+                a = blu_areaMake("hoverLabel", blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
+                a->offset =  { inter.mousePos.x - a->calculatedSizes[blu_axis_X] / 2, height - BLU_FONT_SIZE };
+                a->textScale = 0.6f;
+                blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%f"), globs.curTime - GRAPH2D_SAMPLE_WINDOW * (1-(inter.mousePos.x / width))));
+            }
         }
 
 
