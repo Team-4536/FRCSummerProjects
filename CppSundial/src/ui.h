@@ -903,7 +903,7 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
         {
             int lineCount = 10;
             int vertCount = lineCount * 2;
-            LineVert* gridPts = BUMP_PUSH_ARR(globs.scratch, vertCount+2, LineVert);
+            LineVert* gridPts = BUMP_PUSH_ARR(globs.scratch, vertCount+4, LineVert);
             float ypts[] = { info->bottom, info->top };
 
             for(int i = 0; i < lineCount; i++) {
@@ -915,16 +915,20 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
                 v[0] = { V4f(x, ypts[even], 0, 1), color };
                 v[1] = { V4f(x, ypts[!even], 0, 1), color };
             }
-            gfx_updateSSBO(info->timeVerts, gridPts, sizeof(LineVert) * (vertCount+2), true);
 
+            // hover line
+            float x = 100;
+            if(inter.hovered) { x = inter.mousePos.x / width; }
+            gridPts[vertCount+1] = { V4f(x, ypts[1], 0, 1), col_darkGray };
+            gridPts[vertCount+2] = { V4f(x, ypts[0], 0, 1), col_darkGray };
+            gridPts[vertCount+3] = { V4f(0, 0, 0, 1), col_darkGray };
+
+            gfx_updateSSBO(info->timeVerts, gridPts, sizeof(LineVert) * (vertCount+4), true);
             gfx_UniformBlock* b = gfx_registerCall(p);
-            b->color = col_darkGray;
             b->thickness = 1;
             b->ssbo = info->timeVerts;
-            b->vertCount = 6*(vertCount-1);
+            b->vertCount = 6*(vertCount+2-1);
         }
-
-        // hover line
 
         // value lines
         {
