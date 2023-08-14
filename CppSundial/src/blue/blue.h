@@ -200,27 +200,35 @@ struct blu_Area {
     bool prevHovered = false;
     bool prevPressed = false;
     F32 scrollDelta = 0;
+
+    V2f dragStart = V2f();
 };
 
 
 struct blu_WidgetInteraction {
+    // true when mouse is over or when another area that matches the drop mask is over
     bool hovered = false;
     bool held = false;
     bool clicked = false;
 
+    // how much the mouse has moved since last frame, in pixels
     V2f dragDelta = V2f();
+    // where the drag started, relative to UL corner of area
+    V2f dragStart = V2f();
+    // position of the mouse relative to the UL corner of the area
     V2f mousePos = V2f();
 
     float scrollDelta = 0;
 
     // another elem has been dropped on this one
     bool dropped = false;
+    // if another area has been dropped, what was the value
     void* dropVal = nullptr;
+    // the droptype of the area dropped
     U32 dropType = 0;
 };
 
-
-
+// TODO: documentation
 
 void blu_init(gfx_Texture* solidTex);
 void blu_loadFont(const char* path);
@@ -1067,7 +1075,10 @@ bool __blu_genInteractionsRecurse(blu_Area* area, blu_Area* dragged, bool* outBl
     *outCursor = area->cursor;
     area->prevHovered = true;
     area->prevPressed = globs.inputCurLButton && !globs.inputPrevLButton;
-    if(area->prevPressed) { globs.dragged = area; }
+    if(area->prevPressed) {
+        globs.dragged = area;
+        area->dragStart = globs.inputMousePos - area->rect.start;
+    }
     return true;
 }
 
@@ -1142,11 +1153,8 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
     }
 
     out.hovered = area->prevHovered;
-
-    if(globs.dragged && globs.dragged != area) { return out; }
-
-
     out.scrollDelta = area->scrollDelta;
+    if(globs.dragged && globs.dragged != area) { return out; }
 
     if(out.hovered || globs.dragged == area) {
         out.mousePos = globs.inputMousePos - area->rect.start;
@@ -1159,6 +1167,8 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
 
         if(!globs.inputCurLButton && globs.inputPrevLButton) {
             out.clicked = true; }
+
+        out.dragStart = area->dragStart;
     }
 
 
