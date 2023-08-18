@@ -38,6 +38,7 @@ class Server():
         self.telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
 
         self.servSock = socket.socket(socket.AddressFamily.AF_INET, socket.SOCK_STREAM)
+        self.servSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if(not isReal): self.servSock.bind(("localhost", 7000))
         else: self.servSock.bind(("10.45.36.2", 7000))
         self.servSock.listen(1) # client backlog
