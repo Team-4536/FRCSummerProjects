@@ -714,7 +714,8 @@ bool gfx_loadOBJMesh(const char* path, BumpAlloc* scratch, gfx_VertexArray** out
 }
 
 
-// TODO: binary format and transfer func
+// TODO: better performance on large files
+
 
 #undef PARSE_FLOAT
 #undef PROGRESS_CHECK

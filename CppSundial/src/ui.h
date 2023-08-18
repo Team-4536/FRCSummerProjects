@@ -449,10 +449,7 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* replayArena, gfx_Texture* solidTe
         glUniform2f(loc, uniforms->resolution.x, uniforms->resolution.y);
     };
     globs.lineShader->uniformBindFunc = [](gfx_Pass* pass, gfx_UniformBlock* uniforms) {
-        int loc = glGetUniformLocation(pass->shader->id, "uColor");
-        glUniform4f(loc, uniforms->color.x, uniforms->color.y, uniforms->color.z, uniforms->color.w);
-
-        loc = glGetUniformLocation(pass->shader->id, "uThickness");
+        int loc = glGetUniformLocation(pass->shader->id, "uThickness");
         glUniform1f(loc, uniforms->thickness);
 
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, uniforms->ssbo->id);
@@ -855,6 +852,10 @@ void draw_swerveDrive(SwerveDriveInfo* info, gfx_Framebuffer* target) {
 
 
 
+struct LineVert {
+    V4f pos;
+    V4f color;
+};
 
 void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
 
@@ -902,47 +903,52 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
         {
             int lineCount = 10;
             int vertCount = lineCount * 2;
-            V4f* gridPts = BUMP_PUSH_ARR(globs.scratch, vertCount+2, V4f);
+            LineVert* gridPts = BUMP_PUSH_ARR(globs.scratch, vertCount+4, LineVert);
             float ypts[] = { info->bottom, info->top };
 
             for(int i = 0; i < lineCount; i++) {
-                V4f* v = &gridPts[i*2+1];
+                LineVert* v = &gridPts[i*2+1];
                 bool even = i%2 == 0;
 
                 float x = ((i-fmodf(globs.curTime, 1)) / GRAPH2D_SAMPLE_WINDOW);
-                v[0] = V4f(x, ypts[even], 0, 1);
-                v[1] = V4f(x, ypts[!even], 0, 1);
+                V4f color = v4f_lerp(col_darkGray, col_darkBlue, (1-x)/2); // gradient
+                v[0] = { V4f(x, ypts[even], 0, 1), color };
+                v[1] = { V4f(x, ypts[!even], 0, 1), color };
             }
-            gridPts[0] = V4f(0, 0, 0, 1);
-            gridPts[vertCount+1] = V4f(0, 0, 0, 1);
-            gfx_updateSSBO(info->timeVerts, gridPts, sizeof(V4f) * (vertCount+2), true);
 
+            // hover line
+            float x = 100;
+            if(inter.hovered) { x = inter.mousePos.x / width; }
+            gridPts[vertCount+1] = { V4f(x, ypts[1], 0, 1), col_darkGray };
+            gridPts[vertCount+2] = { V4f(x, ypts[0], 0, 1), col_darkGray };
+            gridPts[vertCount+3] = { V4f(0, 0, 0, 1), col_darkGray };
+
+            gfx_updateSSBO(info->timeVerts, gridPts, sizeof(LineVert) * (vertCount+4), true);
             gfx_UniformBlock* b = gfx_registerCall(p);
-            b->color = col_darkGray;
             b->thickness = 1;
             b->ssbo = info->timeVerts;
-            b->vertCount = 6*(vertCount-1);
+            b->vertCount = 6*(vertCount+2-1);
         }
-
-        // hover line
 
         // value lines
         {
             int lineCount = 3;
             int vertCount = lineCount * 2;
-            V4f* gridPts = BUMP_PUSH_ARR(globs.scratch, vertCount+2, V4f);
+            LineVert* gridPts = BUMP_PUSH_ARR(globs.scratch, vertCount+2, LineVert);
             float xpts[] = { -0.1, 1.1 };
 
             for(int i = 0; i < lineCount; i++) {
-                V4f* v = &gridPts[i*2+1];
+                LineVert* v = &gridPts[i*2+1];
                 bool even = i%2 == 0;
                 float y = i - (lineCount/2);
-                v[0] = V4f(xpts[even], y, 0, 1);
-                v[1] = V4f(xpts[!even], y, 0, 1);
+                v[0].pos = V4f(xpts[even], y, 0, 1);
+                v[0].color = col_darkGray;
+                v[1].pos = V4f(xpts[!even], y, 0, 1);
+                v[1].color = col_darkGray;
             }
-            gridPts[0] = V4f(0, 0, 0, 1);
-            gridPts[vertCount+1] = V4f(0, 0, 0, 1);
-            gfx_updateSSBO(info->gridVerts, gridPts, sizeof(V4f) * (vertCount+2), true);
+            gridPts[0] = { V4f(), col_darkGray };
+            gridPts[vertCount+1] = { V4f(), col_darkGray };
+            gfx_updateSSBO(info->gridVerts, gridPts, sizeof(LineVert) * (vertCount+2), true);
 
             gfx_UniformBlock* b = gfx_registerCall(p);
             b->color = col_darkGray;
@@ -951,30 +957,44 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
             b->vertCount = 6*(vertCount-1);
         }
 
-        // TODO: labels
+        // TODO: value labels
+
+        blu_styleScope(blu_Style()) {
+        blu_style_sizeX({ blu_sizeKind_TEXT, 0 });
+        blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
+            float timeOffset = fmodf(globs.curTime, 1);
+
+            for(int i = 0; i < 10; i++) {
+                a = blu_areaMake(str_format(globs.scratch, STR("%i"), i), blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
+                a->offset =  { (1-((i+timeOffset) / GRAPH2D_SAMPLE_WINDOW)) * width - a->calculatedSizes[blu_axis_X] / 2, height - BLU_FONT_SIZE };
+                a->textScale = 0.5f;
+                blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%i"), (int)(globs.curTime-i)));
+            }
+
+            if(inter.hovered) {
+                a = blu_areaMake("hoverLabel", blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
+                a->offset =  { inter.mousePos.x - a->calculatedSizes[blu_axis_X] / 2, height - BLU_FONT_SIZE };
+                a->textScale = 0.6f;
+                blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%f"), globs.curTime - GRAPH2D_SAMPLE_WINDOW * (1-(inter.mousePos.x / width))));
+            }
+        }
 
 
 
 
-        float* pts = BUMP_PUSH_ARR(globs.scratch, GRAPH2D_VCOUNT * 4, float);
+        LineVert* pts = BUMP_PUSH_ARR(globs.scratch, GRAPH2D_VCOUNT, LineVert);
         for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
             if(info->keys[i].str.length == 0) { continue; }
 
             // TODO: int/bool graphing
-            float sHeight = 0;
-            net_PropSample* sample = net_getSample(info->keys[i].str, net_propType_F64, globs.curTime, &globs.table);
-            if(sample) { sHeight = (float)sample->f64; }
-            pts[0] = 1;
-            pts[1] = sHeight;
-            pts[3] = 1;
 
-            for(int j = 1; j < GRAPH2D_VCOUNT; j++) {
+            for(int j = 0; j < GRAPH2D_VCOUNT; j++) {
                 V4f color = info->colors[i];
 
-                sHeight = 0;
+                float sHeight = 0;
                 // TODO: inline traversal instead of restarting constantly
                 float sampleTime = globs.curTime - sampleGap*j;
-                sample = net_getSample(info->keys[i].str, net_propType_F64, sampleTime, &globs.table);
+                net_PropSample* sample = net_getSample(info->keys[i].str, net_propType_F64, sampleTime, &globs.table);
                 if(sample) { sHeight = (float)sample->f64; }
                 else { color *= col_disconnect; }
 
@@ -983,15 +1003,11 @@ void draw_graph2d(Graph2dInfo* info, gfx_Framebuffer* target) {
                 if(sample && sample->boo) { connected = true; }
                 if(sample && !connected) { color *= col_disconnect; }
 
-                pts[j*4]   = 1-(j*pointGap);
-                pts[j*4+1] = sHeight;
-                pts[j*4+3] = 1;
-                // CLEANUP: should this rely on zeroing from push_arr?
+                pts[j] = { V4f(1-(j*pointGap), sHeight, 0, 1), color };
             }
 
-            gfx_updateSSBO(info->lineVerts[i], pts, sizeof(float) * GRAPH2D_VCOUNT * 4, true);
+            gfx_updateSSBO(info->lineVerts[i], pts, sizeof(LineVert) * GRAPH2D_VCOUNT, true);
 
-            // TODO: coloring along each vert
             gfx_UniformBlock* b = gfx_registerCall(p);
             b->color = info->colors[i];
             b->thickness = 2;
@@ -1360,6 +1376,7 @@ void makeViewSrc(const char* name, ViewType type) {
     blu_Area* a = blu_areaMake(name,
         blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CLICKABLE | blu_areaFlags_DRAW_BACKGROUND);
     blu_areaAddDisplayStr(a, name);
+    a->textScale = 0.75;
     a->style.backgroundColor = v4f_lerp(col_darkGray, col_lightGray, a->target_hoverAnim);
 
     a->dropType = dropMasks_VIEW_TYPE;

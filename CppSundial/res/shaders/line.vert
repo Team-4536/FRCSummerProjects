@@ -1,14 +1,20 @@
 #version 460
 
-layout(location = 0) in vec2 position;
+struct lineVert {
+    vec4 pos;
+    vec4 color;
+};
 
+layout(location = 0) in vec2 position;
 layout(std430, binding = 0) buffer vertBuffer {
-    vec4 verts[];
+    lineVert verts[];
 };
 
 uniform mat4 uVP;
 uniform vec2 uResolution;
 uniform float uThickness;
+
+out vec4 vColor;
 
 // STOLEN FROM HERE: https://stackoverflow.com/questions/60440682/drawing-a-line-in-modern-opengl
 void main()
@@ -16,10 +22,12 @@ void main()
     int line_i = gl_VertexID / 6;
     int tri_i  = gl_VertexID % 6;
 
+    vColor = verts[line_i].color;
+
     vec4 va[4];
     for (int i=0; i<4; ++i)
     {
-        va[i] = uVP * verts[line_i+i];
+        va[i] = uVP * verts[line_i+i].pos;
         va[i].xyz /= va[i].w;
         va[i].xy = (va[i].xy + 1.0) * 0.5 * uResolution;
     }

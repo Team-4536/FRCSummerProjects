@@ -143,6 +143,8 @@ class SwerveBot(wpilib.TimedRobot):
         t = min(1, t)
         self.server.putUpdate("t", t)
 
+        # CLEANUP: be more explicit about type info, because otherwise it will not do the right thing
+
         position = self.swerve.estimatedPosition
         nextPt = getSpline2dSample(self.path, t)
         speed = (getSpline2dSample(self.path, min(1, t+0.001)) - nextPt).getNormalized() * getLinear2dSample(self.speedPath, t)
