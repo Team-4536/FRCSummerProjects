@@ -18,7 +18,6 @@ class EncoderSim:
         self.state: list[float] = [ 0, 0 ]
 
     def update(self, dt: float, motor: rev.CANSparkMax, encoder: rev.RelativeEncoder):
-        # TODO: check if this is correct
         inputVec = [motor.get() * self.motorSpec.nominalVoltage]
         self.state = self.linearSys.calculateX(self.state, inputVec, dt)
         encoder.setPosition(random.normalvariate(self.state[0] / (2 * math.pi), ENCODER_STD_DEV))
