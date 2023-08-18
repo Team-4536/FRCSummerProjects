@@ -1,3 +1,4 @@
+if not exist .\out\NUL mkdir .\out
 
 :: build src
 g++ -c src/base/baseImpl.cpp -Iexternal -Isrc -Isrc/base -o out/base.o -g
