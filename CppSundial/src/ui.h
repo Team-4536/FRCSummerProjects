@@ -507,7 +507,9 @@ void ui_init(BumpAlloc* frameArena, BumpAlloc* replayArena, gfx_Texture* solidTe
 V2f bezierSample(V2f* pts, U32 ptCount, float t) {
     U32 segCount = ptCount / 4;
     U32 segIdx = (U32)(t*segCount);
-    if(segIdx > segCount) { return pts[ptCount-1]; }
+    if(segIdx >= segCount) {
+        return pts[ptCount-1];
+    }
 
     float pct = fmodf(t*segCount, 1);
     V2f* p = &pts[segIdx*4];
@@ -597,14 +599,14 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
         if(renderPointCount > 0) {
             LineVert* pts = BUMP_PUSH_ARR(globs.scratch, renderPointCount + 2, LineVert);
             int ptCount = 0;
-            ARR_APPEND(pts, ptCount, (LineVert{ V4f(0, -1, 0, 1), col_white })); // fix 1st miter, CLEANUP: make align with curve
-            for(float i = 0; i < renderPointCount; i += 1) {
+            V2f pt = info->path[0] + info->path[0] - info->path[1];
+            ARR_APPEND(pts, ptCount, (LineVert{ V4f(pt.x, pt.y, 0, 1), col_white })); // 1st miter to point to 1st control
+            for(float i = 0; i <= renderPointCount; i += 1) {
                 V2f sample = bezierSample(info->path, info->pathPtCount, i/(float)renderPointCount);
                 ARR_APPEND(pts, ptCount, (LineVert{ V4f(sample.x, sample.y, 0, 1), col_white }));
             }
-            V2f last = info->path[info->pathPtCount-1]; // last pt not covered by for loop
-            ARR_APPEND(pts, ptCount, (LineVert{ V4f(last.x, last.y, 0, 1), col_white }));
-            ARR_APPEND(pts, ptCount, (LineVert{ V4f(), col_white })); // end miter
+            pt = info->path[info->pathPtCount-1] + info->path[info->pathPtCount-1] - info->path[info->pathPtCount-2];
+            ARR_APPEND(pts, ptCount, (LineVert{ V4f(pt.x, pt.y, 0, 1), col_white })); // end miter points to last control point
             gfx_updateSSBO(info->pathSSBO, pts, (ptCount) * sizeof(LineVert), false);
         }
         info->pathDirty = false;
