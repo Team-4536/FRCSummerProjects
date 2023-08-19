@@ -117,6 +117,7 @@ void draw_controls(ControlsInfo* info);
 struct PathInfo {
     BumpAlloc resArena;
     gfx_SSBO* pathSSBO = nullptr;
+    gfx_SSBO* connectSSBO = nullptr;
     V2f camPos = { 0, 0 };
     float camHeight = 4;
 
@@ -129,6 +130,7 @@ void init_paths(PathInfo* info) {
     *info = PathInfo();
     bump_allocate(&info->resArena, 10000);
     info->pathSSBO = gfx_registerSSBO(nullptr, 0, false);
+    info->connectSSBO = gfx_registerSSBO(nullptr, 0, false);
 
     info->pathPtCount = 8;
     V2f* p = BUMP_PUSH_ARR(&info->resArena, 8, V2f);
@@ -147,6 +149,7 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb);
 void deinit_paths(PathInfo* info) {
     bump_free(&info->resArena);
     gfx_freeSSBO(info->pathSSBO);
+    gfx_freeSSBO(info->connectSSBO);
 }
 
 
@@ -523,12 +526,12 @@ V2f bezierSample(V2f* pts, U32 ptCount, float t) {
 }
 
 void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
-    blu_Area* a = blu_areaMake("paths", 0);
+    blu_Area* a = blu_areaMake("paths", blu_areaFlags_CLICKABLE);
     areaAddFB(a, fb);
     float width = fb->texture->width;
     float height = fb->texture->height;
-
-
+    blu_WidgetInteraction inter = blu_interactionFromWidget(a);
+    V2f mousePos = inter.mousePos;
 
     V2f move = {
         (float)glfwGetKey(globs.window, GLFW_KEY_D) - glfwGetKey(globs.window, GLFW_KEY_A),
@@ -537,9 +540,6 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
     float scale = glfwGetKey(globs.window, GLFW_KEY_E) - glfwGetKey(globs.window, GLFW_KEY_Q);
     info->camHeight += scale * info->camHeight * globs.dt;
     info->camPos += info->camHeight * globs.dt * move * 0.5;
-
-
-
 
     Mat4f proj;
     float aspect = width/height;
@@ -550,23 +550,28 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
     matrixInverse(view, view);
     Mat4f vp = view * proj;
 
-    // point dragging and finding which is hovered
+    // PT RENDER AND DRAGGING =========================================================================
     for(int i = 0; i < info->pathPtCount; i++) {
         a = blu_areaMake(str_format(globs.scratch, STR("%i"), i),
             blu_areaFlags_DRAW_BACKGROUND |
             blu_areaFlags_FLOATING |
             blu_areaFlags_CLICKABLE |
             blu_areaFlags_HOVER_ANIM);
-        blu_WidgetInteraction inter = blu_interactionFromWidget(a);
+        inter = blu_interactionFromWidget(a);
         float size = lerp(10, 14, a->target_hoverAnim);
         a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, size };
         a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, size };
+        a->style.backgroundColor = col_green;
 
-        V2f drag = inter.dragDelta;
-        drag /= V2f{ width, -height };
-        drag *= V2f{ info->camHeight/2, info->camHeight * aspect/2 };
-        info->path[i] += drag;
-        // TODO: dragging is completely incorrect
+        if(inter.held) {
+            V2f pos = V2f{ mousePos.x, height-mousePos.y };
+            pos /= V2f{ width, height }; // 0-1 range inside of FB, UP+
+            pos -= V2f(0.5); // -0.5 to 0.5 range
+            pos *= V2f{ info->camHeight*aspect, info->camHeight };
+            pos += info->camPos;
+            info->path[i] = pos;
+            info->pathDirty = true;
+        }
 
         V2f pt = info->path[i];
         V4f temp = V4f(pt.x, pt.y, 0, 1) * vp; // move to screenspace (-1 to 1 inside of FB area)
@@ -574,12 +579,6 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
         pt *= V2f{ width, height }; // move to fb space
         a->offset = { pt.x, height-pt.y }; // invert Y bc ui uses down+
         a->offset -= (a->rect.end - a->rect.start) / 2;
-
-        a->style.backgroundColor = col_green;
-
-        if(inter.held) {
-            info->pathDirty = true;
-        }
     }
 
 
@@ -596,25 +595,45 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
     // Only recalculate curve data if this flag gets set
     // TODO: this will miss one segment between two splines, which looks really nasty. plz fix
     if(info->pathDirty) {
+        // spline
+        V4f pathColor = col_white;
         if(renderPointCount > 0) {
             LineVert* pts = BUMP_PUSH_ARR(globs.scratch, renderPointCount + 2, LineVert);
             int ptCount = 0;
             V2f pt = info->path[0] + info->path[0] - info->path[1];
-            ARR_APPEND(pts, ptCount, (LineVert{ V4f(pt.x, pt.y, 0, 1), col_white })); // 1st miter to point to 1st control
+            ARR_APPEND(pts, ptCount, (LineVert{ V4f(pt.x, pt.y, 0, 1), pathColor })); // 1st miter to point to 1st control
             for(float i = 0; i <= renderPointCount; i += 1) {
                 V2f sample = bezierSample(info->path, info->pathPtCount, i/(float)renderPointCount);
-                ARR_APPEND(pts, ptCount, (LineVert{ V4f(sample.x, sample.y, 0, 1), col_white }));
+                ARR_APPEND(pts, ptCount, (LineVert{ V4f(sample.x, sample.y, 0, 1), pathColor }));
             }
             pt = info->path[info->pathPtCount-1] + info->path[info->pathPtCount-1] - info->path[info->pathPtCount-2];
-            ARR_APPEND(pts, ptCount, (LineVert{ V4f(pt.x, pt.y, 0, 1), col_white })); // end miter points to last control point
+            ARR_APPEND(pts, ptCount, (LineVert{ V4f(pt.x, pt.y, 0, 1), pathColor })); // end miter points to last control point
             gfx_updateSSBO(info->pathSSBO, pts, (ptCount) * sizeof(LineVert), false);
         }
+
+        // connection between points
+        pathColor = col_darkGray;
+        LineVert* pts = BUMP_PUSH_ARR(globs.scratch, renderPointCount + 2, LineVert);
+        int ptCount = 0;
+        ARR_APPEND(pts, ptCount, (LineVert{ V4f(0, 0, 0, 1), pathColor }));
+        for(int i = 0; i < info->pathPtCount; i++) {
+            ARR_APPEND(pts, ptCount, (LineVert{V4f(info->path[i].x, info->path[i].y, 0, 1), pathColor}));
+        }
+        ARR_APPEND(pts, ptCount, (LineVert{ V4f(0, 0, 0, 1), pathColor }));
+        gfx_updateSSBO(info->connectSSBO, pts, (ptCount) * sizeof(LineVert), false);
+
         info->pathDirty = false;
     }
+
     gfx_UniformBlock* b = gfx_registerCall(p);
-    b->thickness = 3;
+    b->thickness = 1;
+    b->ssbo = info->connectSSBO;
+    b->vertCount = 6*(info->pathPtCount-1);
+
+    b = gfx_registerCall(p);
+    b->thickness = 2;
     b->ssbo = info->pathSSBO;
-    b->vertCount = 6*(renderPointCount+3-1);
+    b->vertCount = 6*(renderPointCount+1-1);
 }
 
 

@@ -213,7 +213,7 @@ struct blu_WidgetInteraction {
     V2f dragDelta = V2f();
     // where the drag started, relative to UL corner of area
     V2f dragStart = V2f();
-    // position of the mouse relative to the UL corner of the area
+    // position of the mouse relative to the UL corner of the area, will always have data even if area is blocked
     V2f mousePos = V2f();
 
     float scrollDelta = 0;
@@ -1136,7 +1136,7 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
     // ASSERT(area->flags & blu_areaFlags_CLICKABLE);
 
     blu_WidgetInteraction out = blu_WidgetInteraction();
-
+    out.mousePos = globs.inputMousePos - area->rect.start;
 
     if(globs.prevDragged != area && globs.prevDragged) {
         if(area->prevHovered) {
@@ -1156,7 +1156,6 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
     if(globs.dragged && globs.dragged != area) { return out; }
 
     if(out.hovered || globs.dragged == area) {
-        out.mousePos = globs.inputMousePos - area->rect.start;
         out.hovered = true;
     }
 
