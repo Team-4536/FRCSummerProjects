@@ -3,6 +3,7 @@
 #include "config.h"
 
 
+// TODO: move to utils
 
 // #define ARR_APPEND(arr, count, elem) do { (arr)[(count)] = (elem); (count)++; } while(0)
 #define ARR_APPEND(arr, count, elem) ((arr)[(count)] = (elem), &((arr)[(count)++]));

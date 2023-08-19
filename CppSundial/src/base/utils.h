@@ -100,6 +100,7 @@ struct V2f {
 
 };
 
+V2f v2f_lerp(V2f a, V2f b, F32 t);
 
 // TODO: v3
 
@@ -197,6 +198,11 @@ inline V2f operator*(F32 b, const V2f& a) {
 inline V2f operator*(const V2f& a, const V2f& b) {
     return { a.x * b.x, a.y * b.y }; }
 
+inline void operator*=(V2f& a, const V2f& b) { a = a * b; }
+inline void operator/=(V2f& a, const V2f& b) { a = a / b; }
+inline void operator*=(V2f& a, float s) { a = a * s; }
+inline void operator/=(V2f& a, float s) { a = a / s; }
+
 
 // V2I ////////////////////////////////////////////////////////////////
 inline void operator-=(V2i& a, const V2i& b) { a = a - b; }
@@ -213,7 +219,6 @@ inline V2i operator*(const V2i& a, S32 b) {
 
 inline V2i operator*(S32 b, const V2i& a) {
     return { a.x * b, a.y * b }; }
-
 
 
 
@@ -265,6 +270,7 @@ struct Mat4f {
 V4f operator*(const V4f& lhs, const Mat4f& rhs);
 Mat4f operator*(const Mat4f& lhs, const Mat4f& rhs);
 
+// TODO: return based instead of ref based
 bool matrixInverse(Mat4f m, Mat4f& invOut);
 void matrixOrtho(float l, float r, float b, float t, float n, float f, Mat4f& out);
 void matrixPerspective(float fovY, float aspect, float near, float far, Mat4f& out);
@@ -333,6 +339,12 @@ F32 lerp(F32 a, F32 b, F32 t) {
     return a + ((b-a) * t);
 }
 
+V2f v2f_lerp(V2f a, V2f b, F32 t) {
+    return V2f(
+        lerp(a.x, b.x, t),
+        lerp(a.y, b.y, t)
+    );
+}
 
 V4f v4f_lerp(V4f a, V4f b, F32 t) {
     return V4f(
