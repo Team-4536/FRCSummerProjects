@@ -525,13 +525,41 @@ V2f bezierSample(V2f* pts, U32 ptCount, float t) {
     return v2f_lerp(d, e, pct);
 }
 
+V2f mousePosToCameraPos(V2f mousePos, V2f cameraPos, V2f res, V2f cameraSize) {
+    V2f pos = V2f{ mousePos.x, res.y-mousePos.y };
+    pos /= res; // 0-1 range inside of FB, UP+
+    pos -= V2f(0.5); // -0.5 to 0.5 range
+    pos *= cameraSize;
+    pos += cameraPos;
+    return pos;
+}
+
 void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
     blu_Area* a = blu_areaMake("paths", blu_areaFlags_CLICKABLE);
     areaAddFB(a, fb);
     float width = fb->texture->width;
     float height = fb->texture->height;
+    float aspect = width/height;
     blu_WidgetInteraction inter = blu_interactionFromWidget(a);
     V2f mousePos = inter.mousePos;
+
+    // POINT INSERTION
+    if(inter.pressed) {
+        int x = info->pathPtCount;
+        info->path[x+0] = (x? (info->path[x-1]) : V2f{ 0, 0 });
+        info->path[x+1] = (x? 2 * info->path[x-1] - info->path[x-2] : V2f{0, 0});
+        V2f mp = mousePosToCameraPos(mousePos, info->camPos, {width, height}, {info->camHeight*aspect, info->camHeight});
+        info->path[x+2] = mp;
+        info->path[x+3] = mp;
+        info->pathPtCount+=4;
+        info->pathDirty = true;
+    }
+    else if(inter.held) {
+        int x = info->pathPtCount;
+        V2f mp = mousePosToCameraPos(mousePos, info->camPos, {width, height}, {info->camHeight*aspect, info->camHeight});
+        info->path[x-2] = mp;
+        info->pathDirty = true;
+    }
 
     V2f move = {
         (float)glfwGetKey(globs.window, GLFW_KEY_D) - glfwGetKey(globs.window, GLFW_KEY_A),
@@ -542,7 +570,6 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
     info->camPos += info->camHeight * globs.dt * move * 0.5;
 
     Mat4f proj;
-    float aspect = width/height;
     float halfHeight = info->camHeight / 2;
     matrixOrtho(-aspect * halfHeight, aspect * halfHeight, -halfHeight, halfHeight, 0, 100, proj);
     Mat4f view;
@@ -564,12 +591,11 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
         a->style.backgroundColor = col_green;
 
         if(inter.held) {
-            V2f pos = V2f{ mousePos.x, height-mousePos.y };
-            pos /= V2f{ width, height }; // 0-1 range inside of FB, UP+
-            pos -= V2f(0.5); // -0.5 to 0.5 range
-            pos *= V2f{ info->camHeight*aspect, info->camHeight };
-            pos += info->camPos;
-            info->path[i] = pos;
+            info->path[i] = mousePosToCameraPos(
+                mousePos,
+                info->camPos,
+                { width, height },
+                { info->camHeight*aspect, info->camHeight });
             info->pathDirty = true;
         }
 

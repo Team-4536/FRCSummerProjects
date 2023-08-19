@@ -207,7 +207,8 @@ struct blu_WidgetInteraction {
     // true when mouse is over or when another area that matches the drop mask is over
     bool hovered = false;
     bool held = false;
-    bool clicked = false;
+    bool pressed = false; // triggers on mouse down
+    bool clicked = false; // triggers on mouse up
 
     // how much the mouse has moved since last frame, in pixels
     V2f dragDelta = V2f();
@@ -1153,6 +1154,7 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
 
     out.hovered = area->prevHovered;
     out.scrollDelta = area->scrollDelta;
+    out.pressed = area->prevPressed;
     if(globs.dragged && globs.dragged != area) { return out; }
 
     if(out.hovered || globs.dragged == area) {
