@@ -127,8 +127,8 @@ class SwerveBot(wpilib.TimedRobot):
 
     def autonomousInit(self) -> None:
         self.path = [
-            (V2f(0, 0), V2f(1, 2), V2f(3, 2), V2f(4, 0)),
-            (V2f(4, 0), V2f(3, -2), V2f(1, -2), V2f(0, 0))
+            (V2f(0, 0), V2f(1, 2), V2f(4, 2), V2f(4, 0)),
+            (V2f(4, 0), V2f(4, -2), V2f(1, -2), V2f(0, 0))
         ]
         self.speedPath = [ V2f(0, 4.2), V2f(0.9, 4.2), V2f(1, 1) ]
 

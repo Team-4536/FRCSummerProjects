@@ -19,10 +19,14 @@ def getSpline2dSample(points: list[tuple[V2f, V2f, V2f, V2f]], t: float) -> V2f:
 
     pct = (t * len(points)) % 1
     pts = points[idx]
+
     a = V2f.lerp(pts[0], pts[1], pct)
-    b = V2f.lerp(pts[2], pts[3], pct)
-    # TODO: this is completely wrong
-    return V2f.lerp(a, b, pct)
+    b = V2f.lerp(pts[1], pts[2], pct)
+    c = V2f.lerp(pts[2], pts[3], pct)
+
+    d = V2f.lerp(a, b, pct)
+    e = V2f.lerp(b, c, pct)
+    return V2f.lerp(d, e, pct)
 
 # domain of pts expected to lie within 0-1 range
 # X vals are expected to increase from pt 0

@@ -590,6 +590,9 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
         a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, size };
         a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, size };
         a->style.backgroundColor = isControl? col_purple : col_green;
+        if(i == info->pathPtCount-1) {
+            a->style.backgroundColor = col_red;
+        }
 
         if(inter.held && inter.button == blu_mouseButton_LEFT) {
             info->path[i] = mousePosToCameraPos(
