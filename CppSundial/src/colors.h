@@ -1,4 +1,4 @@
-
+#pragma once
 #include "base/utils.h"
 
 V4f col_darkBlue = V4f(27, 28, 37, 255) / 255;

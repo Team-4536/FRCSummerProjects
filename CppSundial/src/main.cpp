@@ -13,10 +13,7 @@
 #include "graphics.h"
 #include "blue/blue.h"
 #include "network/sockets.h"
-
-#include "ui.h"
-
-
+#include "sun/sun.h"
 
 // NOTE: I didn't want to put it in gfx because of the stb dependency
 gfx_Texture* loadTextureFromFile(const char* path) {
@@ -114,7 +111,7 @@ int main() {
     blu_loadFont("C:/windows/fonts/consola.ttf");
 
     nets_init(&frameArena, &replayArena);
-    ui_init(&frameArena, &replayArena, solidTex);
+    sun_init(&frameArena, &replayArena, solidTex);
 
 
     gfx_Shader* blueShader;
@@ -188,7 +185,7 @@ int main() {
         blu_beginFrame();
 
 
-        ui_update(&frameArena, window, dt, time);
+        sun_update(&frameArena, window, dt, time);
 
 
         blu_layout(V2f(w, h));
