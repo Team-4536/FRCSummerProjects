@@ -579,6 +579,7 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
 
     // PT RENDER AND DRAGGING AND REMOVAL =========================================================================
     for(int i = 0; i < info->pathPtCount; i++) {
+        bool isControl = (i%4 == 1) || (i%4 == 2);
         a = blu_areaMake(str_format(globs.scratch, STR("%i"), i),
             blu_areaFlags_DRAW_BACKGROUND |
             blu_areaFlags_FLOATING |
@@ -588,7 +589,7 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
         float size = lerp(10, 14, a->target_hoverAnim);
         a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, size };
         a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, size };
-        a->style.backgroundColor = col_green;
+        a->style.backgroundColor = isControl? col_purple : col_green;
 
         if(inter.held && inter.button == blu_mouseButton_LEFT) {
             info->path[i] = mousePosToCameraPos(
@@ -597,6 +598,14 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
                 { width, height },
                 { info->camHeight*aspect, info->camHeight });
             info->pathDirty = true;
+        }
+        if(inter.clicked && inter.button == blu_mouseButton_RIGHT) {
+            if(!isControl) {
+                U32 start = i%4 == 3? i-3 : i;
+                memmove(&info->path[start], &info->path[start+4], (info->pathPtCount - start) * sizeof(V2f));
+                info->pathPtCount-=4;
+                info->pathDirty = true;
+            }
         }
 
         V2f pt = info->path[i];
@@ -652,15 +661,19 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
         info->pathDirty = false;
     }
 
-    gfx_UniformBlock* b = gfx_registerCall(p);
-    b->thickness = 1.2;
-    b->ssbo = info->connectSSBO;
-    b->vertCount = 6*(info->pathPtCount-1);
-
-    b = gfx_registerCall(p);
-    b->thickness = 2.3;
-    b->ssbo = info->pathSSBO;
-    b->vertCount = 6*(renderPointCount+1-1);
+    gfx_UniformBlock* b;
+    if(info->pathPtCount > 0) {
+        b = gfx_registerCall(p);
+        b->thickness = 1.2;
+        b->ssbo = info->connectSSBO;
+        b->vertCount = 6*(info->pathPtCount-1);
+    }
+    if(renderPointCount+1 > 0) {
+        b = gfx_registerCall(p);
+        b->thickness = 2.3;
+        b->ssbo = info->pathSSBO;
+        b->vertCount = 6*(renderPointCount+1-1);
+    }
 }
 
 
