@@ -544,7 +544,7 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
     V2f mousePos = inter.mousePos;
 
     // POINT INSERTION
-    if(inter.pressed) {
+    if(inter.pressed && inter.button == blu_mouseButton_LEFT) {
         int x = info->pathPtCount;
         info->path[x+0] = (x? (info->path[x-1]) : V2f{ 0, 0 });
         info->path[x+1] = (x? 2 * info->path[x-1] - info->path[x-2] : V2f{0, 0});
@@ -554,7 +554,7 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
         info->pathPtCount+=4;
         info->pathDirty = true;
     }
-    else if(inter.held) {
+    else if(inter.held && inter.button == blu_mouseButton_LEFT) {
         int x = info->pathPtCount;
         V2f mp = mousePosToCameraPos(mousePos, info->camPos, {width, height}, {info->camHeight*aspect, info->camHeight});
         info->path[x-2] = mp;
@@ -577,7 +577,7 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
     matrixInverse(view, view);
     Mat4f vp = view * proj;
 
-    // PT RENDER AND DRAGGING =========================================================================
+    // PT RENDER AND DRAGGING AND REMOVAL =========================================================================
     for(int i = 0; i < info->pathPtCount; i++) {
         a = blu_areaMake(str_format(globs.scratch, STR("%i"), i),
             blu_areaFlags_DRAW_BACKGROUND |
@@ -590,7 +590,7 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
         a->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, size };
         a->style.backgroundColor = col_green;
 
-        if(inter.held) {
+        if(inter.held && inter.button == blu_mouseButton_LEFT) {
             info->path[i] = mousePosToCameraPos(
                 mousePos,
                 info->camPos,
@@ -619,7 +619,7 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
 
     U32 renderPointCount = info->pathPtCount/4 * PATH_BEZIERSUBDIVCOUNT;
     // Only recalculate curve data if this flag gets set
-    // TODO: this will miss one segment between two splines, which looks really nasty. plz fix
+    // TODO: this will miss one segment between two curves which looks really nasty. plz fix
     if(info->pathDirty) {
         // spline
         V4f pathColor = col_white;
@@ -647,17 +647,18 @@ void draw_paths(PathInfo* info, gfx_Framebuffer* fb) {
         }
         ARR_APPEND(pts, ptCount, (LineVert{ V4f(0, 0, 0, 1), pathColor }));
         gfx_updateSSBO(info->connectSSBO, pts, (ptCount) * sizeof(LineVert), false);
+        // CLEANUP: for some reason the first segment doesn't appear until you move the camera
 
         info->pathDirty = false;
     }
 
     gfx_UniformBlock* b = gfx_registerCall(p);
-    b->thickness = 1;
+    b->thickness = 1.2;
     b->ssbo = info->connectSSBO;
     b->vertCount = 6*(info->pathPtCount-1);
 
     b = gfx_registerCall(p);
-    b->thickness = 2;
+    b->thickness = 2.3;
     b->ssbo = info->pathSSBO;
     b->vertCount = 6*(renderPointCount+1-1);
 }

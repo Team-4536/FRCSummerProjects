@@ -183,6 +183,7 @@ int main() {
         F64 mx, my;
         glfwGetCursorPos(window, &mx, &my);
         bool leftPressed = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)? true : false;
+        bool rightPressed = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)? true : false;
 
         blu_beginFrame();
 
@@ -193,7 +194,7 @@ int main() {
         blu_layout(V2f(w, h));
 
         blu_Cursor c, frame;
-        blu_input(V2f((F32)mx, (F32)my), leftPressed, windowScrollDelta, &c);
+        blu_input(V2f((F32)mx, (F32)my), leftPressed, rightPressed, windowScrollDelta, &c);
         if(c == blu_cursor_norm) { glfwSetCursor(window, nullptr); }
         else if(c == blu_cursor_hand) { glfwSetCursor(window, handCursor); }
         else if(c == blu_cursor_resizeH) { glfwSetCursor(window, resizeHCursor); }
