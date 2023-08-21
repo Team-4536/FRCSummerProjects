@@ -272,17 +272,20 @@ void sun_pathsBuild(sun_PathInfo* info, gfx_Framebuffer* fb) {
 
         // connection between points
         // TODO: fix ending miters
-        pathColor = col_white;
-        LineVert* pts = BUMP_PUSH_ARR(globs.scratch, renderPointCount + 2, LineVert);
-        int ptCount = 0;
-        ARR_APPEND(pts, ptCount, (LineVert{ V4f(0, 0, 0, 1), pathColor }));
-        for(int i = 0; i < info->pathPtCount; i++) {
-            ARR_APPEND(pts, ptCount, (LineVert{V4f(info->path[i].x, info->path[i].y, 0, 1), pathColor}));
+        if(info->pathPtCount > 1) {
+            pathColor = col_white;
+            LineVert* pts = BUMP_PUSH_ARR(globs.scratch, renderPointCount + 2, LineVert);
+            int ptCount = 0;
+            V2f pt = info->path[0] * 2 - info->path[1];
+            ARR_APPEND(pts, ptCount, (LineVert{ V4f(pt.x, pt.y, 0, 1), pathColor }));
+            for(int i = 0; i < info->pathPtCount; i++) {
+                ARR_APPEND(pts, ptCount, (LineVert{V4f(info->path[i].x, info->path[i].y, 0, 1), pathColor}));
+            }
+            pt = info->path[info->pathPtCount-1] * 2 - info->path[info->pathPtCount-2];
+            ARR_APPEND(pts, ptCount, (LineVert{ V4f(pt.x, pt.y, 0, 1), pathColor }));
+            gfx_updateSSBO(info->connectSSBO, pts, (ptCount) * sizeof(LineVert), false);
+            // CLEANUP: for some reason the first segment doesn't appear until you move the camera
         }
-        ARR_APPEND(pts, ptCount, (LineVert{ V4f(0, 0, 0, 1), pathColor }));
-        gfx_updateSSBO(info->connectSSBO, pts, (ptCount) * sizeof(LineVert), false);
-        // CLEANUP: for some reason the first segment doesn't appear until you move the camera
-
         info->pathDirty = false;
     }
 
