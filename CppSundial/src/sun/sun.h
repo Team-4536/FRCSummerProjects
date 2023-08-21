@@ -43,6 +43,7 @@ struct SunGlobs {
     float curTime;
 
     blu_Style borderStyle;
+    blu_Style textSizeStyle;
 };
 
 void sun_init(BumpAlloc* frameArena, BumpAlloc* replayArena, gfx_Texture* solidTex);
@@ -72,6 +73,9 @@ void sun_init(BumpAlloc* frameArena, BumpAlloc* replayArena, gfx_Texture* solidT
 
     blu_style_borderColor(col_black, &globs.borderStyle);
     blu_style_borderSize(1, &globs.borderStyle);
+
+    blu_style_sizeX({ blu_sizeKind_TEXT, 0 }, &globs.textSizeStyle);
+    blu_style_sizeY({ blu_sizeKind_TEXT, 0 }, &globs.textSizeStyle);
 
     for(int i = 0; i < SUN_VIEW_COUNT; i++) {
         View* v = &(globs.views[i]);

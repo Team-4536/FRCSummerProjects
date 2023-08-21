@@ -46,7 +46,7 @@ void bump_clear(BumpAlloc* a);
 BumpAlloc* bump_init(BumpAlloc* a, U64 size, void* memory) {
     a->reserved = size;
     a->start = memory;
-    a->end = a->start;
+    bump_clear(a);
     return a;
 }
 
@@ -54,7 +54,7 @@ BumpAlloc* bump_allocate(BumpAlloc* a, U64 size) {
     a->reserved = size;
     a->start = malloc(size);
     ASSERT(a->start);
-    a->end = a->start;
+    bump_clear(a);
     return a;
 }
 
@@ -71,7 +71,6 @@ void* bump_push(BumpAlloc* a, U64 size) {
         ASSERT(false);
     }
     a->end = o+size;
-    memset(o, 0, size);
     return o;
 }
 
@@ -79,6 +78,7 @@ void bump_pop(BumpAlloc* a, U64 size) {
     char* c = static_cast<char*>(a->end);
     ASSERT(size <= (c - static_cast<char*>(a->start)));
     a->end = c - size;
+    memset(a->end, 0, size);
 }
 
 void bump_clear(BumpAlloc* a) {

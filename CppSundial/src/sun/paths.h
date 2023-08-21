@@ -10,6 +10,7 @@
 
 #include "glfw/glfw3.h"
 #include <memory.h>
+#include <stdio.h>
 
 #include "sun/sunUtils.h"
 #include "sun/sun.h"
@@ -79,13 +80,13 @@ void sun_pathsBuild(sun_PathInfo* info, gfx_Framebuffer* fb) {
     float aspect = width/height;
     blu_WidgetInteraction inter = blu_interactionFromWidget(a);
     V2f mousePos = inter.mousePos;
+    V2f mp = mousePosToCameraPos(mousePos, info->camPos, {width, height}, {info->camHeight*aspect, info->camHeight});
 
     // POINT INSERTION
     if(inter.pressed && inter.button == blu_mouseButton_LEFT) {
         int x = info->pathPtCount;
         info->path[x+0] = (x? (info->path[x-1]) : V2f{ 0, 0 });
         info->path[x+1] = (x? 2 * info->path[x-1] - info->path[x-2] : V2f{0, 0});
-        V2f mp = mousePosToCameraPos(mousePos, info->camPos, {width, height}, {info->camHeight*aspect, info->camHeight});
         info->path[x+2] = mp;
         info->path[x+3] = mp;
         info->pathPtCount+=4;
@@ -93,7 +94,6 @@ void sun_pathsBuild(sun_PathInfo* info, gfx_Framebuffer* fb) {
     }
     else if(inter.held && inter.button == blu_mouseButton_LEFT) {
         int x = info->pathPtCount;
-        V2f mp = mousePosToCameraPos(mousePos, info->camPos, {width, height}, {info->camHeight*aspect, info->camHeight});
         info->path[x-2] = mp;
         info->pathDirty = true;
     }
@@ -155,6 +155,16 @@ void sun_pathsBuild(sun_PathInfo* info, gfx_Framebuffer* fb) {
         a->offset = { pt.x, height-pt.y }; // invert Y bc ui uses down+
         a->offset -= (a->rect.end - a->rect.start) / 2;
     }
+
+    {
+        a = blu_areaMake("coords", blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT);
+        blu_style_style(&globs.textSizeStyle, &a->style);
+        a->textScale = 0.75;
+        a->offset = mousePos + V2f { 15, 0 };
+        str s = str_format(globs.scratch, STR("%f, %f"), mp.x, mp.y);
+        blu_areaAddDisplayStr(a, s);
+    }
+
 
 
     // DRAW PATHS ==========================================================================================
