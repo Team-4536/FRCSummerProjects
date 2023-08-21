@@ -45,3 +45,22 @@ def getLinear2dSample(points: list[V2f], t: float) -> float:
                 pct = invLerp(points[idx-1].x, points[idx].x, t)
                 s = lerp(points[idx-1].y, points[idx].y, pct)
                 return s
+
+
+# NOTE: extremely unsafe and will throw like 30 errors on a bad file
+def loadPath(filePath: str) -> list[V2f]:
+    f = open(filePath)
+    s = f.read()
+
+    lines = s.split('\n')
+    components = [l.split(', ') for l in lines]
+
+    out: list[V2f] = []
+    for l in components[0:-1]:
+        flts = []
+        assert(len(l) == 2)
+        for c in l:
+            flts.append(float(c))
+        out.append(V2f(flts[0], flts[1]))
+
+    return out

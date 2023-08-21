@@ -72,6 +72,42 @@ V2f mousePosToCameraPos(V2f mousePos, V2f cameraPos, V2f res, V2f cameraSize) {
     return pos;
 }
 
+void savePath(V2f* path, U32 ptCount) {
+    FILE* f = fopen("path.txt", "w");
+
+    for(int i = 0; i < ptCount; i++) {
+        V2f pt = path[i];
+        str formatted = str_format(globs.scratch, STR("%f, %f\n"), pt.x, pt.y);
+        fwrite(formatted.chars, 1, formatted.length, f);
+    }
+    fclose(f);
+}
+
+// return indicates success
+bool loadPath(V2f** outPoints, U32* outCount, BumpAlloc* arena) {
+    *outPoints = ((V2f*)arena->end);
+    *outCount = 0;
+
+    U64 size;
+    U8* f = loadFileToBuffer("path.txt", false, &size, globs.scratch);
+    if(!f) { return false; }
+
+    str* lines;
+    U32 lineCount;
+    str_split({f, size}, '\n', globs.scratch, &lineCount, &lines);
+    for(int i = 0; i < lineCount; i++) {
+        str* components;
+        U32 compCount;
+        str_split(lines[i], ',', globs.scratch, &compCount, &components);
+        if(compCount != 2) { return false; }
+
+        BUMP_PUSH_NEW(arena, V2f);
+        V2f pt = { str_toFloat(components[0]), str_toFloat(components[1]) };
+        ARR_APPEND(*outPoints, *outCount, pt);
+    }
+}
+
+
 void sun_pathsBuild(sun_PathInfo* info, gfx_Framebuffer* fb) {
     blu_Area* a = blu_areaMake("paths", blu_areaFlags_CLICKABLE);
     sun_areaAddFB(a, fb);
@@ -80,6 +116,7 @@ void sun_pathsBuild(sun_PathInfo* info, gfx_Framebuffer* fb) {
     float aspect = width/height;
     blu_WidgetInteraction inter = blu_interactionFromWidget(a);
     V2f mousePos = inter.mousePos;
+    bool showCoords = inter.hovered;
     V2f mp = mousePosToCameraPos(mousePos, info->camPos, {width, height}, {info->camHeight*aspect, info->camHeight});
 
     // POINT INSERTION
@@ -131,12 +168,10 @@ void sun_pathsBuild(sun_PathInfo* info, gfx_Framebuffer* fb) {
             a->style.backgroundColor = col_red;
         }
 
+        if(inter.hovered) { showCoords = true; }
+
         if(inter.held && inter.button == blu_mouseButton_LEFT) {
-            info->path[i] = mousePosToCameraPos(
-                mousePos,
-                info->camPos,
-                { width, height },
-                { info->camHeight*aspect, info->camHeight });
+            info->path[i] = mp;
             info->pathDirty = true;
         }
         if(inter.clicked && inter.button == blu_mouseButton_RIGHT) {
@@ -156,8 +191,12 @@ void sun_pathsBuild(sun_PathInfo* info, gfx_Framebuffer* fb) {
         a->offset -= (a->rect.end - a->rect.start) / 2;
     }
 
-    {
+
+    // TODO: fix float formatting
+    // TODO: distance measurement tool
+    if(showCoords) {
         a = blu_areaMake("coords", blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT);
+        a->style.textColor = col_darkGray;
         blu_style_style(&globs.textSizeStyle, &a->style);
         a->textScale = 0.75;
         a->offset = mousePos + V2f { 15, 0 };
@@ -165,10 +204,45 @@ void sun_pathsBuild(sun_PathInfo* info, gfx_Framebuffer* fb) {
         blu_areaAddDisplayStr(a, s);
     }
 
+    {
+        a = blu_areaMake("menuParent", blu_areaFlags_FLOATING);
+        a->style.sizes[blu_axis_X] = { blu_sizeKind_PERCENT, 1 };
+        a->style.sizes[blu_axis_Y] = { blu_sizeKind_PERCENT, 1 };
+        a->style.childLayoutAxis = blu_axis_Y;
+        a->offset = { 5, 5 };
 
+        blu_parentScope(a) {
+            blu_styleScope(globs.textSizeStyle) {
+            blu_style_style(&globs.borderStyle);
+
+                if(sun_makeButton(STR("Save"), col_lightGray).clicked) {
+                    savePath(info->path, info->pathPtCount);
+                }
+                if(sun_makeButton(STR("Load"), col_lightGray).clicked) {
+                    bool e = loadPath(&info->path, &info->pathPtCount, &info->resArena);
+                    assert(e);
+                    info->pathDirty = true;
+                }
+            }
+        }
+    }
+
+
+    gfx_Pass* p = gfx_registerClearPass(col_darkBlue, fb);
+    // DRAW FIELD =======================================================================
+    {
+        p = gfx_registerPass();
+        p->target = fb;
+        p->shader = globs.sceneShader2d;
+        p->passUniforms.vp = vp;
+
+        gfx_UniformBlock* b = gfx_registerCall(p);
+        b->texture = globs.fieldTex;
+        b->model = Mat4f(1.0);
+        matrixScale(16.4846, 8.1026, 1, b->model); // taken from field.h
+    }
 
     // DRAW PATHS ==========================================================================================
-    gfx_Pass* p = gfx_registerClearPass(col_darkBlue, fb);
     p = gfx_registerPass();
     p->target = fb;
     p->shader = globs.lineShader;
@@ -181,7 +255,7 @@ void sun_pathsBuild(sun_PathInfo* info, gfx_Framebuffer* fb) {
     // TODO: this will miss one segment between two curves which looks really nasty. plz fix
     if(info->pathDirty) {
         // spline
-        V4f pathColor = col_white;
+        V4f pathColor = col_darkGray;
         if(renderPointCount > 0) {
             LineVert* pts = BUMP_PUSH_ARR(globs.scratch, renderPointCount + 2, LineVert);
             int ptCount = 0;
@@ -197,7 +271,8 @@ void sun_pathsBuild(sun_PathInfo* info, gfx_Framebuffer* fb) {
         }
 
         // connection between points
-        pathColor = col_darkGray;
+        // TODO: fix ending miters
+        pathColor = col_white;
         LineVert* pts = BUMP_PUSH_ARR(globs.scratch, renderPointCount + 2, LineVert);
         int ptCount = 0;
         ARR_APPEND(pts, ptCount, (LineVert{ V4f(0, 0, 0, 1), pathColor }));

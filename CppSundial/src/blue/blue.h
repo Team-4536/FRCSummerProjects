@@ -1130,11 +1130,14 @@ void blu_input(V2f npos, bool lmbState, bool rmbState, float scrollDelta, blu_Cu
 
     globs.prevDragged = globs.dragged;
 
-    bool lr = !globs.inputCurLButton && globs.inputPrevLButton;
-    bool rr = !globs.inputCurRButton && globs.inputPrevRButton;
-    if((lr && globs.dragged->button == blu_mouseButton_LEFT) ||
-      (rr && globs.dragged->button == blu_mouseButton_RIGHT)) {
-        globs.dragged = nullptr;
+    if(globs.dragged) {
+
+        bool lr = !globs.inputCurLButton && globs.inputPrevLButton;
+        bool rr = !globs.inputCurRButton && globs.inputPrevRButton;
+        if((lr && globs.dragged->button == blu_mouseButton_LEFT) ||
+        (rr && globs.dragged->button == blu_mouseButton_RIGHT)) {
+            globs.dragged = nullptr;
+        }
     }
 
     globs.dragDelta = npos - globs.inputMousePos;

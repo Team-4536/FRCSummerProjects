@@ -37,6 +37,8 @@ void str_print(str s);
 void str_println(str s);
 void str_printf(str fmt, ...);
 
+float str_toFloat(str s);
+
 
 str str_format(BumpAlloc* arena, str fmt, ...);
 
@@ -57,8 +59,6 @@ void str_split(str s, char delim, BumpAlloc* arena, U32* outCount, str** outArr)
 
 
 
-
-// TODO: better float formatting
 
 #ifdef BASE_IMPL
 
@@ -118,7 +118,7 @@ str str_format(BumpAlloc* arena, str fmt, ...) {
             }
             else if(*ptr == 'f') {
                 char buf[20] = { 0 };
-                if(gcvt(va_arg(argp, double), 4, buf) == NULL) { continue; };
+                if(gcvt(va_arg(argp, double), 6, buf) == NULL) { continue; };
                 for(int i = 0; i < 20; i++) {
                     if(buf[i] == '\0') { break; }
                     *BUMP_PUSH_NEW(arena, char) = buf[i];
@@ -181,7 +181,7 @@ void str_printf(str fmt, ...) {
             }
             else if(*ptr == 'f') {
                 char buf[20];
-                if(gcvt(va_arg(argp, double), 4, buf) == NULL) { continue; };
+                if(gcvt(va_arg(argp, double), 6, buf) == NULL) { continue; };
                 for(int i = 0; i < 20; i++) {
                     putchar(buf[i]);
                     if(buf[i] == '\0') { break; }
@@ -355,4 +355,7 @@ void str_split(str s, char delim, BumpAlloc* arena, U32* outCount, str** outArr)
     }
 }
 
+float str_toFloat(str s) {
+    return atof((char*)s.chars);
+}
 #endif
