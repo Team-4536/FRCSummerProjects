@@ -25,6 +25,12 @@ struct SunGlobs {
     gfx_Texture* arrowTex = nullptr;
     gfx_Texture* fieldTex = nullptr;
 
+    gfx_Texture* controlTex = nullptr;
+    gfx_Texture* fieldSrcTex = nullptr;
+    gfx_Texture* graphTex = nullptr;
+    gfx_Texture* powerTex = nullptr;
+    gfx_Texture* swerveTex = nullptr;
+
     gfx_VertexArray* robotVA = nullptr;
     gfx_IndexBuffer* robotIB = nullptr;
     gfx_VertexArray* fieldVA = nullptr;
@@ -58,6 +64,12 @@ void sun_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime)
 
 extern SunGlobs globs;
 
+gfx_Texture* loadImage(const char* path) {
+    int w, h, bpp;
+    U8* data = stbi_load(path, &w, &h, &bpp, 4);
+    ASSERT(data);
+    return gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
+}
 
 void sun_init(BumpAlloc* frameArena, BumpAlloc* replayArena, gfx_Texture* solidTex) {
 
@@ -102,21 +114,18 @@ void sun_init(BumpAlloc* frameArena, BumpAlloc* replayArena, gfx_Texture* solidT
     ASSERT(res);
     bump_clear(frameArena);
 
-    data = stbi_load("res/textures/field.png", &w, &h, &bpp, 4);
-    ASSERT(data);
-    globs.fieldTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
+    globs.fieldTex = loadImage("res/textures/field.png");
+    globs.wheelTex = loadImage("res/textures/swerveWheel.png");
+    globs.treadTex = loadImage("res/textures/swerveTread.png");
+    globs.arrowTex = loadImage("res/textures/vector.png");
 
-    data = stbi_load("res/textures/swerveWheel.png", &w, &h, &bpp, 4);
-    ASSERT(data);
-    globs.wheelTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
+    globs.controlTex = loadImage("res/textures/control_64.png");
+    globs.fieldSrcTex = loadImage("res/textures/field_64.png");
+    globs.graphTex = loadImage("res/textures/graph_32.png");
+    globs.powerTex = loadImage("res/textures/power_64.png");
+    globs.swerveTex = loadImage("res/textures/swerve_64.png");
 
-    data = stbi_load("res/textures/swerveTread.png", &w, &h, &bpp, 4);
-    ASSERT(data);
-    globs.treadTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
 
-    data = stbi_load("res/textures/vector.png", &w, &h, &bpp, 4);
-    ASSERT(data);
-    globs.arrowTex = gfx_registerTexture(data, w, h, gfx_texPxType_RGBA8);
 
 
     U32 ibData[] = { 0, 1, 2,   2, 3, 0 };
@@ -231,13 +240,13 @@ void sun_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime)
             blu_style_sizeY({ blu_sizeKind_PX, 50 });
             blu_style_backgroundColor(col_darkGray);
             blu_style_cornerRadius(4);
-                makeViewSrc("Field", viewType_field);
-                makeViewSrc("Graph", viewType_graph2d);
-                makeViewSrc("Swerve", viewType_swerveDrive);
-                makeViewSrc("NT", viewType_net);
-                makeViewSrc("Power", viewType_powerIndicators);
-                makeViewSrc("Ctrls", viewType_controls);
-                makeViewSrc("Paths", viewType_paths);
+                makeViewSrc("Field", globs.fieldSrcTex, viewType_field);
+                makeViewSrc("Graph", globs.graphTex, viewType_graph2d);
+                makeViewSrc("Swerve", globs.swerveTex, viewType_swerveDrive);
+                makeViewSrc("NT", globs.solidTex, viewType_net);
+                makeViewSrc("Power", globs.powerTex, viewType_powerIndicators);
+                makeViewSrc("Ctrls", globs.controlTex, viewType_controls);
+                makeViewSrc("Paths", globs.solidTex, viewType_paths);
             }
         }
 

@@ -122,7 +122,7 @@ struct View {
 
 void initView(View* v);
 void updateView(View* v);
-void makeViewSrc(const char* name, ViewType type);
+void makeViewSrc(const char* name, gfx_Texture* texture, ViewType type);
 void makeView(const char* name, View* v);
 
 #ifdef SUN_IMPL
@@ -159,13 +159,12 @@ void updateView(View* v) {
 }
 
 // TODO: button texures
-void makeViewSrc(const char* name, ViewType type) {
+void makeViewSrc(const char* name, gfx_Texture* texture, ViewType type) {
 
     blu_Area* a = blu_areaMake(name,
-        blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CLICKABLE | blu_areaFlags_DRAW_BACKGROUND);
-    blu_areaAddDisplayStr(a, name);
-    a->textScale = 0.75;
+        blu_areaFlags_HOVER_ANIM | blu_areaFlags_DRAW_TEXTURE | blu_areaFlags_CLICKABLE | blu_areaFlags_DRAW_BACKGROUND);
     a->style.backgroundColor = v4f_lerp(col_darkGray, col_lightGray, a->target_hoverAnim);
+    a->texture = texture;
 
     a->dropType = dropMasks_VIEW_TYPE;
     a->dropVal = (void*)type;
