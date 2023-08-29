@@ -70,9 +70,8 @@ class SwerveSim:
             ]
 
         # TODO: get real inertia vals
-        # TODO: is this the corect gearing?
         self.steerSims: list[EncoderSim] = [
-            EncoderSim(plant.DCMotor.NEO(1), 0.001, 1) for i in range(4)
+            EncoderSim(plant.DCMotor.NEO(1), 0.001, (150/7)) for i in range(4)
             ]
 
         self.position = V2f(0, 0)
@@ -129,9 +128,9 @@ class SwerveController:
         #choose between brake or hold position when no input is given (if false brake will be a toggle on button "A")
         self.brakeDefault = False
 
-        kp = 2
+        kp = 3
         ki = 0
-        kd = 12
+        kd = 0
         self.FLPID = PIDController(kp, ki, kd)
         self.FRPID = PIDController(kp, ki, kd)
         self.BLPID = PIDController(kp, ki, kd)
