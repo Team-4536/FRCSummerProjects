@@ -243,7 +243,6 @@ void sun_pathsBuild(sun_PathInfo* info, gfx_Framebuffer* fb) {
         b->model = Mat4f(1.0);
         matrixScale(16.4846, 8.1026, 1, b->model); // taken from field.h
 
-        /*
         U32 sampleCount = 30;
         for(float t = 0; t < 1; t += 1.0/sampleCount) {
             b = gfx_registerCall(p);
@@ -252,7 +251,6 @@ void sun_pathsBuild(sun_PathInfo* info, gfx_Framebuffer* fb) {
             V2f sample = bezierSample(info->path, info->pathPtCount, t);
             matrixTranslation(sample.x, sample.y, 0, b->model);
         }
-        */
     }
 
     // DRAW PATHS ==========================================================================================

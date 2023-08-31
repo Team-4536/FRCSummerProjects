@@ -14,7 +14,7 @@ import socketing
 import timing
 from inputs import deadZone
 from virtualGyro import VirtualGyro
-from paths import getSpline2dSample, getLinear2dSample, loadPath
+from paths import getSpline2dSample, getLinear2dSample, loadPath, getPathLength, getPathSample
 
 from subsystems.swerve import SwerveState, SwerveController, SwerveSim
 
@@ -137,7 +137,7 @@ class SwerveBot(wpilib.TimedRobot):
 
         self.anglePath = [ V2f(0, 0), V2f(0.5, 90), V2f(1, -90) ]
         self.pathStart = self.time.timeSinceInit
-        self.pathLength = 10 # in seconds
+        self.pathLength = getPathLength(self.path)/3;
 
 
     def autonomousPeriodic(self) -> None:
@@ -149,8 +149,8 @@ class SwerveBot(wpilib.TimedRobot):
         # CLEANUP: be more explicit about type info, because otherwise it will not do the right thing
 
         position = self.swerve.estimatedPosition
-        nextPt = getSpline2dSample(self.path, t)
-        speed = (getSpline2dSample(self.path, min(1, t+0.001)) - nextPt).getNormalized() * getLinear2dSample(self.speedPath, t)
+        nextPt = getPathSample(self.path, t)
+        speed = (getPathSample(self.path, min(1, t+0.001)) - nextPt).getNormalized() * getLinear2dSample(self.speedPath, t)
         nextAngle = getLinear2dSample(self.anglePath, t)
         self.server.putUpdate("targetX", nextPt.x)
         self.server.putUpdate("targetY", nextPt.y)
