@@ -18,13 +18,12 @@
     } \
 
 
-#define min(a, b) ((a)<(b)?(a):(b))
-#define max(a, b) ((a)>(b)?(a):(b))
-
-
 #define ARR_APPEND(arr, count, elem) ((arr)[(count)] = (elem), &((arr)[(count)++]));
 #define ARR_POP(arr, count) ((count)--, (arr)[(count)])
 void* arr_allocate0(U64 elemSize, U64 count);
+
+#define MIN(a, b) (((a) < (b))? (a) : (b))
+#define MAX(a, b) (((a) > (b))? (a) : (b))
 
 
 

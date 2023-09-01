@@ -86,8 +86,8 @@ blu_Area* sun_makeScrollArea(float* pos) {
                 *pos += blu_interactionFromWidget(a).dragDelta.y / clipSize * clipMax;
             }
 
-            *pos = max(*pos, 0);
-            *pos = min(*pos, clipMax - clipSize);
+            *pos = MAX(*pos, 0);
+            *pos = MIN(*pos, clipMax - clipSize);
             spacer->style.sizes[blu_axis_Y] = { blu_sizeKind_PX, ((*pos) / clipMax) * clipSize };
         } else {
             *pos = 0;

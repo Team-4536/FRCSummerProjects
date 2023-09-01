@@ -27,7 +27,9 @@ void loadReplay(net_Table* table) {
     while((c - f) < size) {
         if(*c != '\n') { c++; continue; }
 
-        str line = { lineStart, c-lineStart };
+        S64 dif = c-lineStart;
+        ASSERT(dif >= 0);
+        str line = { lineStart, (U64)dif };
         U32 spCount;
         str* split;
         str_split(line, ' ', globs.scratch, &spCount, &split);

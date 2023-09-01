@@ -769,10 +769,10 @@ void __blu_calculateChildRectsRecurse(blu_Area* parent, Rect2f clip) {
             }
         };
 
-        clip.start.x = max(parentClip.start.x, elem->rect.start.x);
-        clip.start.y = max(parentClip.start.y, elem->rect.start.y);
-        clip.end.x = min(parentClip.end.x, elem->rect.end.x);
-        clip.end.y = min(parentClip.end.y, elem->rect.end.y);
+        clip.start.x = MAX(parentClip.start.x, elem->rect.start.x);
+        clip.start.y = MAX(parentClip.start.y, elem->rect.start.y);
+        clip.end.x = MIN(parentClip.end.x, elem->rect.end.x);
+        clip.end.y = MIN(parentClip.end.y, elem->rect.end.y);
         elem->clipRect = clip;
 
         __blu_calculateChildRectsRecurse(elem, clip);

@@ -482,7 +482,7 @@ void nets_update(net_Table* table, float curTime, str targetIp) {
         U8* end = (U8*)globs.sendArena.end;
         while (start < end && globs.connected) {
             // TODO: sent message logging
-            int res = send(globs.simSocket.s, (const char*)start, min(end - start, NETS_PACKET_SIZE), 0);
+            int res = send(globs.simSocket.s, (const char*)start, MIN(end - start, NETS_PACKET_SIZE), 0);
             if(res == SOCKET_ERROR) {
                 if(WSAGetLastError() != WSAEWOULDBLOCK) {
 
