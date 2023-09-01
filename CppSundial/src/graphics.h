@@ -2,6 +2,7 @@
 #include "base/allocators.h"
 #include "base/str.h"
 #include "base/utils.h"
+#include "base/geometry.h"
 
 struct gfx_UniformBlock;
 struct gfx_Shader;

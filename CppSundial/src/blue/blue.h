@@ -3,6 +3,7 @@
 #include "base/config.h"
 #include "base/str.h"
 #include "base/allocators.h"
+#include "base/geometry.h"
 #include "graphics.h"
 
 
