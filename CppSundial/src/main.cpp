@@ -8,7 +8,6 @@
 #include "stb_truetype/stb_truetype.h"
 #include "GLAD/gl.h"
 
-#include "base/arr.h"
 #include "base/utils.h"
 #include "graphics.h"
 #include "blue/blue.h"

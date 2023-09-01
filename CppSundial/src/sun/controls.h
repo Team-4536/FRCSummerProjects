@@ -2,7 +2,6 @@
 
 #include "base/allocators.h"
 #include "base/config.h"
-#include "base/arr.h"
 #include "base/utils.h"
 #include "network/network.h"
 #include "blue/blue.h"

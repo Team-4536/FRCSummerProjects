@@ -2,7 +2,6 @@
 
 #include "base/allocators.h"
 #include "base/utils.h"
-#include "base/arr.h"
 
 #include "graphics.h"
 #include "blue/blue.h"

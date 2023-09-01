@@ -31,7 +31,6 @@ void nets_putMessage(str name, bool data);
 #include <iphlpapi.h>
 
 #include "base/hashtable.h"
-#include "base/arr.h"
 #include "base/utils.h"
 
 #define NETS_PACKET_SIZE 1024

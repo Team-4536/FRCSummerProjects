@@ -12,7 +12,6 @@
 
 
 
-
 // first, last, and n should all be ptrs to the node struct
 // uses prop "next" as link ptr
 #define SLL_APPEND(first, last, n) \
@@ -36,6 +35,10 @@ F32 lerp(F32 a, F32 b, F32 t);
 constexpr F32 radians(F32 d);
 constexpr F32 degrees(F32 r);
 
+
+#define ARR_APPEND(arr, count, elem) ((arr)[(count)] = (elem), &((arr)[(count)++]));
+#define ARR_POP(arr, count) ((count)--, (arr)[(count)])
+void* arr_allocate0(U64 elemSize, U64 count);
 
 
 // returns nullptr on failed file open, else pointer to buffer
@@ -302,7 +305,18 @@ Mat4f matrixTransform(Transform t);
 #ifdef BASE_IMPL
 
 #include <stdio.h>
+#include <memory>
 
+
+void* arr_allocate0(U64 elemSize, U64 count) {
+
+    U64 size = count * sizeof(elemSize);
+    void* v = malloc(size);
+    ASSERT(v);
+    memset(v, 0, size);
+    return v;
+
+}
 
 
 U8* loadFileToBuffer(const char* path, bool asText, U64* outSize, BumpAlloc* arena) {

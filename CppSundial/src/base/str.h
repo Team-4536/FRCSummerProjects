@@ -63,12 +63,12 @@ void str_split(str s, char delim, BumpAlloc* arena, U32* outCount, str** outArr)
 #ifdef BASE_IMPL
 
 #include "allocators.h"
+#include "utils.h"
 #include <string.h>
 #include <memory.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <cmath>
-#include "arr.h"
 
 
 // CLEANUP: reuse this code,

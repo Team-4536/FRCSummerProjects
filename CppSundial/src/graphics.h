@@ -162,7 +162,6 @@ bool gfx_loadOBJMesh(const char* path, BumpAlloc* scratch, gfx_VertexArray** out
 
 #ifdef GFX_IMPL
 
-#include "base/arr.h"
 #include "GLAD/gl.h"
 #include "stb_image/stb_image.h"
 #include <stdio.h>

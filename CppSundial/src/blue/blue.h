@@ -42,10 +42,11 @@ THE CHECKLIST:
     [ ] padding
     [ ] drop shadows
     [ ] text input
-    [ ] text hotkeys
+    [ ] text shortcuts (copy, paste, cut)
+    [ ] normal hotkeys
 
     [ ] cleanup
-    [ ] batching
+    [ ] render batching
 
     [ ] documentation and examples
     [ ] testing?
@@ -285,7 +286,7 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area);
 #ifdef BLU_IMPL
 
 #include "base/hashtable.h"
-#include "base/arr.h"
+#include "base/utils.h"
 #include "stb_truetype/stb_truetype.h"
 #include <stdio.h>
 
