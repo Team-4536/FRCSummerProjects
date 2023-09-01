@@ -1,15 +1,8 @@
 #pragma once
 
-
-// misc stuff and geometry
-
-
 #include "base/typedefs.h"
 #include "base/config.h"
 #include "base/allocators.h"
-#include <math.h> // CLEANUP: get this out of here
-
-
 
 
 // first, last, and n should all be ptrs to the node struct
@@ -23,8 +16,6 @@
         last->next = n; \
         last = n; \
     } \
-
-
 
 
 #define min(a, b) ((a)<(b)?(a):(b))
@@ -41,7 +32,6 @@ void* arr_allocate0(U64 elemSize, U64 count);
 
 #include <stdio.h>
 #include <memory>
-
 
 void* arr_allocate0(U64 elemSize, U64 count) {
 
