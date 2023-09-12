@@ -2,6 +2,7 @@
 #include "base/allocators.h"
 #include "base/str.h"
 #include "base/utils.h"
+#include "base/geometry.h"
 
 struct gfx_UniformBlock;
 struct gfx_Shader;
@@ -162,7 +163,6 @@ bool gfx_loadOBJMesh(const char* path, BumpAlloc* scratch, gfx_VertexArray** out
 
 #ifdef GFX_IMPL
 
-#include "base/arr.h"
 #include "GLAD/gl.h"
 #include "stb_image/stb_image.h"
 #include <stdio.h>

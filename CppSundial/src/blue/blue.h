@@ -3,6 +3,7 @@
 #include "base/config.h"
 #include "base/str.h"
 #include "base/allocators.h"
+#include "base/geometry.h"
 #include "graphics.h"
 
 
@@ -42,10 +43,11 @@ THE CHECKLIST:
     [ ] padding
     [ ] drop shadows
     [ ] text input
-    [ ] text hotkeys
+    [ ] text shortcuts (copy, paste, cut)
+    [ ] normal hotkeys
 
     [ ] cleanup
-    [ ] batching
+    [ ] render batching
 
     [ ] documentation and examples
     [ ] testing?
@@ -97,6 +99,12 @@ enum blu_Cursor {
     blu_cursor_resizeH,
     blu_cursor_resizeV,
     blu_cursor_type,
+};
+
+enum blu_MouseButton {
+    blu_mouseButton_NONE,
+    blu_mouseButton_LEFT,
+    blu_mouseButton_RIGHT
 };
 
 
@@ -195,7 +203,9 @@ struct blu_Area {
     // persistant shit for input / anim //////////////
     F32 target_hoverAnim = 0;
 
+
     bool prevHovered = false;
+    blu_MouseButton button = blu_mouseButton_NONE;
     bool prevPressed = false;
     F32 scrollDelta = 0;
 
@@ -203,17 +213,20 @@ struct blu_Area {
 };
 
 
+// CLEANUP: document when input fields are valid
 struct blu_WidgetInteraction {
     // true when mouse is over or when another area that matches the drop mask is over
     bool hovered = false;
     bool held = false;
-    bool clicked = false;
+    bool pressed = false; // triggers on mouse down
+    bool clicked = false; // triggers on mouse up
+    blu_MouseButton button = blu_mouseButton_NONE; // which mouse button was pressed/clicked/held
 
     // how much the mouse has moved since last frame, in pixels
     V2f dragDelta = V2f();
     // where the drag started, relative to UL corner of area
     V2f dragStart = V2f();
-    // position of the mouse relative to the UL corner of the area
+    // position of the mouse relative to the UL corner of the area, will always have data even if area is blocked
     V2f mousePos = V2f();
 
     float scrollDelta = 0;
@@ -233,7 +246,7 @@ void blu_loadFont(const char* path);
 void blu_beginFrame(); // cull, reset globals
 // build code goes here
 void blu_layout(V2f scSize); // calculate layout shit
-void blu_input(V2f npos, bool lmbState, float scrollDelta, blu_Cursor* outCursor);  // set current and update prev input // CLEANUP: merge with begin?
+void blu_input(V2f npos, bool lmbState, bool rmbState, float scrollDelta, blu_Cursor* outCursor);  // set current and update prev input // CLEANUP: merge with begin?
 void blu_makeDrawCalls(gfx_Pass* normalPass);
 
 blu_Area* blu_areaMake(str s, U32 flags);
@@ -274,7 +287,7 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area);
 #ifdef BLU_IMPL
 
 #include "base/hashtable.h"
-#include "base/arr.h"
+#include "base/utils.h"
 #include "stb_truetype/stb_truetype.h"
 #include <stdio.h>
 
@@ -343,6 +356,8 @@ struct blu_Globs {
     V2f inputMousePos = V2f();
     bool inputCurLButton = false;
     bool inputPrevLButton = false;
+    bool inputCurRButton = false;
+    bool inputPrevRButton = false;
     blu_Area* dragged = nullptr;
     blu_Area* prevDragged = nullptr;
     V2f dragDelta = V2f();
@@ -754,10 +769,10 @@ void __blu_calculateChildRectsRecurse(blu_Area* parent, Rect2f clip) {
             }
         };
 
-        clip.start.x = max(parentClip.start.x, elem->rect.start.x);
-        clip.start.y = max(parentClip.start.y, elem->rect.start.y);
-        clip.end.x = min(parentClip.end.x, elem->rect.end.x);
-        clip.end.y = min(parentClip.end.y, elem->rect.end.y);
+        clip.start.x = MAX(parentClip.start.x, elem->rect.start.x);
+        clip.start.y = MAX(parentClip.start.y, elem->rect.start.y);
+        clip.end.x = MIN(parentClip.end.x, elem->rect.end.x);
+        clip.end.y = MIN(parentClip.end.y, elem->rect.end.y);
         elem->clipRect = clip;
 
         __blu_calculateChildRectsRecurse(elem, clip);
@@ -1073,10 +1088,19 @@ bool __blu_genInteractionsRecurse(blu_Area* area, blu_Area* dragged, bool* outBl
 
     *outCursor = area->cursor;
     area->prevHovered = true;
-    area->prevPressed = globs.inputCurLButton && !globs.inputPrevLButton;
+
+    bool leftPressed = globs.inputCurLButton && !globs.inputPrevLButton;
+    bool rightPressed = globs.inputCurRButton && !globs.inputPrevRButton;
+    area->prevPressed = leftPressed || rightPressed;
+
     if(area->prevPressed) {
         globs.dragged = area;
         area->dragStart = globs.inputMousePos - area->rect.start;
+
+        blu_MouseButton m = blu_mouseButton_NONE;
+        if(leftPressed) { m = blu_mouseButton_LEFT; }
+        else if(rightPressed) { m = blu_mouseButton_RIGHT; }
+        area->button = m;
     }
     return true;
 }
@@ -1104,11 +1128,18 @@ bool __blu_genScrollInteractionsRecurse(blu_Area* area, bool* outBlockSiblings, 
     return true;
 }
 
-void blu_input(V2f npos, bool lmbState, float scrollDelta, blu_Cursor* outCursor) {
+void blu_input(V2f npos, bool lmbState, bool rmbState, float scrollDelta, blu_Cursor* outCursor) {
 
     globs.prevDragged = globs.dragged;
-    if(!globs.inputCurLButton && globs.inputPrevLButton) {
-        globs.dragged = nullptr;
+
+    if(globs.dragged) {
+
+        bool lr = !globs.inputCurLButton && globs.inputPrevLButton;
+        bool rr = !globs.inputCurRButton && globs.inputPrevRButton;
+        if((lr && globs.dragged->button == blu_mouseButton_LEFT) ||
+        (rr && globs.dragged->button == blu_mouseButton_RIGHT)) {
+            globs.dragged = nullptr;
+        }
     }
 
     globs.dragDelta = npos - globs.inputMousePos;
@@ -1117,6 +1148,8 @@ void blu_input(V2f npos, bool lmbState, float scrollDelta, blu_Cursor* outCursor
     globs.inputPrevLButton = globs.inputCurLButton;
     globs.inputCurLButton = lmbState;
 
+    globs.inputPrevRButton = globs.inputCurRButton;
+    globs.inputCurRButton = rmbState;
 
     *outCursor = blu_cursor_norm;
     if(globs.dragged) { *outCursor = globs.dragged->cursor; }
@@ -1130,13 +1163,9 @@ void blu_input(V2f npos, bool lmbState, float scrollDelta, blu_Cursor* outCursor
     __blu_updateInteractionsRecurse(globs.ogParent);
 }
 
-
-
 blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
-    // ASSERT(area->flags & blu_areaFlags_CLICKABLE);
-
     blu_WidgetInteraction out = blu_WidgetInteraction();
-
+    out.mousePos = globs.inputMousePos - area->rect.start;
 
     if(globs.prevDragged != area && globs.prevDragged) {
         if(area->prevHovered) {
@@ -1153,23 +1182,28 @@ blu_WidgetInteraction blu_interactionFromWidget(blu_Area* area) {
 
     out.hovered = area->prevHovered;
     out.scrollDelta = area->scrollDelta;
+    out.pressed = area->prevPressed;
     if(globs.dragged && globs.dragged != area) { return out; }
 
     if(out.hovered || globs.dragged == area) {
-        out.mousePos = globs.inputMousePos - area->rect.start;
         out.hovered = true;
+    }
+
+    if(globs.dragged == area || area->prevPressed) {
+        out.button = area->button;
     }
 
     if(globs.dragged == area) {
         out.held = true;
         out.dragDelta = globs.dragDelta; // TODO: this isn't actually a drag delta, its a pos change
 
-        if(!globs.inputCurLButton && globs.inputPrevLButton) {
+        if(!globs.inputCurLButton && globs.inputPrevLButton && area->button == blu_mouseButton_LEFT) {
+            out.clicked = true; }
+        if(!globs.inputCurRButton && globs.inputPrevRButton && area->button == blu_mouseButton_RIGHT) {
             out.clicked = true; }
 
         out.dragStart = area->dragStart;
     }
-
 
     return out;
 }

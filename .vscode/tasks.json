@@ -9,12 +9,16 @@
             "command": "py -3 sundial/src/main.py",
             "problemMatcher": []
         },
-
         {
             "label": "Build CSundial",
-            "group": "build",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
             "type": "shell",
-            "options": { "cwd": "${workspaceFolder}\\cppsundial" },
+            "options": {
+                "cwd": "${workspaceFolder}\\cppsundial"
+            },
             "command": "build\\build.cmd",
             "problemMatcher": []
         },
@@ -22,7 +26,9 @@
             "label": "Build CSundial dependencies",
             "group": "build",
             "type": "shell",
-            "options": { "cwd": "${workspaceFolder}\\cppsundial" },
+            "options": {
+                "cwd": "${workspaceFolder}\\cppsundial"
+            },
             "command": "build\\builddeps.cmd",
             "problemMatcher": []
         },
@@ -47,6 +53,6 @@
                 "Build CSundial"
             ],
             "problemMatcher": []
-        },
+        }
     ]
 }

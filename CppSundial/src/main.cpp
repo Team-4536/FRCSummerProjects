@@ -8,15 +8,11 @@
 #include "stb_truetype/stb_truetype.h"
 #include "GLAD/gl.h"
 
-#include "base/arr.h"
 #include "base/utils.h"
 #include "graphics.h"
 #include "blue/blue.h"
 #include "network/sockets.h"
-
-#include "ui.h"
-
-
+#include "sun/sun.h"
 
 // NOTE: I didn't want to put it in gfx because of the stb dependency
 gfx_Texture* loadTextureFromFile(const char* path) {
@@ -114,7 +110,7 @@ int main() {
     blu_loadFont("C:/windows/fonts/consola.ttf");
 
     nets_init(&frameArena, &replayArena);
-    ui_init(&frameArena, &replayArena, solidTex);
+    sun_init(&frameArena, &replayArena, solidTex);
 
 
     gfx_Shader* blueShader;
@@ -183,17 +179,18 @@ int main() {
         F64 mx, my;
         glfwGetCursorPos(window, &mx, &my);
         bool leftPressed = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)? true : false;
+        bool rightPressed = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)? true : false;
 
         blu_beginFrame();
 
 
-        ui_update(&frameArena, window, dt, time);
+        sun_update(&frameArena, window, dt, time);
 
 
         blu_layout(V2f(w, h));
 
         blu_Cursor c, frame;
-        blu_input(V2f((F32)mx, (F32)my), leftPressed, windowScrollDelta, &c);
+        blu_input(V2f((F32)mx, (F32)my), leftPressed, rightPressed, windowScrollDelta, &c);
         if(c == blu_cursor_norm) { glfwSetCursor(window, nullptr); }
         else if(c == blu_cursor_hand) { glfwSetCursor(window, handCursor); }
         else if(c == blu_cursor_resizeH) { glfwSetCursor(window, resizeHCursor); }
