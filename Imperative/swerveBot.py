@@ -8,6 +8,8 @@ import wpimath.system.plant as plant
 from wpimath.geometry import Pose2d, Rotation2d
 from wpimath.kinematics import ChassisSpeeds
 from wpimath.controller import RamseteController
+from wpimath import trajectory
+from wpimath.trajectory import TrajectoryUtil
 
 from real import V2f, angleWrap
 import socketing
@@ -124,56 +126,16 @@ class SwerveBot(wpilib.TimedRobot):
 
 
 
-
+    
     def autonomousInit(self) -> None:
+        trajectoryJSON = "deploy/???"
+        trajectory = trajectory.Trajectory()
+        trajectory = TrajectoryUtil.fromPathweaverJson(trajectoryJSON)
 
-        p = loadPath("imperative/path.txt")
-        assert(len(p) % 4 == 0)
-        self.path = []
-        for i in range(0, len(p), 4):
-            self.path.append(( p[i], p[i+1], p[i+2], p[i+3] ))
-
-        self.speedPath = [ V2f(0, 3), V2f(0.9, 3), V2f(1, 1) ]
-
-        self.anglePath = [ V2f(0, 0), V2f(0.5, 90), V2f(1, -90) ]
-        self.pathStart = self.time.timeSinceInit
-        self.pathLength = getPathLength(self.path)/3;
 
 
     def autonomousPeriodic(self) -> None:
-
-        t = (self.time.timeSinceInit - self.pathStart) / self.pathLength
-        t = min(1, t)
-        self.server.putUpdate("t", t)
-
-        # CLEANUP: be more explicit about type info, because otherwise it will not do the right thing
-
-        position = self.swerve.estimatedPosition
-        nextPt = getPathSample(self.path, t)
-        speed = (getPathSample(self.path, min(1, t+0.001)) - nextPt).getNormalized() * getLinear2dSample(self.speedPath, t)
-        nextAngle = getLinear2dSample(self.anglePath, t)
-        self.server.putUpdate("targetX", nextPt.x)
-        self.server.putUpdate("targetY", nextPt.y)
-        self.server.putUpdate("targetSpeedX", speed.x)
-        self.server.putUpdate("targetSpeedY", speed.y)
-        self.server.putUpdate("targetAngle", nextAngle)
-
-        recoveryDist = 4
-        recoveryTime = 0.2
-        l = (nextPt - position).getLength()
-        l = max(0, min(l, recoveryDist))
-        e = (1-(l/recoveryDist))**(2.4)
-        e = 1-e
-        correction = (nextPt - position) / recoveryTime
-        trajectory = speed
-        out = V2f.lerp(trajectory, correction, e)
-        self.server.putUpdate("e", e)
-
-        outA = angleWrap(nextAngle - self.gyro.getYaw()) * 40
-        self.swerveController.tickReal(V2f(out.x, out.y).rotateDegrees(-self.gyro.getYaw()), outA, self.time.dt, self.swerve, self.server)
-        self.server.putUpdate("outX", out.x)
-        self.server.putUpdate("outY", out.y)
-        self.server.putUpdate("outA", outA)
+        
 
 
 
