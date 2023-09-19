@@ -2,14 +2,15 @@ import wpilib
 import rev
 import ntcore
 import math
-import navx
+#import navx
 
 import wpimath.system.plant as plant
 from wpimath.geometry import Pose2d, Rotation2d
 from wpimath.kinematics import ChassisSpeeds
 from wpimath.controller import RamseteController
-from wpimath import trajectory
+from wpimath.trajectory import Trajectory
 from wpimath.trajectory import TrajectoryUtil
+
 
 from real import V2f, angleWrap
 import socketing
@@ -34,9 +35,8 @@ class SwerveBotInputs():
 
 class SwerveBot(wpilib.TimedRobot):
 
-    # TODO: assert saftey
-
-    def robotInit(self) -> None:
+    # TODO: assert safte
+    def robotInit(self) -> None: 
 
         self.server = socketing.Server(self.isReal())
         self.driveCtrlr = wpilib.XboxController(0)
@@ -128,14 +128,15 @@ class SwerveBot(wpilib.TimedRobot):
 
     
     def autonomousInit(self) -> None:
-        trajectoryJSON = "deploy/???"
-        trajectory = trajectory.Trajectory()
-        trajectory = TrajectoryUtil.fromPathweaverJson(trajectoryJSON)
+        trajectoryJSON = "deploy/path.wpilib.json"
+        self.trajectory = TrajectoryUtil.fromPathweaverJson(trajectoryJSON)
+        self.ramseteController = RamseteController(1.0, 1.0)
+        
 
 
 
     def autonomousPeriodic(self) -> None:
-        
+        out = self.ramseteController.calculate(Pose2d(self.sim.position.x, self.sim.position.y, self.sim.rotation), self.trajectory.State)
 
 
 
