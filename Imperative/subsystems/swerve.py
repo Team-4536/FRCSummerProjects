@@ -173,8 +173,9 @@ class SwerveController:
         for x in zip(driveSpeeds, swerve.driveMotors):
             x[1].set(x[0])
 
-
-
+    def velPID(self, chassisSpeeds, center):
+        pass
+    
 
 
     # forward = forward/back

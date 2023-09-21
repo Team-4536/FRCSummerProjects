@@ -5,12 +5,13 @@ import math
 #import navx
 
 import wpimath.system.plant as plant
-from wpimath.geometry import Pose2d, Rotation2d
+from wpimath.geometry import Pose2d, Rotation2d, Translation2d
 from wpimath.kinematics import ChassisSpeeds
-from wpimath.controller import RamseteController
+from wpimath.controller import RamseteController 
 from wpimath.trajectory import Trajectory
 from wpimath.trajectory import TrajectoryUtil
-
+from wpimath.kinematics import SwerveDrive4Kinematics
+from wpimath.controller import PIDController
 
 from real import V2f, angleWrap
 import socketing
@@ -131,12 +132,18 @@ class SwerveBot(wpilib.TimedRobot):
         trajectoryJSON = "deploy/path.wpilib.json"
         self.trajectory = TrajectoryUtil.fromPathweaverJson(trajectoryJSON)
         self.ramseteController = RamseteController(1.0, 1.0)
+        wheelesFromCenter = (Translation2d(0.254,0.254),Translation2d(-0.254,0.254),Translation2d(-0.254,-0.254),Translation2d(0.254,-0.254))
+        self.swerveDrive4Kinematics = SwerveDrive4Kinematics(wheelesFromCenter[0], wheelesFromCenter[1], wheelesFromCenter[2], wheelesFromCenter[3])
         
 
 
 
     def autonomousPeriodic(self) -> None:
-        out = self.ramseteController.calculate(Pose2d(self.sim.position.x, self.sim.position.y, self.sim.rotation), self.trajectory.State)
+        chassisSpeeds = self.ramseteController.calculate(Pose2d(self.sim.position.x, self.sim.position.y, self.sim.rotation), self.trajectory.State)
+        center = Translation2d(0, 0)
+        swerveKinamatics = self.swerveDrive4Kinematics.toSwerveModuleStates(chassisSpeeds, center)
+        
+
 
 
 
