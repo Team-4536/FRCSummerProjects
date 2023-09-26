@@ -7,8 +7,8 @@ import math
 import wpimath.system.plant as plant
 from wpimath.geometry import Pose2d, Rotation2d, Translation2d
 from wpimath.kinematics import ChassisSpeeds
-from wpimath.controller import RamseteController 
-from wpimath.trajectory import Trajectory
+from wpimath.controller import RamseteController
+from wpimath import trajectory
 from wpimath.trajectory import TrajectoryUtil
 from wpimath.kinematics import SwerveDrive4Kinematics
 from wpimath.controller import PIDController
@@ -36,8 +36,9 @@ class SwerveBotInputs():
 
 class SwerveBot(wpilib.TimedRobot):
 
-    # TODO: assert safte
-    def robotInit(self) -> None: 
+    # TODO: assert saftey
+
+    def robotInit(self) -> None:
 
         self.server = socketing.Server(self.isReal())
         self.driveCtrlr = wpilib.XboxController(0)
@@ -129,23 +130,21 @@ class SwerveBot(wpilib.TimedRobot):
 
     
     def autonomousInit(self) -> None:
+        #self.voltagePID = PIDController() #numbers needed
         trajectoryJSON = "deploy/path.wpilib.json"
         self.trajectory = TrajectoryUtil.fromPathweaverJson(trajectoryJSON)
         self.ramseteController = RamseteController(1.0, 1.0)
         wheelesFromCenter = (Translation2d(0.254,0.254),Translation2d(-0.254,0.254),Translation2d(-0.254,-0.254),Translation2d(0.254,-0.254))
         self.swerveDrive4Kinematics = SwerveDrive4Kinematics(wheelesFromCenter[0], wheelesFromCenter[1], wheelesFromCenter[2], wheelesFromCenter[3])
-        
 
 
 
     def autonomousPeriodic(self) -> None:
-        chassisSpeeds = self.ramseteController.calculate(Pose2d(self.sim.position.x, self.sim.position.y, self.sim.rotation), self.trajectory.State)
+        chassisSpeedsRam = self.ramseteController.calculate(Pose2d(self.sim.position.x, self.sim.position.y, self.sim.rotation), self.trajectory.State)
         center = Translation2d(0, 0)
-        swerveKinamatics = self.swerveDrive4Kinematics.toSwerveModuleStates(chassisSpeeds, center)
-        
-
-
-
+        #swerveKinamatics = self.swerveDrive4Kinematics.toSwerveModuleStates(chassisSpeeds, center)
+        wheelStates = self.swerveDrive4Kinematics.toSwerveModuleStates(chassisSpeedsRam, center)
+        chassisSpeedsValues = self.swerveDrive4Kinematics.toChassisSpeeds(wheelStates[0], wheelStates[1], wheelStates[2], wheelStates[3])
 
 
     def teleopPeriodic(self) -> None:
