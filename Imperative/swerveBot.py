@@ -130,11 +130,22 @@ class SwerveBot(wpilib.TimedRobot):
 
     
     def autonomousInit(self) -> None:
-        #self.voltagePID = PIDController() #numbers needed
+        driveKp = 0
+        driveKi = 0
+        driveKd = 0
+        rotationKp = 0
+        rotationKi = 0
+        rotationKd = 0
+        self.wheels = {
+            "FL": {"Drive" : PIDController(driveKp, driveKi, driveKd), "Rotation": PIDController(rotationKp, rotationKi, rotationKd)},
+            "FR": {"Drive" : PIDController(driveKp, driveKi, driveKd), "Rotation": PIDController(rotationKp, rotationKi, rotationKd)},
+            "BL": {"Drive" : PIDController(driveKp, driveKi, driveKd), "Rotation": PIDController(rotationKp, rotationKi, rotationKd)},
+            "BR": {"Drive" : PIDController(driveKp, driveKi, driveKd), "Rotation": PIDController(rotationKp, rotationKi, rotationKd)}
+        }
         trajectoryJSON = "deploy/path.wpilib.json"
         self.trajectory = TrajectoryUtil.fromPathweaverJson(trajectoryJSON)
         self.ramseteController = RamseteController(1.0, 1.0)
-        wheelesFromCenter = (Translation2d(0.254,0.254),Translation2d(-0.254,0.254),Translation2d(-0.254,-0.254),Translation2d(0.254,-0.254))
+        wheelesFromCenter = (Translation2d(0.254,0.254),Translation2d(-0.254,0.254),Translation2d(-0.254,-0.254),Translation2d(0.254,-0.254))#METERS
         self.swerveDrive4Kinematics = SwerveDrive4Kinematics(wheelesFromCenter[0], wheelesFromCenter[1], wheelesFromCenter[2], wheelesFromCenter[3])
 
 
@@ -144,7 +155,9 @@ class SwerveBot(wpilib.TimedRobot):
         center = Translation2d(0, 0)
         #swerveKinamatics = self.swerveDrive4Kinematics.toSwerveModuleStates(chassisSpeeds, center)
         wheelStates = self.swerveDrive4Kinematics.toSwerveModuleStates(chassisSpeedsRam, center)
-        chassisSpeedsValues = self.swerveDrive4Kinematics.toChassisSpeeds(wheelStates[0], wheelStates[1], wheelStates[2], wheelStates[3])
+        for wheel in self.wheels:
+            self.wheels[wheel]["Drive"].calculate(wheelStates[0].speed, self.trajectory.sample())
+            
 
 
     def teleopPeriodic(self) -> None:
@@ -163,7 +176,7 @@ class SwerveBot(wpilib.TimedRobot):
         turning = self.input.turning * 180
         self.server.putUpdate("turning", turning)
 
-        self.swerveController.tickReal(drive, turning, self.time.dt, self.swerve, self.server)
+        self.swerveController.tickReal(drive, self.swerve, self.server)
         # drive = drive.rotateDegrees(-self.gyro.getYaw() - 90)
         # self.swerveController.tick(drive.x, drive.y, self.input.turning, self.time.dt, self.input.brakeToggle, self.swerve)
 

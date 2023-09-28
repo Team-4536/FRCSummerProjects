@@ -140,44 +140,18 @@ class SwerveController:
 
 
     # X component is forward+ in M/s, y is left+, turning is CW+ in degs/sec
-    def tickReal(self, speed: V2f, turning: float, dt: float, swerve: SwerveState, server) -> None:
+    def tickReal(self, swerve: SwerveState, voltages: list[float]) -> None:
+        for motor, voltage in zip(swerve.driveMotors, voltages):
+            motor.setVoltage(voltage)
 
-        turningInRads = math.radians(turning)
-        turningVectors = [
-            V2f(1, -1),
-            V2f(-1, -1),
-            V2f(1, 1),
-            V2f(-1, 1)
-        ]
-
-        driveSpeeds = [ ]
-        for i in range(4):
-            tv = turningVectors[i].getNormalized() * (turningInRads * swerve.wheelOffsets[i].getLength())
-            vec = speed + tv
-            wheelSpeed = vec.getLength()
-
-            if(wheelSpeed == 0):
-                swerve.steerMotors[i].set(0)
-                swerve.driveMotors[i].set(0)
-                continue
-
-            error = angleWrap(vec.getAngle() - swerve.steerEncoders[i].getPosition()*360)
-            if(abs(error) > 90):
-                error = error - 180
-                wheelSpeed *= -1
-
-            swerve.steerMotors[i].set(self.pids[i].tickErr(angleWrap(error)/360, dt))
-            driveSpeeds.append(wheelSpeed / swerve.maxSpeed)
-
-        driveSpeeds = normalizeWheelSpeeds(driveSpeeds)
-        for x in zip(driveSpeeds, swerve.driveMotors):
-            x[1].set(x[0])
+        
     
 
 
     # forward = forward/back
     # right = Left/Right
     # turning is CW+
+    
     def tick(self, forward: float, right: float, turn: float, dt: float, brakeButtonPressed, swerve: SwerveState) -> None:
         #brake input toggle
         if brakeButtonPressed == True:
