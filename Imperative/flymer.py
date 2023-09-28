@@ -146,6 +146,67 @@ class Flymer(wpilib.TimedRobot):
         if self.input.brakeToggle:
             self.brakes.toggle()
 
+  
+  
+    def autonomousInit(self) -> None:
+        self.ontop = False
+        self.balance = False
+
+        self.timerstart = self.time.timeSinceInit
+
+
+    def autonomousPeriodic(self) -> None:
+        autospeed = .1
+        balancespeed = .05
+    
+        
+        if self.balance == True: #balanceauto
+
+    
+            if abs(self.gyro.getPitch()) > 10:
+                self.ontop = True
+
+            if self.ontop == False:
+                self.FLDrive.set(autospeed)
+                self.FRDrive.set(autospeed)
+                self.BLDrive.set(autospeed)
+                self.BRDrive.set(autospeed)
+
+            if self.ontop == True and abs(self.gyro.getPitch()) < 10:
+                self.brakes.set(wpilib.DoubleSolenoid.Value.kForward)
+                self.FLDrive.set(0)
+                self.FRDrive.set(0)
+                self.BLDrive.set(0)
+                self.BRDrive.set(0)
+
+            if self.ontop == True and self.gyro.getPitch() > 10:
+                self.FLDrive.set(-balancespeed)
+                self.FRDrive.set(-balancespeed)
+                self.BLDrive.set(-balancespeed)
+                self.BRDrive.set(-balancespeed)
+
+
+            if self.ontop == True and self.gyro.getPitch() < 10:
+                self.FLDrive.set(balancespeed)
+                self.FRDrive.set(balancespeed)
+                self.BLDrive.set(balancespeed)
+                self.BRDrive.set(balancespeed)
+
+        if self.balance == False: #exitauto
+             self.FLDrive.set(balancespeed)
+             self.FRDrive.set(balancespeed)
+             self.BLDrive.set(balancespeed)
+             self.BRDrive.set(balancespeed)
+
+             if self.time.timeSinceInit - self.timerstart > 6:
+                self.FLDrive.set(0)
+                self.FRDrive.set(0)
+                self.BLDrive.set(0)
+                self.BRDrive.set(0)
+
+             
+            
+
 
     def disabledPeriodic(self) -> None:
         self.FLDrive.set(0)
