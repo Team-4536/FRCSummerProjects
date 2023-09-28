@@ -34,12 +34,15 @@ class FlymerInputs():
         self.retract = deadZone(armCtrlr.getRightY())
         self.grabToggle = armCtrlr.getAButtonPressed()
 
-
+AUTO_BALANCE = "balance"
+AUTO_EXIT = "exit"
 class Flymer(wpilib.TimedRobot):
 
 
     def robotInit(self) -> None:
-
+        self.chooser = wpilib.SendableChooser()
+        self.chooser.setDefaultOption(AUTO_EXIT, AUTO_EXIT)
+        self.chooser.addOption(AUTO_BALANCE, AUTO_BALANCE)
         self.server = socketing.Server(self.isReal())
 
         # DRIVE MOTORS ==================================================
@@ -150,7 +153,7 @@ class Flymer(wpilib.TimedRobot):
   
     def autonomousInit(self) -> None:
         self.ontop = False
-        self.balance = False
+        self.balance = self.chooser.getSelected()
 
         self.timerstart = self.time.timeSinceInit
 
@@ -160,7 +163,7 @@ class Flymer(wpilib.TimedRobot):
         balancespeed = .05
     
         
-        if self.balance == True: #balanceauto
+        if self.balance == AUTO_BALANCE: #balanceauto
 
     
             if abs(self.gyro.getPitch()) > 10:
@@ -192,7 +195,7 @@ class Flymer(wpilib.TimedRobot):
                 self.BLDrive.set(balancespeed)
                 self.BRDrive.set(balancespeed)
 
-        if self.balance == False: #exitauto
+        elif self.balance == AUTO_EXIT: #exitauto
              self.FLDrive.set(balancespeed)
              self.FRDrive.set(balancespeed)
              self.BLDrive.set(balancespeed)
@@ -204,7 +207,9 @@ class Flymer(wpilib.TimedRobot):
                 self.BLDrive.set(0)
                 self.BRDrive.set(0)
 
-             
+        else:
+            assert(False)
+            
             
 
 
