@@ -53,6 +53,13 @@
                 "Build CSundial"
             ],
             "problemMatcher": []
+        },
+        {
+            "label": "Deploy flymer",
+            "type": "shell",
+            "command": "py imperative/flymer.py deploy --nonstandard",
+            "options": { "cwd": "${workspaceFolder}"},
+            "problemMatcher": []
         }
     ]
 }
