@@ -9,6 +9,7 @@ from real import V2f
 from subsystems.mech import mechController
 import socketing
 from inputs import deadZone
+from PIDController import PIDController
 
 
 
@@ -34,12 +35,15 @@ class FlymerInputs():
         self.retract = deadZone(armCtrlr.getLeftY())
         self.grabToggle = armCtrlr.getAButtonPressed()
 
-
+AUTO_BALANCE = "balance"
+AUTO_EXIT = "exit"
 class Flymer(wpilib.TimedRobot):
 
 
     def robotInit(self) -> None:
-
+        self.chooser = wpilib.SendableChooser()
+        self.chooser.setDefaultOption(AUTO_EXIT, AUTO_EXIT)
+        self.chooser.addOption(AUTO_BALANCE, AUTO_BALANCE)
         self.server = socketing.Server(self.isReal())
 
         # DRIVE MOTORS ==================================================
@@ -59,6 +63,10 @@ class Flymer(wpilib.TimedRobot):
         self.liftMotor = rev.CANSparkMax(7, brushedMotor)
         self.retractMotor = rev.CANSparkMax(6, brushedMotor)
         self.turretMotor = rev.CANSparkMax(5, brushlessMotor)
+        self.liftEncoder = self.liftMotor.getEncoder()
+        self.retractEncoder = self.retractMotor.getEncoder()
+        self.turretEncoder = self.turretMotor.getEncoder()
+
 
         self.pcm = wpilib.PneumaticsControlModule()
 
@@ -145,6 +153,85 @@ class Flymer(wpilib.TimedRobot):
 
         if self.input.brakeToggle:
             self.brakes.toggle()
+
+
+    def scoreInit(self) -> None:
+        self.retractcontroller = PIDController(0.1,0,0)
+        self.liftcontroller = PIDController(0.1,0,0)
+        self.liftEncoder.setPosition(0)
+        self.retractEncoder.setPosition(0)
+        self.turretEncoder.setPosition(0)
+        
+       
+
+    def scorePeriodic(self) -> None:
+        retractpos = 1
+        liftpos = 1
+        turretpos = 1
+        retractspeed = self.retractcontroller.tick(retractpos, self.retractEncoder.getPosition(), self.time.dt)
+        liftspeed = self.liftcontroller.tick(liftpos, self.liftEncoder.getPosition(), self.time.dt)
+     
+  
+    def autonomousInit(self) -> None:
+        self.ontop = False
+        self.balance = self.chooser.getSelected()
+
+        self.timerstart = self.time.timeSinceInit
+
+
+    def autonomousPeriodic(self) -> None:
+        autospeed = .1
+        balancespeed = .15
+    
+        
+        if self.balance == AUTO_BALANCE: #balanceauto
+
+    
+            if abs(self.gyro.getPitch()) > 10:
+                self.ontop = True
+
+            if self.ontop == False:
+                self.FLDrive.set(autospeed)
+                self.FRDrive.set(autospeed)
+                self.BLDrive.set(autospeed)
+                self.BRDrive.set(autospeed)
+
+            if self.ontop == True and abs(self.gyro.getPitch()) < 10:
+                self.brakes.set(wpilib.DoubleSolenoid.Value.kForward)
+                self.FLDrive.set(0)
+                self.FRDrive.set(0)
+                self.BLDrive.set(0)
+                self.BRDrive.set(0)
+
+            if self.ontop == True and self.gyro.getPitch() > 10:
+                self.FLDrive.set(-balancespeed)
+                self.FRDrive.set(-balancespeed)
+                self.BLDrive.set(-balancespeed)
+                self.BRDrive.set(-balancespeed)
+
+
+            if self.ontop == True and self.gyro.getPitch() < 10:
+                self.FLDrive.set(balancespeed)
+                self.FRDrive.set(balancespeed)
+                self.BLDrive.set(balancespeed)
+                self.BRDrive.set(balancespeed)
+
+        elif self.balance == AUTO_EXIT: #exitauto
+             self.FLDrive.set(balancespeed)
+             self.FRDrive.set(balancespeed)
+             self.BLDrive.set(balancespeed)
+             self.BRDrive.set(balancespeed)
+
+             if self.time.timeSinceInit - self.timerstart > 6:
+                self.FLDrive.set(0)
+                self.FRDrive.set(0)
+                self.BLDrive.set(0)
+                self.BRDrive.set(0)
+
+        else:
+            assert(False)
+            
+            
 
 
     def disabledPeriodic(self) -> None:
