@@ -16,6 +16,7 @@ from PIDController import PIDController
 
 class FlymerInputs():
 
+
     # TODO: switch keyboard/controller modes from sundial
 
     def __init__(self, driveCtrlr: wpilib.XboxController, armCtrlr: wpilib.XboxController) -> None:
@@ -35,6 +36,7 @@ class FlymerInputs():
         self.retract = deadZone(armCtrlr.getLeftY())
         self.grabToggle = armCtrlr.getAButtonPressed()
 
+AUTO_NONE = "none"
 AUTO_BALANCE = "balance"
 AUTO_EXIT = "exit"
 class Flymer(wpilib.TimedRobot):
@@ -42,8 +44,11 @@ class Flymer(wpilib.TimedRobot):
 
     def robotInit(self) -> None:
         self.chooser = wpilib.SendableChooser()
-        self.chooser.setDefaultOption(AUTO_EXIT, AUTO_EXIT)
+
+        self.chooser.setDefaultOption(AUTO_NONE, AUTO_NONE)
         self.chooser.addOption(AUTO_BALANCE, AUTO_BALANCE)
+        self.chooser.addOption(AUTO_EXIT, AUTO_EXIT)
+        wpilib.SmartDashboard.putData("autos", self.chooser)
         self.server = socketing.Server(self.isReal())
 
         # DRIVE MOTORS ==================================================
@@ -63,9 +68,10 @@ class Flymer(wpilib.TimedRobot):
         self.liftMotor = rev.CANSparkMax(7, brushedMotor)
         self.retractMotor = rev.CANSparkMax(6, brushedMotor)
         self.turretMotor = rev.CANSparkMax(5, brushlessMotor)
-        self.liftEncoder = self.liftMotor.getEncoder()
-        self.retractEncoder = self.retractMotor.getEncoder()
+        self.liftEncoder = self.liftMotor.getEncoder(rev.SparkMaxRelativeEncoder.Type.kQuadrature)
+        self.retractEncoder = self.retractMotor.getEncoder(rev.SparkMaxRelativeEncoder.Type.kQuadrature)
         self.turretEncoder = self.turretMotor.getEncoder()
+ 
 
 
         self.pcm = wpilib.PneumaticsControlModule()
@@ -181,7 +187,7 @@ class Flymer(wpilib.TimedRobot):
 
     def autonomousPeriodic(self) -> None:
         autospeed = .1
-        balancespeed = .15
+        balancespeed = .05
     
         
         if self.balance == AUTO_BALANCE: #balanceauto
@@ -217,16 +223,19 @@ class Flymer(wpilib.TimedRobot):
                 self.BRDrive.set(balancespeed)
 
         elif self.balance == AUTO_EXIT: #exitauto
-             self.FLDrive.set(balancespeed)
-             self.FRDrive.set(balancespeed)
-             self.BLDrive.set(balancespeed)
-             self.BRDrive.set(balancespeed)
+             self.FLDrive.set(autospeed)
+             self.FRDrive.set(autospeed)
+             self.BLDrive.set(autospeed)
+             self.BRDrive.set(autospeed)
 
              if self.time.timeSinceInit - self.timerstart > 6:
                 self.FLDrive.set(0)
                 self.FRDrive.set(0)
                 self.BLDrive.set(0)
                 self.BRDrive.set(0)
+
+        elif self.balance == AUTO_NONE:
+            pass
 
         else:
             assert(False)
