@@ -9,6 +9,7 @@ from real import V2f
 from subsystems.mech import mechController
 import socketing
 from inputs import deadZone
+from PIDController import PIDController
 
 
 
@@ -62,6 +63,10 @@ class Flymer(wpilib.TimedRobot):
         self.liftMotor = rev.CANSparkMax(7, brushedMotor)
         self.retractMotor = rev.CANSparkMax(6, brushedMotor)
         self.turretMotor = rev.CANSparkMax(5, brushlessMotor)
+        self.liftEncoder = self.liftMotor.getEncoder()
+        self.retractEncoder = self.retractMotor.getEncoder()
+        self.turretEncoder = self.turretMotor.getEncoder()
+
 
         self.pcm = wpilib.PneumaticsControlModule()
 
@@ -149,7 +154,23 @@ class Flymer(wpilib.TimedRobot):
         if self.input.brakeToggle:
             self.brakes.toggle()
 
-  
+
+    def scoreInit(self) -> None:
+        self.retractcontroller = PIDController(0.1,0,0)
+        self.liftcontroller = PIDController(0.1,0,0)
+        self.liftEncoder.setPosition(0)
+        self.retractEncoder.setPosition(0)
+        self.turretEncoder.setPosition(0)
+        
+       
+
+    def scorePeriodic(self) -> None:
+        retractpos = 1
+        liftpos = 1
+        turretpos = 1
+        retractspeed = self.retractcontroller.tick(retractpos, self.retractEncoder.getPosition(), self.time.dt)
+        liftspeed = self.liftcontroller.tick(liftpos, self.liftEncoder.getPosition(), self.time.dt)
+     
   
     def autonomousInit(self) -> None:
         self.ontop = False
@@ -160,7 +181,7 @@ class Flymer(wpilib.TimedRobot):
 
     def autonomousPeriodic(self) -> None:
         autospeed = .1
-        balancespeed = .05
+        balancespeed = .15
     
         
         if self.balance == AUTO_BALANCE: #balanceauto
