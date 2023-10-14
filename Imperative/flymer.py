@@ -3,17 +3,20 @@ import wpilib
 import wpimath.system.plant as plant
 import rev
 import navx
+import math
 
 import timing
 from real import V2f
 from subsystems.mech import mechController
 import socketing
 from inputs import deadZone
-
+from PIDController import PIDController
+from real import angleWrap
 
 
 
 class FlymerInputs():
+
 
     # TODO: switch keyboard/controller modes from sundial
 
@@ -34,6 +37,7 @@ class FlymerInputs():
         self.retract = deadZone(armCtrlr.getRightY())
         self.grabToggle = armCtrlr.getAButtonPressed()
 
+AUTO_NONE = "none"
 AUTO_BALANCE = "balance"
 AUTO_EXIT = "exit"
 class Flymer(wpilib.TimedRobot):
@@ -41,8 +45,11 @@ class Flymer(wpilib.TimedRobot):
 
     def robotInit(self) -> None:
         self.chooser = wpilib.SendableChooser()
-        self.chooser.setDefaultOption(AUTO_EXIT, AUTO_EXIT)
+
+        self.chooser.setDefaultOption(AUTO_NONE, AUTO_NONE)
         self.chooser.addOption(AUTO_BALANCE, AUTO_BALANCE)
+        self.chooser.addOption(AUTO_EXIT, AUTO_EXIT)
+        wpilib.SmartDashboard.putData("autos", self.chooser)
         self.server = socketing.Server(self.isReal())
 
         # DRIVE MOTORS ==================================================
@@ -62,6 +69,11 @@ class Flymer(wpilib.TimedRobot):
         self.liftMotor = rev.CANSparkMax(7, brushedMotor)
         self.retractMotor = rev.CANSparkMax(6, brushedMotor)
         self.turretMotor = rev.CANSparkMax(5, brushlessMotor)
+        self.liftEncoder = self.liftMotor.getEncoder(rev.SparkMaxRelativeEncoder.Type.kQuadrature)
+        self.retractEncoder = self.retractMotor.getEncoder(rev.SparkMaxRelativeEncoder.Type.kQuadrature)
+        self.turretEncoder = self.turretMotor.getEncoder()
+ 
+
 
         self.pcm = wpilib.PneumaticsControlModule()
 
@@ -149,14 +161,84 @@ class Flymer(wpilib.TimedRobot):
         if self.input.brakeToggle:
             self.brakes.toggle()
 
-  
-  
+
+    def scoreInit(self) -> None:
+        self.retractcontroller = PIDController(0.1,0,0)
+        self.liftcontroller = PIDController(0.1,0,0)
+        self.liftEncoder.setPosition(0)
+        self.retractEncoder.setPosition(0)
+        self.turretEncoder.setPosition(0)
+        self.approachspeed = 0.2
+        self.autostage = -1
+        self.defaultgoal = V2f()
+        self.scoregoal = V2f(1, 1) ##CHANGE THESE VALUES LATER
+        self.stagestart = self.time.timeSinceInit   
+    
+    def scorePeriodic(self) -> bool:
+        retractgoal = 0
+        liftgoal = 0
+        if self.autostage == -1: ##APPROACHING NODE
+            self.FLDrive.set(self.approachspeed)
+            self.FRDrive.set(self.approachspeed)
+            self.BLDrive.set(self.approachspeed)
+            self.BRDrive.set(self.approachspeed)
+            if self.time.timeSinceInit - self.stagestart > .5:
+                self.autostage+=1
+        if self.autostage == 0: ##EXTENDING
+            retractgoal = self.scoregoal.x
+            liftgoal = self.scoregoal.y
+            if self.retractEncoder.getPosition() >= (self.scoregoal.x-.05):
+                 self.stagestart = self.time.timeSinceInit
+                 self.autostage+=1
+        if self.autostage == 1: ##SCORING
+            retractgoal = self.scoregoal.x
+            liftgoal = self.scoregoal.y
+            self.grabber.toggle()
+            if self.time.timeSinceInit - self.stagestart > 1:
+                self.stagestart = self.time.timeSinceInit
+                self.autostage+=.5
+        if self.autostage == 1.5: ##MOVING AWAY
+            self.FLDrive.set(-self.approachspeed)
+            self.FRDrive.set(-self.approachspeed)
+            self.BLDrive.set(-self.approachspeed)
+            self.BRDrive.set(-self.approachspeed)
+            if self.time.timeSinceInit - self.stagestart > 1:  
+                self.FLDrive.set(0)
+                self.FRDrive.set(0)
+                self.BLDrive.set(0)
+                self.BRDrive.set(0)
+                self.stagestart = self.time.timeSinceInit
+                self.autostage+=.5
+        if self.autostage == 2: ##RETRACTING
+            retractgoal = self.defaultgoal.x
+            liftgoal = self.defaultgoal.y
+            if self.retractEncoder.getPosition() <= (self.defaultgoal.x+.05):
+                self.autostage+=1
+        if self.autostage == 3:##TURNING
+            retractgoal = self.defaultgoal.x
+            liftgoal = self.defaultgoal.y
+            angle = angleWrap(180 - self.gyro.getAngle())
+            turnspeed = angle*.005
+            self.FLDrive.set(turnspeed)
+            self.FRDrive.set(turnspeed)
+            self.BLDrive.set(-turnspeed)
+            self.BRDrive.set(-turnspeed)
+            if abs(angle) <= 5:
+                self.autostage+=1
+        if self.autostage == 4:
+            return True
+        retractspeed = self.retractcontroller.tick(retractgoal, self.retractEncoder.getPosition(), self.time.dt)
+        liftspeed = self.liftcontroller.tick(liftgoal, self.liftEncoder.getPosition(), self.time.dt)
+        return False
+
     def autonomousInit(self) -> None:
         self.ontop = False
         self.balance = self.chooser.getSelected()
-
         self.timerstart = self.time.timeSinceInit
-
+        if self.balance == AUTO_BALANCE:
+            self.scoreInit()
+        if self.balance == AUTO_EXIT:
+            self.scoreInit()
 
     def autonomousPeriodic(self) -> None:
         autospeed = .1
@@ -164,7 +246,9 @@ class Flymer(wpilib.TimedRobot):
     
         
         if self.balance == AUTO_BALANCE: #balanceauto
-
+            finished = self.scorePeriodic()
+            if finished == False:
+                return
     
             if abs(self.gyro.getPitch()) > 10:
                 self.ontop = True
@@ -196,16 +280,22 @@ class Flymer(wpilib.TimedRobot):
                 self.BRDrive.set(balancespeed)
 
         elif self.balance == AUTO_EXIT: #exitauto
-             self.FLDrive.set(balancespeed)
-             self.FRDrive.set(balancespeed)
-             self.BLDrive.set(balancespeed)
-             self.BRDrive.set(balancespeed)
+             finished = self.scorePeriodic()
+             if finished == False:
+                return
+             self.FLDrive.set(autospeed)
+             self.FRDrive.set(autospeed)
+             self.BLDrive.set(autospeed)
+             self.BRDrive.set(autospeed)
 
              if self.time.timeSinceInit - self.timerstart > 6:
                 self.FLDrive.set(0)
                 self.FRDrive.set(0)
                 self.BLDrive.set(0)
                 self.BRDrive.set(0)
+
+        elif self.balance == AUTO_NONE:
+            pass
 
         else:
             assert(False)
