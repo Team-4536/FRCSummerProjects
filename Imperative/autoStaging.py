@@ -87,13 +87,14 @@ class Auto():
         self.listindex = 0
         self.stagestart = time
     def update(self, r: flymer.Flymer) -> None:
+
         r.server.putUpdate("stage start", self.stagestart)
         r.server.putUpdate("stage number", self.listindex)
-     
-        stage = self.list[self.listindex]
-        done = stage(r)
-        if done:
-            if self.listindex != len(self.list):
+        if self.listindex <=len(self.list):
+            stage = self.list[self.listindex]
+            done = stage(r)
+            if done:
                 self.listindex+=1 
                 self.stagestart = r.time.timeSinceInit
+        
         

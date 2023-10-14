@@ -40,6 +40,7 @@ class FlymerInputs():
 
 AUTO_NONE = "none"
 AUTO_BALANCE = "balance"
+AUTO_EXIT_SCORE = "exit+score"
 AUTO_EXIT = "exit"
 class Flymer(wpilib.TimedRobot):
 
@@ -50,6 +51,7 @@ class Flymer(wpilib.TimedRobot):
         self.chooser.setDefaultOption(AUTO_NONE, AUTO_NONE)
         self.chooser.addOption(AUTO_BALANCE, AUTO_BALANCE)
         self.chooser.addOption(AUTO_EXIT, AUTO_EXIT)
+        self.chooser.addOption(AUTO_EXIT_SCORE, AUTO_EXIT_SCORE)                                                                                                                                                            #code code code 
         wpilib.SmartDashboard.putData("autos", self.chooser)
         self.server = socketing.Server(self.isReal())
 
@@ -74,8 +76,6 @@ class Flymer(wpilib.TimedRobot):
         self.retractEncoder = self.retractMotor.getEncoder(rev.SparkMaxRelativeEncoder.Type.kQuadrature)
         self.turretEncoder = self.turretMotor.getEncoder()
  
-
-
         self.pcm = wpilib.PneumaticsControlModule()
 
         self.grabber = self.pcm.makeDoubleSolenoid(7, 5)
@@ -162,8 +162,6 @@ class Flymer(wpilib.TimedRobot):
         if self.input.brakeToggle:
             self.brakes.toggle()
 
-
-   
     def driveArmGoal(self, liftgoal:float, retractgoal:float) -> None:
         retractspeed = -self.retractcontroller.tick(retractgoal, self.retractEncoder.getPosition(), self.time.dt)
         liftspeed = self.liftcontroller.tick(liftgoal, self.liftEncoder.getPosition(), self.time.dt)
@@ -182,11 +180,9 @@ class Flymer(wpilib.TimedRobot):
         self.BLDrive.set(speed)
         self.BRDrive.set(-speed)
 
-
     def driveArmSpeed(self, retractspeed: float, liftspeed:float) -> None:
         self.retractMotor.set(retractspeed)
         self.liftMotor.set(liftspeed)
-
 
     def autonomousInit(self) -> None:
         self.retractcontroller = PIDController(0.1,0,0)
@@ -203,16 +199,19 @@ class Flymer(wpilib.TimedRobot):
         self.balancespeed = .1
         self.scoregoal = V2f(5,5)
         self.defaultgoal = V2f(0,0)
-        
+
         stagelist = []
         scorelist = [autoStaging.approach, autoStaging.extend, autoStaging.score, autoStaging.retreat, autoStaging.turn]
        
         if self.selectedauto == AUTO_BALANCE: #balanceauto
             stagelist = scorelist + [autoStaging.balance]
              
-        elif self.selectedauto == AUTO_EXIT: #exitauto
+        elif self.selectedauto == AUTO_EXIT_SCORE: #exitauto
             stagelist = scorelist + [autoStaging.exit]
 
+        elif self.selectedauto == AUTO_EXIT:
+            stagelist = [autoStaging.exit]
+       
         elif self.selectedauto == AUTO_NONE:
             pass
 
@@ -221,6 +220,9 @@ class Flymer(wpilib.TimedRobot):
             pass
 
         self.auto = autoStaging.Auto(stagelist, self.time.timeSinceInit)
+
+    def autonomousPeriodic(self) -> None:
+        self.auto.update(self)
 
 
     def disabledPeriodic(self) -> None:
