@@ -201,6 +201,8 @@ class Flymer(wpilib.TimedRobot):
         self.selectedauto = self.chooser.getSelected()
         self.autospeed = .2
         self.balancespeed = .1
+        self.scoregoal = V2f(5,5)
+        self.defaultgoal = V2f(0,0)
         
         stagelist = []
         scorelist = [autoStaging.approach, autoStaging.extend, autoStaging.score, autoStaging.retreat, autoStaging.turn]
@@ -217,6 +219,8 @@ class Flymer(wpilib.TimedRobot):
         else:
             # assert(False)
             pass
+
+        self.auto = autoStaging.Auto(stagelist, self.time.timeSinceInit)
 
 
     def disabledPeriodic(self) -> None:

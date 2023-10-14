@@ -4,7 +4,7 @@ import wpimath.system.plant as plant
 import rev
 import navx
 import math
-import robot
+import flymer
 import timing
 from real import V2f
 from subsystems.mech import mechController
@@ -17,26 +17,26 @@ from collections.abc import Callable
 def drive(self) ->bool:
     return False
 
-def approach(r: robot.Flymer) -> bool: #APPROACHING----------------------------
+def approach(r: flymer.Flymer) -> bool: #APPROACHING----------------------------
     r.driveUnif(r.approachspeed)
     if r.time.timeSinceInit - r.auto.stagestart > .5:
         r.driveUnif(0)
         return True
     return False
 
-def extend(r: robot.Flymer) -> bool: #EXTENDING--------------------------------
+def extend(r: flymer.Flymer) -> bool: #EXTENDING--------------------------------
     r.driveArmGoal(r.scoregoal.y, r.scoregoal.x)
 
     if r.retractEncoder.getPosition() >= (r.scoregoal.x-.05):
         return True
     return False
 
-def score(r: robot.Flymer) -> bool: #SCORING-----------------------------------
+def score(r: flymer.Flymer) -> bool: #SCORING-----------------------------------
     r.driveArmGoal(r.scoregoal.y, r.scoregoal.x)
     r.grabber.set(wpilib.DoubleSolenoid.Value.kReverse)
     return True
 
-def retreat(r: robot.Flymer) -> bool: #RETREATING&RETRACTING-------------------
+def retreat(r: flymer.Flymer) -> bool: #RETREATING&RETRACTING-------------------
     r.driveUnif(-r.approachspeed)
     r.driveArmGoal(r.defaultgoal.y, r.defaultgoal.x)
     if r.time.timeSinceInit - r.auto.stagestart > 1:  
@@ -46,7 +46,7 @@ def retreat(r: robot.Flymer) -> bool: #RETREATING&RETRACTING-------------------
             return True
     return False
 
-def turn(r: robot.Flymer) -> bool: #TURNING------------------------------------
+def turn(r: flymer.Flymer) -> bool: #TURNING------------------------------------
     angle = angleWrap(180 - r.gyro.getAngle())
     turnspeed = angle*.005
     r.driveTurn(turnspeed)
@@ -54,7 +54,7 @@ def turn(r: robot.Flymer) -> bool: #TURNING------------------------------------
         return True
     return False
 
-def exit(r: robot.Flymer) -> bool:
+def exit(r: flymer.Flymer) -> bool:
     r.driveUnif(r.autospeed)
     if r.time.timeSinceInit - r.auto.stagestart > 6:  
         r.driveUnif(0)
@@ -62,7 +62,7 @@ def exit(r: robot.Flymer) -> bool:
     return False
 
 
-def balance(r: robot.Flymer) -> bool:
+def balance(r: flymer.Flymer) -> bool:
     if r.ontop == False:
         r.driveUnif(r.autospeed)
         if abs(r.gyro.getPitch()) > 10:
@@ -82,18 +82,18 @@ def balance(r: robot.Flymer) -> bool:
     return False
 
 class Auto():
-    def __init__(self, stagelist: list[Callable[[robot.Flymer], bool]], time:float) -> None:
+    def __init__(self, stagelist: list[Callable[[flymer.Flymer], bool]], time:float) -> None:
         self.list = stagelist
         self.listindex = 0
         self.stagestart = time
-    def update(self, robot: robot.Flymer) -> None:
-        robot.server.putUpdate("stage start", self.stagestart)
-        robot.server.putUpdate("stage number", self.listindex)
+    def update(self, r: flymer.Flymer) -> None:
+        r.server.putUpdate("stage start", self.stagestart)
+        r.server.putUpdate("stage number", self.listindex)
      
         stage = self.list[self.listindex]
-        done = stage(robot)
+        done = stage(r)
         if done:
             if self.listindex != len(self.list):
                 self.listindex+=1 
-                self.stagestart = robot.time.timeSinceInit
+                self.stagestart = r.time.timeSinceInit
         
