@@ -3,7 +3,8 @@ import ntcore
 import socket
 from enum import IntEnum
 import select
-from typing import Any
+from typing import Any, Self
+
 
 # in seconds
 SEND_INTERVAL = 1/50
@@ -30,7 +31,7 @@ class Message:
 
 class Server():
 
-    inst = None
+    inst: Self = None #type: ignore
 
     def __init__(self, isReal: bool) -> None:
 
