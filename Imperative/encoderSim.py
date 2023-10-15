@@ -10,8 +10,9 @@ ENCODER_STD_DEV = 0.001
 
 class EncoderSim:
 
-    def __init__(self, motorSpec: plant.DCMotor, inertia: float, gearing: float) -> None:
+    def __init__(self, motorSpec: plant.DCMotor, inertia: float, gearing: float, inverted: bool) -> None:
 
+        self.inverted = inverted
         self.motorSpec = motorSpec
         self.inertia = inertia
         self.linearSys = plant.LinearSystemId.DCMotorSystem(self.motorSpec, self.inertia, gearing)
@@ -21,4 +22,7 @@ class EncoderSim:
     def update(self, dt: float, motor: rev.CANSparkMax, encoder: ctre.sensors.CANCoder | rev.RelativeEncoder):
         inputVec = [motor.get() * self.motorSpec.nominalVoltage]
         self.state = self.linearSys.calculateX(self.state, inputVec, dt)
-        encoder.setPosition(random.normalvariate(self.state[0] / (2 * math.pi), ENCODER_STD_DEV))
+
+        val = self.state[0] / (2 * math.pi)
+        if self.inverted: val *= -1
+        encoder.setPosition(random.normalvariate(val, ENCODER_STD_DEV))
