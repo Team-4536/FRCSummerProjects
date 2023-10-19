@@ -91,10 +91,21 @@ class swerveTest(wpilib.TimedRobot):
         
     def teleopPeriodic(self) -> None:
 
-        driveStick = V2f(-self.controller.getLeftY(), self.controller.getLeftX()) * .3
-        #driveStick = driveStick.rotateDegrees(-self.gyro.getYaw())
+        # 0.3 = good for testing || 0.7 = for inexperienced drivers/indoor practice || 1.0 = competition and full field practice
+        speedScalar = 0.3
+
+        # 0.3 = good for testing || 0.5 = for inexperienced drivers/indoor practice || 0.7 = competition and fill field practice
+        turnScalar = 0.3
+
+        driveX = inputs.deadZone(self.controller.getLeftX())
+        driveY = -inputs.deadZone(self.controller.getLeftY())
+        turnSpeed = inputs.deadZone(self.controller.getRightX()) * turnScalar
+
+        driveStick = V2f(driveY, driveX) * speedScalar
         
-        self.swerveController.tick(driveStick.x, driveStick.y, self.controller.getRightX() * 0.2, self.time.dt, self.controller.getBButtonPressed(), self.controller.getYButtonPressed, self.swerve, self.gyro)
+        self.swerveController.tick(driveStick.x, driveStick.y, turnSpeed, self.time.dt, self.controller.getBButtonPressed(), self.controller.getYButtonPressed, self.swerve, self.gyro)
+
+        """-------------------------------------------------------"""
 
         """
         forward = -inputs.deadZone(self.controller.getLeftY())
