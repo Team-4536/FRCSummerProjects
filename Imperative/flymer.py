@@ -13,7 +13,7 @@ import socketing
 from inputs import deadZone
 from PIDController import PIDController
 from real import angleWrap
-
+from encoderSim import EncoderSim
 
 
 class FlymerInputs():
@@ -111,6 +111,10 @@ class Flymer(wpilib.TimedRobot):
         self.server.putUpdate("RetractSpeed", self.retractMotor.get())
         self.server.putUpdate("TurretSpeed", self.turretMotor.get())
 
+        self.server.putUpdate("LiftPos", self.liftEncoder.getPosition())
+        self.server.putUpdate("RetractPos", self.retractEncoder.getPosition())
+        self.server.putUpdate("TurretPos", self.turretEncoder.getPosition())
+
         self.server.putUpdate("grabber", True if self.grabber.get() == wpilib.DoubleSolenoid.Value.kForward else False)
         self.server.putUpdate("brakes", True if self.brakes.get() == wpilib.DoubleSolenoid.Value.kForward else False)
 
@@ -118,6 +122,14 @@ class Flymer(wpilib.TimedRobot):
         self.server.putUpdate("AbsoluteDrive", self.absoluteDrive)
 
         self.server.update(self.time.timeSinceInit)
+
+    def _simulationInit(self) -> None:
+        self.liftSim = EncoderSim(plant.DCMotor.NEO(1), 1, 1, False)
+        self.retractSim = EncoderSim(plant.DCMotor.NEO(1), 1, 1, False)
+
+    def _simulationPeriodic(self) -> None:
+        self.liftSim.update(self.time.dt, self.liftMotor, self.liftEncoder)
+        self.retractSim.update(self.time.dt, self.retractMotor, self.retractEncoder)
 
     def teleopInit(self) -> None:
         self.gyro.reset()
