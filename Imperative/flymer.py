@@ -131,10 +131,8 @@ class Flymer(wpilib.TimedRobot):
 
         if self.input.absoluteDriveToggle:
             self.absoluteDrive = not self.absoluteDrive
-
         if speedControl > .8:
             speedControl = 1
-
         if self.absoluteDrive:
             self.driveSpeeds = mechController(self.leftStickVector.x * speedControl, self.leftStickVector.y * speedControl, self.input.turning * self.turningScalar)
         else:
@@ -152,13 +150,12 @@ class Flymer(wpilib.TimedRobot):
         if self.input.gyroReset:
             self.gyro.reset()
 
-        self.liftMotor.set(self.input.lift * 0.4)
+        self.liftMotor.set(self.input.lift * 0.7)
         self.retractMotor.set(self.input.retract * 0.5)
         self.turretMotor.set(self.input.turret * 0.08)
 
         if self.input.grabToggle:
             self.grabber.toggle()
-
         if self.input.brakeToggle:
             self.brakes.toggle()
 
@@ -199,39 +196,30 @@ class Flymer(wpilib.TimedRobot):
         self.balancespeed = .1
         self.scoregoal = V2f(5,5)
         self.defaultgoal = V2f(0,0)
-
         stagelist = []
         scorelist = [autoStaging.approach, autoStaging.extend, autoStaging.score, autoStaging.retreat, autoStaging.turn]
        
-        if self.selectedauto == AUTO_BALANCE: #balanceauto
+        if self.selectedauto == AUTO_BALANCE: #balance auto
             stagelist = scorelist + [autoStaging.balance]
-             
-        elif self.selectedauto == AUTO_EXIT_SCORE: #exitauto
+        elif self.selectedauto == AUTO_EXIT_SCORE: #exit score auto
             stagelist = scorelist + [autoStaging.exit]
-
-        elif self.selectedauto == AUTO_EXIT:
+        elif self.selectedauto == AUTO_EXIT: #exit auto
             stagelist = [autoStaging.exit]
-       
-        elif self.selectedauto == AUTO_NONE:
+        elif self.selectedauto == AUTO_NONE:#no auto :)
             pass
-
         else:
-            # assert(False)
             pass
-
+        
         self.auto = autoStaging.Auto(stagelist, self.time.timeSinceInit)
 
     def autonomousPeriodic(self) -> None:
         self.auto.update(self)
-
-
+    
     def disabledPeriodic(self) -> None:
         self.driveUnif(0)
-
         self.liftMotor.set(0)
         self.retractMotor.set(0)
         self.turretMotor.set(0)
-
 
 if __name__ == "__main__":
     wpilib.run(Flymer)

@@ -26,7 +26,6 @@ def approach(r: flymer.Flymer) -> bool: #APPROACHING----------------------------
 
 def extend(r: flymer.Flymer) -> bool: #EXTENDING--------------------------------
     r.driveArmGoal(r.scoregoal.y, r.scoregoal.x)
-
     if r.retractEncoder.getPosition() >= (r.scoregoal.x-.05):
         return True
     return False
@@ -60,7 +59,6 @@ def exit(r: flymer.Flymer) -> bool:
         r.driveUnif(0)
         return True
     return False
-
 
 def balance(r: flymer.Flymer) -> bool:
     if r.ontop == False:
