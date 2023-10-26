@@ -88,17 +88,17 @@ class swerveTest(wpilib.TimedRobot):
         self.server.putUpdate("BRPos", self.seList[3].getAbsolutePosition())
 
         self.server.update(self.time.timeSinceInit)
-        
+
     def teleopPeriodic(self) -> None:
 
         # 0.3 = good for testing || 0.7 = for inexperienced drivers/indoor practice || 1.0 = competition and full field practice
-        speedScalar = 0.3 #speed control set as constant
-        # speedScalar = .1 + self.controller.getRightTriggerAxis() #speed control on trigger
+        # speedScalar = 0.3 #speed control set as constant
+        speedScalar = .1 + self.controller.getRightTriggerAxis() #speed control on trigger
 
         if speedScalar > 1:
             speedScalar = 1
 
-        # 0.3 = good for testing || 0.5 = for inexperienced drivers/indoor practice || 0.7 = competition and fill field practice
+        # 0.2 = good for testing || 0.3 = for inexperienced drivers/indoor practice || 0.4 = competition and fill field practice
         turnScalar = 0.3
 
         #inputs (change if drivers want them different)
@@ -111,7 +111,7 @@ class swerveTest(wpilib.TimedRobot):
         brakes = self.controller.getBButtonPressed()
         brakeDefault = self.controller.getStartButtonPressed()
         gyroReset = self.controller.getYButtonPressed()
-        
+
         self.swerveController.tick(driveStick.x, driveStick.y, turnSpeed, self.time.dt, brakes, brakeDefault, gyroReset, self.swerve, self.gyro)
 
         """-------------------------------------------------------"""

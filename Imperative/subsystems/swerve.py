@@ -132,7 +132,7 @@ class SwerveController:
         #choose between brake or hold position when no input is given (if false brakes will be a toggle on button "B")
         self.brakeDefault = True
 
-        kp = 2
+        kp = 2.5
         ki = 0
         kd = 0
         self.FLPID = PIDController(kp, ki, kd)
@@ -193,6 +193,8 @@ class SwerveController:
 
         if startButtonPressed == True:
             self.brakeDefault = not self.brakeDefault
+            if self.brakeDefault == False:
+                self.brakes = False
 
         if gyroReset == True:
             gyro.reset()
