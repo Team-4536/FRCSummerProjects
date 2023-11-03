@@ -205,7 +205,7 @@ class SwerveController:
         elif self.brakeDefault == True:
             self.brakes = False
 
-        inputGyro = gyro.getYaw()
+        inputGyro = angleWrap(gyro.getYaw())
 
         #assign inputs to vectors
         leftStick = V2f(forward, right)
@@ -228,23 +228,11 @@ class SwerveController:
 
         """-----------------------------------------"""
 
-        #Assign encoders and make sure they're measuring in degrees
-        FLPosAngle = (swerve.steerEncoders[0].getAbsolutePosition())
-        FRPosAngle = (swerve.steerEncoders[1].getAbsolutePosition())
-        BLPosAngle = (swerve.steerEncoders[2].getAbsolutePosition())
-        BRPosAngle = (swerve.steerEncoders[3].getAbsolutePosition())
-
-        #wrap angles to (0, 90, 180, -90) instead of (0, 90, 180, 270)
-        while FLPosAngle > 180:
-            FLPosAngle = FLPosAngle - 360
-        while FRPosAngle > 180:
-            FRPosAngle = FRPosAngle - 360
-        while BLPosAngle > 180:
-            BLPosAngle = BLPosAngle - 360
-        while BRPosAngle > 180:
-            BRPosAngle = BRPosAngle - 360
-
-        """----------------------------------------------------"""
+        #Assign encoders and wrap angles
+        FLPosAngle = angleWrap((swerve.steerEncoders[0].getAbsolutePosition()))
+        FRPosAngle = angleWrap((swerve.steerEncoders[1].getAbsolutePosition()))
+        BLPosAngle = angleWrap((swerve.steerEncoders[2].getAbsolutePosition()))
+        BRPosAngle = angleWrap((swerve.steerEncoders[3].getAbsolutePosition()))
 
         #separate vector values
         #getAngle returns 0 to 360 degrees
@@ -253,6 +241,7 @@ class SwerveController:
         BLTarget = BLVector.getAngle()
         BRTarget = BRVector.getAngle()
 
+        #telemetry
         Server.inst.putUpdate("FLTarget", FLTarget)
         Server.inst.putUpdate("FRTarget", FRTarget)
         Server.inst.putUpdate("BLTarget", BLTarget)
