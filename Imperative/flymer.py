@@ -78,6 +78,10 @@ class Flymer(wpilib.TimedRobot):
 
         self.leftLimit = wpilib.DigitalInput(6) 
         self.rightLimit = wpilib.DigitalInput(5)
+        self.liftLowerLimit = wpilib.DigitalInput(4)
+        self.liftSideSwitch = wpilib.DigitalInput(3)
+        self.liftUpperLimit = wpilib.DigitalInput(2)
+        
         self.pcm = wpilib.PneumaticsControlModule()
 
         self.grabber = self.pcm.makeDoubleSolenoid(7, 5)
@@ -124,6 +128,11 @@ class Flymer(wpilib.TimedRobot):
         self.server.putUpdate("AbsoluteDrive", self.absoluteDrive)
         self.server.putUpdate("LeftSwitch", self.leftLimit.get())
         self.server.putUpdate("RightSwitch", self.rightLimit.get())
+        self.server.putUpdate("LiftSideSwitch", self.liftSideSwitch.get())
+        self.server.putUpdate("LiftUpperSwitch", self.liftUpperLimit.get())
+        self.server.putUpdate("LiftLowerSwitch", self.liftLowerLimit.get())
+    
+        
 
         self.server.update(self.time.timeSinceInit)
 
@@ -168,7 +177,17 @@ class Flymer(wpilib.TimedRobot):
         if self.input.gyroReset:
             self.gyro.reset()
 
-        self.liftMotor.set(self.input.lift * 0.7)
+        liftScalar = 0.5
+
+        """if self.liftSideSwitch.get():
+             liftScalar = 0.25"""
+
+        self.liftMotor.set(self.input.lift * liftScalar)
+
+        if self.liftUpperLimit.get():
+            if self.input.lift < 0:
+                self.liftMotor.set(0)
+
         self.retractMotor.set(self.input.retract * 0.5)
       
 
