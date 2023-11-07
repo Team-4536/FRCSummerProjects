@@ -53,7 +53,7 @@ class SwerveState:
         r = Rotation2d(math.radians(-currentAngle)) # wpi uses CCW angles
 
         for i in range(0, 4):
-            self.wheelStates[i].angle = Rotation2d(-(self.steerEncoders[i].getPosition()/180 * 2 * math.pi))
+            self.wheelStates[i].angle = Rotation2d(-(self.steerEncoders[i].getPosition() * 2 * math.pi))
             self.wheelStates[i].distance = self.driveEncoders[i].getPosition() * self.wheelCirc
 
         nPose = self.est.updateWithTime(currentTime, r, self.wheelStates)
@@ -69,13 +69,13 @@ class SwerveState:
 class SwerveSim:
     def __init__(self) -> None:
         self.driveSims: list[EncoderSim] = [
-            EncoderSim(plant.DCMotor.NEO(1), 0.005, 6.12, False) for i in range(4)
+            EncoderSim(plant.DCMotor.NEO(1), 0.005, 6.12) for i in range(4)
             ]
 
         # TODO: get real inertia vals
         # TODO: is this the corect gearing?
         self.steerSims: list[EncoderSim] = [
-            EncoderSim(plant.DCMotor.NEO(1), 0.0000001, 1, False) for i in range(4)
+            EncoderSim(plant.DCMotor.NEO(1), 0.001, 1) for i in range(4)
             ]
 
         self.position = V2f(0, 0)
@@ -94,7 +94,7 @@ class SwerveSim:
 
             sim = self.steerSims[i]
             sim.update(dt, swerve.steerMotors[i], swerve.steerEncoders[i])
-            steerPos = (sim.state[0] / (2 * math.pi)) # position in degrees
+            steerPos = (sim.state[0] / (2 * math.pi)) * 360 # position in degrees
             sim.state[1] *= 0.5
 
             posDeltas.append((V2f(1, 0) * driveDelta).rotateDegrees(steerPos))

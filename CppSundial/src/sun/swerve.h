@@ -65,7 +65,7 @@ void sun_swerveBuild(sun_SwerveInfo* info, gfx_Framebuffer* target) {
         matrixTranslation(translations[i].x, translations[i].y, 0, t);
 
         if(rotationProps[i]) {
-            matrixZRotation(-(F32)rotationProps[i]->f64, temp);
+            matrixZRotation(-(F32)rotationProps[i]->f64 * 360, temp);
             t = temp * t;
         }
 
