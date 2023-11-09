@@ -48,22 +48,28 @@ class Flymer(wpilib.TimedRobot):
         self.armCtrlr = wpilib.XboxController(1)
 
         # TIME =========================================================
+        self.armMotor = rev.CANSparkMax(0, rev.CANSparkMax.MotorType.kBrushless)
+        self.liftMotor = rev.CANSparkMax(0, rev.CANSparkMax.MotorType.kBrushless)
         self.time = timing.TimeData(None)
 
     def robotPeriodic(self) -> None:
 
         self.time = timing.TimeData(self.time)
 
-
+        self.server = socketing.Server(self.isReal())
         self.server.update(self.time.timeSinceInit)
 
     def teleopPeriodic(self) -> None:
 
         self.input = FlymerInputs(self.driveCtrlr, self.armCtrlr)
+        self.armMotor.set(self.input.turret * 0.01)
+        self.liftMotor.set(self.input.lift*0.05)
     
 
 
-    def disabledPeriodic(self) -> None:
+    def disabledPeriodic(self) -> None: 
+        self.armMotor.set(0)
+        self.liftMotor.set(0)
 
 
 
