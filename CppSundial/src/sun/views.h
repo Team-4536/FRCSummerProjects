@@ -35,8 +35,8 @@ struct sun_Graph2dInfo {
     NTKey keys[GRAPH2D_LINECOUNT] = { 0 };
     V4f colors[GRAPH2D_LINECOUNT];
 
-    float top = 0.9;
-    float bottom = -0.9;
+    float top = 1.2;
+    float bottom = -1.2;
 
     // allocated and removed per instance
     gfx_SSBO* lineVerts[GRAPH2D_LINECOUNT] = { 0 };

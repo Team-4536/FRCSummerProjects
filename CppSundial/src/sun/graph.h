@@ -112,6 +112,7 @@ void sun_graph2dBuild(sun_Graph2dInfo* info, gfx_Framebuffer* target) {
             b->thickness = 1;
             b->ssbo = info->timeVerts;
             b->vertCount = 6*(vertCount+2-1);
+
         }
 
         // value lines
@@ -121,10 +122,37 @@ void sun_graph2dBuild(sun_Graph2dInfo* info, gfx_Framebuffer* target) {
             LineVert* gridPts = BUMP_PUSH_ARR(globs.scratch, vertCount+2, LineVert);
             float xpts[] = { -0.1, 1.1 };
 
+            float spacing = 0;
+            {
+                float lineGap = (info->top - info->bottom) / 6;
+                assert(lineGap > 0);
+
+                float dec = lineGap; // nasty hack to get the base ten decimal/exponents
+                int exp = 0;
+                while(dec < 1) { dec *= 10; exp--; }
+                while(dec > 10) { dec /= 10; exp++; }
+
+                int roundingTargets[] = { 5, 2, 1 };
+                for(int i = 0; i < 3; i++) {
+                    if(dec > roundingTargets[i]) {
+                        dec = roundingTargets[i];
+                        break;
+                    }
+                }
+                spacing = dec * exp;
+                // TODO: fix warnings lol
+
+                a = blu_areaMake("debug", blu_areaFlags_DRAW_TEXT | blu_areaFlags_FLOATING);
+                a->style.sizes[blu_axis_X].kind = blu_sizeKind_TEXT;
+                a->style.sizes[blu_axis_Y].kind = blu_sizeKind_TEXT;
+                a->offset = { 100, 0 };
+                blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%f"), spacing));
+            }
+
             for(int i = 0; i < lineCount; i++) {
                 LineVert* v = &gridPts[i*2+1];
                 bool even = i%2 == 0;
-                float y = i - (lineCount/2);
+                float y = (i - (lineCount/2)) * spacing;
                 v[0].pos = V4f(xpts[even], y, 0, 1);
                 v[0].color = col_darkGray;
                 v[1].pos = V4f(xpts[!even], y, 0, 1);
@@ -151,14 +179,14 @@ void sun_graph2dBuild(sun_Graph2dInfo* info, gfx_Framebuffer* target) {
             for(int i = 0; i < 10; i++) {
                 a = blu_areaMake(str_format(globs.scratch, STR("%i"), i), blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
                 a->offset =  { (1-((i+timeOffset) / GRAPH2D_SAMPLE_WINDOW)) * width - a->calculatedSizes[blu_axis_X] / 2, height - BLU_FONT_SIZE };
-                a->textScale = 0.5f;
+                a->textScale = 0.7f;
                 blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%i"), (int)(globs.curTime-i)));
             }
 
             if(inter.hovered) {
                 a = blu_areaMake("hoverLabel", blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
                 a->offset =  { inter.mousePos.x - a->calculatedSizes[blu_axis_X] / 2, height - BLU_FONT_SIZE };
-                a->textScale = 0.6f;
+                a->textScale = 0.75f;
                 blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%f"), globs.curTime - GRAPH2D_SAMPLE_WINDOW * (1-(inter.mousePos.x / width))));
             }
         }
@@ -265,7 +293,8 @@ void sun_graph2dBuild(sun_Graph2dInfo* info, gfx_Framebuffer* target) {
                     }
 
                 }
-            }
+
+            } // end styling for list
         }
     } // end area
 };
