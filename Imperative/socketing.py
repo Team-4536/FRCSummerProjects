@@ -3,8 +3,8 @@ import ntcore
 import socket
 from enum import IntEnum
 import select
-from typing import Any, Self
-
+from typing import Any
+from typing_extensions import Self
 
 # in seconds
 SEND_INTERVAL = 1/50
