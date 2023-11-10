@@ -263,6 +263,13 @@ void blu_pushStyle(blu_Style s);
 void blu_popStyle();
 void blu_style_style(blu_Style* style, blu_Style* target = nullptr);
 
+
+// TODO: basic debug text make function
+// TOOD: button make function
+// TODO: dropdown make function
+// TODO: add format string as display str func
+
+// TODO: make text scale a style
 void blu_style_sizeX(blu_Size size, blu_Style* target = nullptr);
 void blu_style_sizeY(blu_Size size, blu_Style* target = nullptr);
 void blu_style_childLayoutAxis(blu_Axis axis, blu_Style* target = nullptr);
