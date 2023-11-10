@@ -76,12 +76,12 @@ class Flymer(wpilib.TimedRobot):
         self.retractEncoder = self.retractMotor.getEncoder(rev.SparkMaxRelativeEncoder.Type.kQuadrature)
         self.turretEncoder = self.turretMotor.getEncoder()
 
-        self.leftLimit = wpilib.DigitalInput(6) 
+        self.leftLimit = wpilib.DigitalInput(6)
         self.rightLimit = wpilib.DigitalInput(5)
         self.liftLowerLimit = wpilib.DigitalInput(4)
         self.liftSideSwitch = wpilib.DigitalInput(3)
         self.liftUpperLimit = wpilib.DigitalInput(2)
-        
+
         self.pcm = wpilib.PneumaticsControlModule()
 
         self.grabber = self.pcm.makeDoubleSolenoid(7, 5)
@@ -131,8 +131,8 @@ class Flymer(wpilib.TimedRobot):
         self.server.putUpdate("LiftSideSwitch", self.liftSideSwitch.get())
         self.server.putUpdate("LiftUpperSwitch", self.liftUpperLimit.get())
         self.server.putUpdate("LiftLowerSwitch", self.liftLowerLimit.get())
-    
-        
+
+
 
         self.server.update(self.time.timeSinceInit)
 
@@ -179,8 +179,8 @@ class Flymer(wpilib.TimedRobot):
 
         liftScalar = 0.5
 
-        """if self.liftSideSwitch.get():
-             liftScalar = 0.25"""
+        if self.liftSideSwitch.get() and self.input.lift < 0:
+             liftScalar = 0.2
 
         self.liftMotor.set(self.input.lift * liftScalar)
 
