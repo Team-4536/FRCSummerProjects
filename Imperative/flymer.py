@@ -5,7 +5,7 @@ import rev
 import navx
 import math
 import autoStaging
-
+from encoderSim import EncoderSim
 import timing
 from real import V2f
 from subsystems.mech import mechController
@@ -75,7 +75,13 @@ class Flymer(wpilib.TimedRobot):
         self.liftEncoder = self.liftMotor.getEncoder(rev.SparkMaxRelativeEncoder.Type.kQuadrature)
         self.retractEncoder = self.retractMotor.getEncoder(rev.SparkMaxRelativeEncoder.Type.kQuadrature)
         self.turretEncoder = self.turretMotor.getEncoder()
- 
+
+        self.leftLimit = wpilib.DigitalInput(6)
+        self.rightLimit = wpilib.DigitalInput(5)
+        self.liftLowerLimit = wpilib.DigitalInput(4)
+        self.liftSideSwitch = wpilib.DigitalInput(3)
+        self.liftUpperLimit = wpilib.DigitalInput(2)
+
         self.pcm = wpilib.PneumaticsControlModule()
 
         self.grabber = self.pcm.makeDoubleSolenoid(7, 5)
@@ -120,16 +126,25 @@ class Flymer(wpilib.TimedRobot):
 
         self.server.putUpdate("Gyro", self.gyro.getYaw())
         self.server.putUpdate("AbsoluteDrive", self.absoluteDrive)
+        self.server.putUpdate("LeftSwitch", self.leftLimit.get())
+        self.server.putUpdate("RightSwitch", self.rightLimit.get())
+        self.server.putUpdate("LiftSideSwitch", self.liftSideSwitch.get())
+        self.server.putUpdate("LiftUpperSwitch", self.liftUpperLimit.get())
+        self.server.putUpdate("LiftLowerSwitch", self.liftLowerLimit.get())
+
+
 
         self.server.update(self.time.timeSinceInit)
 
     def _simulationInit(self) -> None:
+        self.turretSim = EncoderSim(plant.DCMotor.NEO(1), 1, 1, False)
         self.liftSim = EncoderSim(plant.DCMotor.NEO(1), 1, 1, False)
         self.retractSim = EncoderSim(plant.DCMotor.NEO(1), 1, 1, False)
 
     def _simulationPeriodic(self) -> None:
         self.liftSim.update(self.time.dt, self.liftMotor, self.liftEncoder)
         self.retractSim.update(self.time.dt, self.retractMotor, self.retractEncoder)
+        self.turretSim.update(self.time.dt, self.turretMotor, self.turretEncoder)
 
     def teleopInit(self) -> None:
         self.gyro.reset()
@@ -162,9 +177,36 @@ class Flymer(wpilib.TimedRobot):
         if self.input.gyroReset:
             self.gyro.reset()
 
-        self.liftMotor.set(self.input.lift * 0.7)
+        liftScalar = 0.5
+
+        if self.liftSideSwitch.get() and self.input.lift < 0:
+             liftScalar = 0.2
+
+        self.liftMotor.set(self.input.lift * liftScalar)
+
+        if self.liftUpperLimit.get():
+            if self.input.lift < 0:
+                self.liftMotor.set(0)
+
         self.retractMotor.set(self.input.retract * 0.5)
-        self.turretMotor.set(self.input.turret * 0.08)
+      
+
+
+        speed = self.input.turret * 0.08
+        if self.rightLimit.get():
+            if speed > 0:
+                speed = 0
+            
+        if self.leftLimit.get():
+              if speed < 0:
+                speed = 0
+
+        self.turretMotor.set(speed)
+
+
+        
+
+
 
         if self.input.grabToggle:
             self.grabber.toggle()
