@@ -88,7 +88,7 @@ class Auto():
 
         r.server.putUpdate("stage start", self.stagestart)
         r.server.putUpdate("stage number", self.listindex)
-        if self.listindex <=len(self.list):
+        if self.listindex < len(self.list):
             stage = self.list[self.listindex]
             done = stage(r)
             if done:
