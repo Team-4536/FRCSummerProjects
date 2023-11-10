@@ -82,114 +82,125 @@ void sun_graph2dBuild(sun_Graph2dInfo* info, gfx_Framebuffer* target) {
         float sampleGap = GRAPH2D_SAMPLE_WINDOW / GRAPH2D_VCOUNT;
 
 
-
-        // time lines
-        {
-            int lineCount = 10;
-            int vertCount = lineCount * 2;
-            LineVert* gridPts = BUMP_PUSH_ARR(globs.scratch, vertCount+4, LineVert);
-            float ypts[] = { info->bottom, info->top };
-
-            for(int i = 0; i < lineCount; i++) {
-                LineVert* v = &gridPts[i*2+1];
-                bool even = i%2 == 0;
-
-                float x = ((i-fmodf(globs.curTime, 1)) / GRAPH2D_SAMPLE_WINDOW);
-                V4f color = v4f_lerp(col_darkGray, col_darkBlue, (1-x)/2); // gradient
-                v[0] = { V4f(x, ypts[even], 0, 1), color };
-                v[1] = { V4f(x, ypts[!even], 0, 1), color };
-            }
-
-            // hover line
-            float x = 100;
-            if(inter.hovered) { x = inter.mousePos.x / width; }
-            gridPts[vertCount+1] = { V4f(x, ypts[1], 0, 1), col_darkGray };
-            gridPts[vertCount+2] = { V4f(x, ypts[0], 0, 1), col_darkGray };
-            gridPts[vertCount+3] = { V4f(0, 0, 0, 1), col_darkGray };
-
-            gfx_updateSSBO(info->timeVerts, gridPts, sizeof(LineVert) * (vertCount+4), true);
-            gfx_UniformBlock* b = gfx_registerCall(p);
-            b->thickness = 1;
-            b->ssbo = info->timeVerts;
-            b->vertCount = 6*(vertCount+2-1);
-
-        }
-
-        // value lines
-        {
-            int lineCount = 3;
-            int vertCount = lineCount * 2;
-            LineVert* gridPts = BUMP_PUSH_ARR(globs.scratch, vertCount+2, LineVert);
-            float xpts[] = { -0.1, 1.1 };
-
-            float spacing = 0;
-            {
-                float lineGap = (info->top - info->bottom) / lineCount;
-                assert(lineGap > 0);
-
-                float dec = lineGap; // nasty hack to get the base ten decimal/exponents
-                int exp = 0;
-                while(dec < 1) { dec *= 10; exp--; }
-                while(dec > 10) { dec /= 10; exp++; }
-
-                int roundingTargets[] = { 5, 2, 1 };
-                for(int i = 0; i < 3; i++) {
-                    if(dec > roundingTargets[i]) {
-                        dec = roundingTargets[i];
-                        break;
-                    }
-                }
-                spacing = dec * powf(10, exp);
-                // TODO: fix warnings lol
-
-                a = blu_areaMake("debug", blu_areaFlags_DRAW_TEXT | blu_areaFlags_FLOATING);
-                a->style.sizes[blu_axis_X].kind = blu_sizeKind_TEXT;
-                a->style.sizes[blu_axis_Y].kind = blu_sizeKind_TEXT;
-                a->offset = { 100, 0 };
-                blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%f"), spacing));
-            }
-
-            for(int i = 0; i < lineCount; i++) {
-                LineVert* v = &gridPts[i*2+1];
-                bool even = i%2 == 0;
-                float y = (i - (lineCount/2)) * spacing;
-                v[0].pos = V4f(xpts[even], y, 0, 1);
-                v[0].color = col_darkGray;
-                v[1].pos = V4f(xpts[!even], y, 0, 1);
-                v[1].color = col_darkGray;
-            }
-            gridPts[0] = { V4f(), col_darkGray };
-            gridPts[vertCount+1] = { V4f(), col_darkGray };
-            gfx_updateSSBO(info->gridVerts, gridPts, sizeof(LineVert) * (vertCount+2), true);
-
-            gfx_UniformBlock* b = gfx_registerCall(p);
-            b->color = col_darkGray;
-            b->thickness = 1;
-            b->ssbo = info->gridVerts;
-            b->vertCount = 6*(vertCount-1);
-        }
-
-        // TODO: value labels
-
         blu_styleScope(blu_Style()) {
         blu_style_sizeX({ blu_sizeKind_TEXT, 0 });
         blu_style_sizeY({ blu_sizeKind_TEXT, 0 });
-            float timeOffset = fmodf(globs.curTime, 1);
+            {
+                // time lines
+                int lineCount = 10;
+                int vertCount = lineCount * 2;
+                LineVert* gridPts = BUMP_PUSH_ARR(globs.scratch, vertCount+4, LineVert);
+                float ypts[] = { info->bottom, info->top };
 
-            for(int i = 0; i < 10; i++) {
-                a = blu_areaMake(str_format(globs.scratch, STR("%i"), i), blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
-                a->offset =  { (1-((i+timeOffset) / GRAPH2D_SAMPLE_WINDOW)) * width - a->calculatedSizes[blu_axis_X] / 2, height - BLU_FONT_SIZE };
-                a->textScale = 0.7f;
-                blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%i"), (int)(globs.curTime-i)));
+                for(int i = 0; i < lineCount; i++) {
+                    LineVert* v = &gridPts[i*2+1];
+                    bool even = i%2 == 0;
+
+                    float x = ((i-fmodf(globs.curTime, 1)) / GRAPH2D_SAMPLE_WINDOW);
+                    V4f color = v4f_lerp(col_darkGray, col_darkBlue, (1-x)/2); // gradient
+                    v[0] = { V4f(x, ypts[even], 0, 1), color };
+                    v[1] = { V4f(x, ypts[!even], 0, 1), color };
+                }
+
+                // hover line
+                float x = 100;
+                if(inter.hovered) { x = inter.mousePos.x / width; }
+                gridPts[vertCount+1] = { V4f(x, ypts[1], 0, 1), col_darkGray };
+                gridPts[vertCount+2] = { V4f(x, ypts[0], 0, 1), col_darkGray };
+                gridPts[vertCount+3] = { V4f(0, 0, 0, 1), col_darkGray };
+
+                gfx_updateSSBO(info->timeVerts, gridPts, sizeof(LineVert) * (vertCount+4), true);
+                gfx_UniformBlock* b = gfx_registerCall(p);
+                b->thickness = 1;
+                b->ssbo = info->timeVerts;
+                b->vertCount = 6*(vertCount+2-1);
+
+                // time labels
+                float timeOffset = fmodf(globs.curTime, 1);
+
+                for(int i = 0; i < 10; i++) {
+                    a = blu_areaMake(str_format(globs.scratch, STR("time label %i"), i),
+                        blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
+                    a->offset =  { (1-((i+timeOffset) / GRAPH2D_SAMPLE_WINDOW)) * width - a->calculatedSizes[blu_axis_X] / 2, height - BLU_FONT_SIZE };
+                    a->textScale = 0.7f;
+                    blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%i"), (int)(globs.curTime-i)));
+                }
+                if(inter.hovered) {
+                    a = blu_areaMake("hoverLabel", blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
+                    a->offset =  { inter.mousePos.x - a->calculatedSizes[blu_axis_X] / 2, height - BLU_FONT_SIZE };
+                    a->textScale = 0.75f;
+                    blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%f"), globs.curTime - GRAPH2D_SAMPLE_WINDOW * (1-(inter.mousePos.x / width))));
+                }
             }
 
-            if(inter.hovered) {
-                a = blu_areaMake("hoverLabel", blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
-                a->offset =  { inter.mousePos.x - a->calculatedSizes[blu_axis_X] / 2, height - BLU_FONT_SIZE };
-                a->textScale = 0.75f;
-                blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%f"), globs.curTime - GRAPH2D_SAMPLE_WINDOW * (1-(inter.mousePos.x / width))));
+            // value lines
+            {
+                int lineCount = 14;
+                int vertCount = lineCount * 2;
+                LineVert* gridPts = BUMP_PUSH_ARR(globs.scratch, vertCount+2, LineVert);
+                float xpts[] = { -0.1, 1.1 };
+
+                float lineSpacing = 0;
+                float lineOffset = 0;
+                { // find line spacing/ offset based on zoom
+                    float lineGap = (info->top - info->bottom) / 6;
+                    assert(lineGap > 0);
+
+                    float dec = lineGap; // get the base ten decimal/exponents
+                    int exp = 0;
+                    while(dec < 1) { dec *= 10; exp--; }
+                    while(dec > 10) { dec /= 10; exp++; }
+
+                    int roundingTargets[] = { 5, 2, 1 };
+                    for(int i = 0; i < 3; i++) {
+                        if(dec > roundingTargets[i]) {
+                            dec = roundingTargets[i];
+                            break;
+                        }
+                    }
+                    lineSpacing = dec * powf(10, exp);
+                    lineOffset = fmodf((info->top + info->bottom) / 2, lineSpacing);
+                }
+                // TODO: fix warnings lol
+                float spaceToPx = height / (info->top - info->bottom); // conversion between drawing space and pix
+                int centerIdx = (int)((info->top+info->bottom)/2 / lineSpacing);
+
+                for(int i = 0; i < lineCount; i++) {
+                    LineVert* v = &gridPts[i*2+1];
+                    bool even = i%2 == 0;
+                    float y = (i - (lineCount/2) + centerIdx) * lineSpacing;
+                    v[0].pos = V4f(xpts[even], y, 0, 1);
+                    v[0].color = col_darkGray;
+                    v[1].pos = V4f(xpts[!even], y, 0, 1);
+                    v[1].color = col_darkGray;
+                }
+                gridPts[0] = { V4f(), col_darkGray };
+                gridPts[vertCount+1] = { V4f(), col_darkGray };
+                gfx_updateSSBO(info->gridVerts, gridPts, sizeof(LineVert) * (vertCount+2), true);
+
+                gfx_UniformBlock* b = gfx_registerCall(p);
+                b->color = col_darkGray;
+                b->thickness = 1;
+                b->ssbo = info->gridVerts;
+                b->vertCount = 6*(vertCount-1);
+
+                // labels
+                {
+                    for(int i = 0; i < lineCount; i++) {
+                        int k = i - lineCount/2;
+                        a = blu_areaMake(str_format(globs.scratch, STR("value label %i"), i),
+                            blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
+                        a->textScale = 0.7f;
+                        float label = (k + centerIdx) * lineSpacing;
+                        blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%f"), label));
+
+                        a->offset.x = width - a->calculatedSizes[blu_axis_X];
+                        a->offset.y = height / 2 + (-k*lineSpacing + lineOffset) * spaceToPx;
+                        a->offset.y -= a->calculatedSizes[blu_axis_Y] / 2;
+                    }
+                }
             }
-        }
+        } // end grid things
 
 
 
