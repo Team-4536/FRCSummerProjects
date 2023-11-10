@@ -124,7 +124,7 @@ void sun_graph2dBuild(sun_Graph2dInfo* info, gfx_Framebuffer* target) {
 
             float spacing = 0;
             {
-                float lineGap = (info->top - info->bottom) / 6;
+                float lineGap = (info->top - info->bottom) / lineCount;
                 assert(lineGap > 0);
 
                 float dec = lineGap; // nasty hack to get the base ten decimal/exponents
@@ -139,7 +139,7 @@ void sun_graph2dBuild(sun_Graph2dInfo* info, gfx_Framebuffer* target) {
                         break;
                     }
                 }
-                spacing = dec * exp;
+                spacing = dec * powf(10, exp);
                 // TODO: fix warnings lol
 
                 a = blu_areaMake("debug", blu_areaFlags_DRAW_TEXT | blu_areaFlags_FLOATING);
