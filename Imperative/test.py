@@ -6,7 +6,7 @@ from socketing import Server
 import inputs
 import timing
 import ctre.sensors
-import PIDController
+from PIDController import PIDController
 from real import angleWrap
 from swerveBot import SwerveState
 from real import V2f
@@ -67,6 +67,9 @@ class swerveTest(wpilib.TimedRobot):
         self.swerveController = SwerveController()
 
 
+
+
+
     def robotPeriodic(self) -> None:
         self.time = timing.TimeData(self.time)
 
@@ -88,27 +91,60 @@ class swerveTest(wpilib.TimedRobot):
         self.server.putUpdate("BRPos", self.seList[3].getAbsolutePosition())
 
         self.server.update(self.time.timeSinceInit)
+
+
+    """----------------------------------------------------------"""
+
+
+
+    def teleopInit(self) -> None:
         
+        kp = 0.001
+        ki = 0
+        kd = 0
+
+        self.pid = PIDController(kp, ki, kd)
+        self.target = angleWrap(self.gyro.getYaw())
+
+
+
     def teleopPeriodic(self) -> None:
 
-        driveStick = V2f(-self.controller.getLeftY(), self.controller.getLeftX()) * .3
-        #driveStick = driveStick.rotateDegrees(-self.gyro.getYaw())
-        
-        self.swerveController.tick(driveStick.x, driveStick.y, self.controller.getRightX() * 0.2, self.time.dt, self.controller.getBButtonPressed(), self.controller.getYButtonPressed, self.swerve, self.gyro)
+        # 0.3 = good for testing || 0.7 = for inexperienced drivers/indoor practice || 1.0 = competition and full field practice
+        # speedScalar = 0.3 #speed control set as constant
+        speedScalar = .1 + self.controller.getRightTriggerAxis() #speed control on trigger
+        if speedScalar > 1: speedScalar = 1
 
-        """
-        forward = -inputs.deadZone(self.controller.getLeftY())
-        turn = inputs.deadZone(self.controller.getRightX())
-        # self.target += turn * 0.5 * self.time.dt
-        if(self.controller.getPOV() != -1):
-            self.target = self.controller.getPOV() / 360
+        # 0.2 = good for testing || 0.3 = for inexperienced drivers/indoor practice || 0.4 = competition and fill field practice
+        turnScalar = 0.2
 
-        self.drive.set(forward * 0.1)
-        error = angleWrap(self.target*360 - self.se.getPosition()) / 360
-        self.server.putUpdate("error", error)
-        self.steer.set(self.pid.tickErr(-error, self.time.dt))
-        """
+
+        #inputs (change if drivers want them different)
+        driveX = inputs.deadZone(self.controller.getLeftX())
+        driveY = -inputs.deadZone(self.controller.getLeftY())
+        # turnSpeed = inputs.deadZone(self.controller.getRightX()) * turnScalar
+        self.target += (inputs.deadZone(self.controller.getRightX()) * 2)
+        driveStick = V2f(driveY, driveX) * speedScalar
+
+        brakes = self.controller.getBButtonPressed()
+        brakeDefault = self.controller.getStartButtonPressed()
+        gyroReset = self.controller.getYButtonPressed()
+
+        #angle pid
+        angle = angleWrap(self.gyro.getYaw())
+        error = angleWrap(self.target-angle)
+
+        turnSpeed = self.pid.tickErr(error, self.time.dt) * turnScalar
+
+
+        #make swerve move
+        self.swerveController.tick(driveStick.x, driveStick.y, turnSpeed, self.time.dt, brakes, brakeDefault, gyroReset, self.swerve, self.gyro)
+
     
+    """--------------------------------------------------------------------------------"""
+
+
+
 
     def disabledInit(self) -> None:
         self.disabledPeriodic()

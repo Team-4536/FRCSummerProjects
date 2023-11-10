@@ -124,15 +124,15 @@ class SwerveSim:
 
 
 
-# TODO: change brake mode from toggle to happen until input received
+# TODO: change brake mode from toggle to happen until input received <-- completed in my controller using brakeDefault boolean -emmett
 class SwerveController:
     def __init__(self) -> None:
         self.brakes = False
 
-        #choose between brake or hold position when no input is given (if false brake will be a toggle on button "A")
-        self.brakeDefault = False
+        #choose between brake or hold position when no input is given (if false brakes will be a toggle on button "B")
+        self.brakeDefault = True
 
-        kp = 2
+        kp = 2.5
         ki = 0
         kd = 0
         self.FLPID = PIDController(kp, ki, kd)
@@ -163,20 +163,20 @@ class SwerveController:
             if(wheelSpeed == 0):
                 swerve.steerMotors[i].set(0)
                 swerve.driveMotors[i].set(0)
-                continue
+                continue #what does continue do
 
             error = angleWrap(vec.getAngle() - swerve.steerEncoders[i].getPosition())
-            if(abs(error) > 90):
+            if(abs(error) > 90): #this wont work if the error is negative - ex. error is -100, abs(-100) > 90 so it would subtract 180 making the error -280
                 error = error - 180
                 wheelSpeed *= -1
 
             if(i == 0):
                 server.putUpdate("target", float(vec.getAngle()))
             swerve.steerMotors[i].set(self.pids[i].tickErr(angleWrap(error)/360, dt))
-            driveSpeeds.append(wheelSpeed / swerve.maxSpeed)
+            driveSpeeds.append(wheelSpeed / swerve.maxSpeed) #rob im pretty sure this would make the wheels move at the fastest posible speed all the time 
 
-        driveSpeeds = normalizeWheelSpeeds(driveSpeeds)
-        for x in zip(driveSpeeds, swerve.driveMotors):
+        driveSpeeds = normalizeWheelSpeeds(driveSpeeds) #what does normalize do i dont understand it
+        for x in zip(driveSpeeds, swerve.driveMotors): #???
             x[1].set(x[0])
 
 
@@ -186,15 +186,26 @@ class SwerveController:
     # forward = forward/back
     # right = Left/Right
     # turning is CW+
-    def tick(self, forward: float, right: float, turn: float, dt: float, brakeButtonPressed, gyroReset, swerve: SwerveState, gyro) -> None:
+    def tick(self, forward: float, right: float, turn: float, dt: float, brakeButtonPressed: bool, startButtonPressed: bool, gyroReset: bool, swerve: SwerveState, gyro) -> None:
         #brake input toggle
         if brakeButtonPressed == True:
             self.brakes = not self.brakes
 
-        if gyroReset == True:
-            gyroReset()
+        if startButtonPressed == True:
+            self.brakeDefault = not self.brakeDefault
+            if self.brakeDefault == False:
+                self.brakes = False
 
-        inputGyro = gyro.getYaw()
+        if gyroReset == True:
+            gyro.reset()
+
+        #brake by default if option is turned on
+        if self.brakeDefault == True and forward == 0 and right == 0 and turn == 0:
+            self.brakes = True
+        elif self.brakeDefault == True:
+            self.brakes = False
+
+        inputGyro = angleWrap(gyro.getYaw())
 
         #assign inputs to vectors
         leftStick = V2f(forward, right)
@@ -217,33 +228,11 @@ class SwerveController:
 
         """-----------------------------------------"""
 
-        #Assign encoders and make sure they're measuring in degrees
-
-        #if steer encoders return rotations
-        """
-        FLPosAngle = (swerve.steerEncoders[0].getPosition() % 1) * 360
-        FRPosAngle = (swerve.steerEncoders[1].getPosition() % 1) * 360
-        BLPosAngle = (swerve.steerEncoders[2].getPosition() % 1) * 360
-        BRPosAngle = (swerve.steerEncoders[3].getPosition() % 1) * 360
-        """
-
-        #if encoders return angle (0-360 degrees)
-        FLPosAngle = (swerve.steerEncoders[0].getAbsolutePosition())
-        FRPosAngle = (swerve.steerEncoders[1].getAbsolutePosition())
-        BLPosAngle = (swerve.steerEncoders[2].getAbsolutePosition())
-        BRPosAngle = (swerve.steerEncoders[3].getAbsolutePosition())
-
-        #wrap angles to (0, 90, 180, -90) instead of (0, 90, 180, 270)
-        while FLPosAngle > 180:
-            FLPosAngle = FLPosAngle - 360
-        while FRPosAngle > 180:
-            FRPosAngle = FRPosAngle - 360
-        while BLPosAngle > 180:
-            BLPosAngle = BLPosAngle - 360
-        while BRPosAngle > 180:
-            BRPosAngle = BRPosAngle - 360
-
-        """----------------------------------------------------"""
+        #Assign encoders and wrap angles
+        FLPosAngle = angleWrap((swerve.steerEncoders[0].getAbsolutePosition()))
+        FRPosAngle = angleWrap((swerve.steerEncoders[1].getAbsolutePosition()))
+        BLPosAngle = angleWrap((swerve.steerEncoders[2].getAbsolutePosition()))
+        BRPosAngle = angleWrap((swerve.steerEncoders[3].getAbsolutePosition()))
 
         #separate vector values
         #getAngle returns 0 to 360 degrees
@@ -252,9 +241,14 @@ class SwerveController:
         BLTarget = BLVector.getAngle()
         BRTarget = BRVector.getAngle()
 
+        #telemetry
         Server.inst.putUpdate("FLTarget", FLTarget)
+        Server.inst.putUpdate("FRTarget", FRTarget)
+        Server.inst.putUpdate("BLTarget", BLTarget)
+        Server.inst.putUpdate("BRTarget", BRTarget)
 
         Server.inst.putUpdate("GyroYaw", inputGyro)
+        Server.inst.putUpdate("Brakes", self.brakes)
 
         #getLength returns power value from 0 to 1
         FLPower = FLVector.getLength()
@@ -262,51 +256,21 @@ class SwerveController:
         BLPower = BLVector.getLength()
         BRPower = BRVector.getLength()
 
-        Server.inst.putUpdate("Brakes", self.brakes)
-
         #set brakes
-        if self.brakeDefault == False:
-            if self.brakes == True:
-                FLTarget = 135
-                FRTarget = 225
-                BLTarget = 45
-                BRTarget = 315
-                FLPower = 0
-                FRPower = 0
-                BLPower = 0
-                BRPower = 0
-        else:
-            if forward == 0 and right == 0 and turn == 0:
-                FLTarget = 135
-                FRTarget = 225
-                BLTarget = 45
-                BRTarget = 315
+        if self.brakes == True:
+            FLTarget = 45
+            FRTarget = -45
+            BLTarget = -45
+            BRTarget = 45
+            FLPower = 0
+            FRPower = 0
+            BLPower = 0
+            BRPower = 0
 
         """---------------------------------------"""
 
         #calculate error
-
-        """
-        def getSteeringError(Target, PosAngle, Power):
-            # ???????????????????????????????????
-            # just trust the process rob
-            FakeError = -Target - PosAngle
-            Pos = -(FakeError)
-            while Pos > 90:
-                Pos = Pos - 180
-                Power = -(Power)
-            SteeringError = -Pos
-            while SteeringError > 90:
-                SteeringError = SteeringError - 180
-                Power = -(Power)
-            if SteeringError > 180:
-                SteeringError = SteeringError - 360
-
-            return SteeringError, Power
-        """
-
-        #attept at making that less confusing (probably works)
-        def getBetterSteeringError(target, pos, power):
+        def getSteeringError(target, pos, power):
             error = target - pos
 
             while error < -180:
@@ -315,24 +279,25 @@ class SwerveController:
                 error = error - 360
 
             #calculate shortest path to target (module should never move more than 90 degrees at once)
-            
             if error > 90:
-                error = error - 180
-                power = -power
+                error -= 180
+                power *= -1
             if error < -90:
-                error = error + 180
-                power = -power
-            
+                error += 180
+                power *= -1
             
             return error, power
 
         #actually call the function to find error for each module
-        FLSteeringError, FLPower = getBetterSteeringError(FLTarget, FLPosAngle, FLPower)
-        FRSteeringError, FRPower = getBetterSteeringError(FRTarget, FRPosAngle, FRPower)
-        BLSteeringError, BLPower = getBetterSteeringError(BLTarget, BLPosAngle, BLPower)
-        BRSteeringError, BRPower = getBetterSteeringError(BRTarget, BRPosAngle, BRPower)
+        FLSteeringError, FLPower = getSteeringError(FLTarget, FLPosAngle, FLPower)
+        FRSteeringError, FRPower = getSteeringError(FRTarget, FRPosAngle, FRPower)
+        BLSteeringError, BLPower = getSteeringError(BLTarget, BLPosAngle, BLPower)
+        BRSteeringError, BRPower = getSteeringError(BRTarget, BRPosAngle, BRPower)
 
         Server.inst.putUpdate("FLSteeringError", FLSteeringError)
+        Server.inst.putUpdate("FRSteeringError", FRSteeringError)
+        Server.inst.putUpdate("BLSteeringError", BLSteeringError)
+        Server.inst.putUpdate("BRSteeringError", BRSteeringError)
 
         #hold position if no input is given
         if self.brakeDefault == False:
