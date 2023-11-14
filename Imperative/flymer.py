@@ -185,7 +185,12 @@ class Flymer(wpilib.TimedRobot):
         self.liftMotor.set(self.input.lift * liftScalar)
 
         if self.liftUpperLimit.get():
+            self.liftEncoder.setPosition(0)
             if self.input.lift < 0:
+                self.liftMotor.set(0)
+
+        if self.liftLowerLimit.get():
+            if self.input.lift > 0:
                 self.liftMotor.set(0)
 
         self.retractMotor.set(self.input.retract * 0.5)
