@@ -148,6 +148,7 @@ class Flymer(wpilib.TimedRobot):
 
     def teleopInit(self) -> None:
         self.gyro.reset()
+        self.retractEncoder.setPosition(0)
 
     def teleopPeriodic(self) -> None:
 
@@ -177,6 +178,9 @@ class Flymer(wpilib.TimedRobot):
         if self.input.gyroReset:
             self.gyro.reset()
 
+        if self.armCtrlr.getLeftBumperPressed():
+            self.retractEncoder.setPosition(0)
+
         liftScalar = 0.5
 
         if self.liftSideSwitch.get() and self.input.lift < 0:
@@ -197,6 +201,10 @@ class Flymer(wpilib.TimedRobot):
       
 
 
+        if self.armCtrlr.getYButtonPressed() and self.liftUpperLimit.get():
+            self.driveArmGoal(593, 0)
+
+
         speed = self.input.turret * 0.08
         if self.rightLimit.get():
             if speed > 0:
@@ -207,9 +215,6 @@ class Flymer(wpilib.TimedRobot):
                 speed = 0
 
         self.turretMotor.set(speed)
-
-
-        
 
 
 
