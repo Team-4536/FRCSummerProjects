@@ -18,32 +18,38 @@ from encoderSim import EncoderSim
 
 class FlymerInputs():
 
-
     # TODO: switch keyboard/controller modes from sundial
 
     def __init__(self, driveCtrlr: wpilib.XboxController, armCtrlr: wpilib.XboxController) -> None:
+
+        #drive controller
         self.driveX = deadZone(driveCtrlr.getLeftX())
         self.driveY = deadZone((-driveCtrlr.getLeftY()))
         self.turning = deadZone(driveCtrlr.getRightX())
         self.speedControl = driveCtrlr.getRightTriggerAxis() + .2
 
-        self.gyroReset = driveCtrlr.getYButtonPressed()
-
-        self.absoluteDriveToggle = driveCtrlr.getXButtonPressed()
-
+        self.dpadAngle = driveCtrlr.getPOV()
         self.brakeToggle = driveCtrlr.getBButtonPressed()
+        self.gyroReset = driveCtrlr.getYButtonPressed()
+        self.absToggle = driveCtrlr.getXButtonPressed()
 
+        #arm controller
         self.lift = deadZone(armCtrlr.getLeftY())
         self.turret = deadZone(armCtrlr.getLeftX())
         self.retract = deadZone(armCtrlr.getRightY())
         self.grabToggle = armCtrlr.getAButtonPressed()
+        self.coneHigh = armCtrlr.getYButtonPressed()
+        self.coneMid = armCtrlr.getXButtonPressed()
+        self.homeArm = armCtrlr.getBButtonPressed()
+        self.calibrateRetract = armCtrlr.getLeftBumper()
+
 
 AUTO_NONE = "none"
 AUTO_BALANCE = "balance"
 AUTO_EXIT_SCORE = "exit+score"
 AUTO_EXIT = "exit"
-class Flymer(wpilib.TimedRobot):
 
+class Flymer(wpilib.TimedRobot):
 
     def robotInit(self) -> None:
         self.chooser = wpilib.SendableChooser()
@@ -51,7 +57,7 @@ class Flymer(wpilib.TimedRobot):
         self.chooser.setDefaultOption(AUTO_NONE, AUTO_NONE)
         self.chooser.addOption(AUTO_BALANCE, AUTO_BALANCE)
         self.chooser.addOption(AUTO_EXIT, AUTO_EXIT)
-        self.chooser.addOption(AUTO_EXIT_SCORE, AUTO_EXIT_SCORE)                                                                                                                                                            #code code code 
+        self.chooser.addOption(AUTO_EXIT_SCORE, AUTO_EXIT_SCORE)  # code code code
         wpilib.SmartDashboard.putData("autos", self.chooser)
         self.server = socketing.Server(self.isReal())
 
@@ -65,9 +71,10 @@ class Flymer(wpilib.TimedRobot):
         self.BLDrive = rev.CANSparkMax(3, brushlessMotor)
         self.BRDrive = rev.CANSparkMax(2, brushlessMotor)
 
-        self.absoluteDrive = False #default is off, hit X to toggle
+        self.absoluteDrive = True  # default is off, hit X to toggle
 
-        self.turningScalar = .2 #change for comp to about .3
+        self.turningScalar = .2  # change for comp to about .3
+        self.anglePID = PIDController(0.1, 0, 0)
 
         self.liftMotor = rev.CANSparkMax(7, brushedMotor)
         self.retractMotor = rev.CANSparkMax(6, brushedMotor)
@@ -76,8 +83,8 @@ class Flymer(wpilib.TimedRobot):
         self.retractEncoder = self.retractMotor.getEncoder(rev.SparkMaxRelativeEncoder.Type.kQuadrature)
         self.turretEncoder = self.turretMotor.getEncoder()
 
-        self.leftLimit = wpilib.DigitalInput(6)
-        self.rightLimit = wpilib.DigitalInput(5)
+        self.turretCCWLimit = wpilib.DigitalInput(6)
+        self.turretCWLimit = wpilib.DigitalInput(5)
         self.liftLowerLimit = wpilib.DigitalInput(4)
         self.liftSideSwitch = wpilib.DigitalInput(3)
         self.liftUpperLimit = wpilib.DigitalInput(2)
@@ -126,13 +133,11 @@ class Flymer(wpilib.TimedRobot):
 
         self.server.putUpdate("Gyro", self.gyro.getYaw())
         self.server.putUpdate("AbsoluteDrive", self.absoluteDrive)
-        self.server.putUpdate("LeftSwitch", self.leftLimit.get())
-        self.server.putUpdate("RightSwitch", self.rightLimit.get())
+        self.server.putUpdate("LeftSwitch", self.turretCCWLimit.get())
+        self.server.putUpdate("RightSwitch", self.turretCWLimit.get())
         self.server.putUpdate("LiftSideSwitch", self.liftSideSwitch.get())
         self.server.putUpdate("LiftUpperSwitch", self.liftUpperLimit.get())
         self.server.putUpdate("LiftLowerSwitch", self.liftLowerLimit.get())
-
-
 
         self.server.update(self.time.timeSinceInit)
 
@@ -147,107 +152,185 @@ class Flymer(wpilib.TimedRobot):
         self.turretSim.update(self.time.dt, self.turretMotor, self.turretEncoder)
 
     def teleopInit(self) -> None:
+        #reset gyro and retraction encoder
         self.gyro.reset()
         self.retractEncoder.setPosition(0)
+        
+        #create variables
+        self.armHoming = False
+        self.scoringHigh = False
+        self.scoringMid = False
+        self.retractBounded = True
+        self.target = self.gyro.getYaw()
 
     def teleopPeriodic(self) -> None:
-
+        #get controller inputs
         self.input = FlymerInputs(self.driveCtrlr, self.armCtrlr)
         self.leftStickVector = V2f(self.input.driveX, self.input.driveY).rotateDegrees(-self.gyro.getYaw())
+        self.turningAfterPID = self.input.turning
+
+        if self.input.turning == 0:
+            if self.input.dpadAngle != -1:
+                self.target = self.input.dpadAngle
+
+            self.turningAfterPID = self.anglePID.tick(self.target, self.gyro.getYaw(), self.time.dt)
+        else:
+            self.turningAfterPID = self.input.turning
+            self.target = self.gyro.getYaw()
+
+        if self.turningAfterPID > 1: self.turningAfterPID = 1
 
         speedControl = self.input.speedControl
 
-        if self.input.absoluteDriveToggle:
+        #absolute drive toggle button
+        if self.input.absToggle:
             self.absoluteDrive = not self.absoluteDrive
+
+        #speed controller bounds
         if speedControl > .8:
             speedControl = 1
+
+        #get wheel speeds
         if self.absoluteDrive:
-            self.driveSpeeds = mechController(self.leftStickVector.x * speedControl, self.leftStickVector.y * speedControl, self.input.turning * self.turningScalar)
+            self.driveSpeeds = mechController(self.leftStickVector.x * speedControl, self.leftStickVector.y * speedControl, self.turningAfterPID * self.turningScalar)
         else:
             self.driveSpeeds = mechController(self.input.driveX * speedControl, self.input.driveY * speedControl, self.input.turning * self.turningScalar)
 
-        if self.input.speedControl > .7:
-            self.input.speedControl = 1
-
+        #assign wheel speeds
         # self.driveSpeeds = drive.scaleSpeeds(self.driveSpeeds, 0.3)
         self.FLDrive.set(self.driveSpeeds[0])
         self.FRDrive.set(self.driveSpeeds[1])
         self.BLDrive.set(self.driveSpeeds[2])
         self.BRDrive.set(self.driveSpeeds[3])
 
+        #reset buttons
         if self.input.gyroReset:
             self.gyro.reset()
 
         if self.armCtrlr.getLeftBumperPressed():
+            self.retractBounded = False
             self.retractEncoder.setPosition(0)
+        else:
+            self.retractBounded = True
 
+
+        """----------arm scalars----------"""
+        # (arm down = power+)
         liftScalar = 0.5
+        liftSpeed = self.input.lift
 
-        if self.liftSideSwitch.get() and self.input.lift < 0:
-             liftScalar = 0.2
+        # (arm in/retract = power+)
+        retractScalar = 0.5
+        retractSpeed = self.input.retract
 
-        self.liftMotor.set(self.input.lift * liftScalar)
+        # (CW = power+)
+        turretScalar = 0.08
+        turretSpeed = self.input.turret
+
+        
+        """--arm setpoints--"""
+        if self.input.homeArm: self.armHoming = True 
+        elif self.input.coneHigh and self.liftUpperLimit: self.scoringHigh = True
+        elif self.input.coneMid and self.liftUpperLimit: self.scoringMid = True
+
+        if self.input.lift != 0 or self.input.retract != 0 or self.retractBounded: 
+            self.armHoming = False
+            self.scoringHigh = False
+            self.scoringMid = False
+
+        #home
+        if self.armHoming:   
+            liftSpeed = -1
+            retractError = -self.retractEncoder.getPosition()
+
+            retractSpeed = self.retractcontroller.tickErr(retractError, self.time.dt)
+            if abs(retractError) < 10 and self.liftUpperLimit: self.armHoming = False
+        else: self.armHoming = False
+
+        #score cone high
+        if self.scoringHigh:
+            liftError = 593 - self.liftEncoder.getPosition()
+            retractError = 0 #would be (target) - self.retractEncoder.getPosition()
+
+            liftSpeed = self.liftcontroller.tickErr(liftError, self.time.dt)
+            retractSpeed = self.retractcontroller.tickErr(retractError, self.time.dt)
+            if abs(liftError) < 50 and abs(retractError) < 10: self.scoringHigh = False
+        else: self.scoringHigh = False
+
+        #score cone middle
+        if self.scoringMid:
+            liftError = 0 #change to targets and stuff
+            retractError = 0
+
+            liftSpeed = self.liftcontroller.tickErr(liftError, self.time.dt)
+            retractSpeed = self.retractcontroller.tickErr(retractError, self.time.dt)
+
+
+        """motors and limits"""
+        #lift motor
+        if self.liftSideSwitch.get() and liftSpeed < 0: liftScalar = 0.2
 
         if self.liftUpperLimit.get():
             self.liftEncoder.setPosition(0)
-            if self.input.lift < 0:
-                self.liftMotor.set(0)
+            if liftSpeed < 0: 
+                liftSpeed = 0
 
-        if self.liftLowerLimit.get():
-            if self.input.lift > 0:
-                self.liftMotor.set(0)
+        if self.liftLowerLimit.get() and liftSpeed > 0: liftSpeed = 0
 
-        self.retractMotor.set(self.input.retract * 0.5)
-      
+        if liftSpeed > 1: liftSpeed = 1
+        self.liftMotor.set(liftSpeed * liftScalar)
+
+        #retract motor
+        if self.retractEncoder.getPosition() <= 0 and self.retractBounded:
+            retractSpeed = 0
+
+        if retractSpeed > 1: retractSpeed = 1
+        self.retractMotor.set(retractSpeed * retractScalar)
+
+        #turret motor
+        if self.turretCWLimit.get() and turretSpeed > 0: turretSpeed = 0
+        if self.turretCCWLimit.get() and turretSpeed < 0: turretSpeed = 0
+
+        if turretSpeed > 1: turretSpeed = 1
+        self.turretMotor.set(turretSpeed * turretScalar)
+
+        """---------pneumatics---------"""
+        if self.input.grabToggle: self.grabber.toggle()
+
+        if self.input.brakeToggle: self.brakes.toggle()
 
 
-        if self.armCtrlr.getYButtonPressed() and self.liftUpperLimit.get():
-            self.driveArmGoal(593, 0)
 
+    def getArmPower(self, liftError: float, retractError: float):
+        liftSpeed = self.liftcontroller.tickErr(liftError, self.time.dt)
+        retractSpeed = -self.retractcontroller.tickErr(retractError, self.time.dt)
+        return liftSpeed, retractSpeed
 
-        speed = self.input.turret * 0.08
-        if self.rightLimit.get():
-            if speed > 0:
-                speed = 0
-            
-        if self.leftLimit.get():
-              if speed < 0:
-                speed = 0
-
-        self.turretMotor.set(speed)
-
-
-
-        if self.input.grabToggle:
-            self.grabber.toggle()
-        if self.input.brakeToggle:
-            self.brakes.toggle()
-
-    def driveArmGoal(self, liftgoal:float, retractgoal:float) -> None:
-        retractspeed = -self.retractcontroller.tick(retractgoal, self.retractEncoder.getPosition(), self.time.dt)
+    def driveArmGoal(self, liftgoal: float, retractgoal: float) -> None:
+        retractspeed = - self.retractcontroller.tick(retractgoal, self.retractEncoder.getPosition(), self.time.dt)
         liftspeed = self.liftcontroller.tick(liftgoal, self.liftEncoder.getPosition(), self.time.dt)
         self.retractMotor.set(retractspeed)
         self.liftMotor.set(liftspeed)
-       
+
     def driveUnif(self, speed: float) -> None:
         self.FLDrive.set(speed)
         self.FRDrive.set(speed)
         self.BLDrive.set(speed)
         self.BRDrive.set(speed)
-        
-    def driveTurn(self, speed:float) -> None:
+
+    def driveTurn(self, speed: float) -> None:
         self.FLDrive.set(speed)
         self.FRDrive.set(-speed)
         self.BLDrive.set(speed)
         self.BRDrive.set(-speed)
 
-    def driveArmSpeed(self, retractspeed: float, liftspeed:float) -> None:
+    def driveArmSpeed(self, retractspeed: float, liftspeed: float) -> None:
         self.retractMotor.set(retractspeed)
         self.liftMotor.set(liftspeed)
 
     def autonomousInit(self) -> None:
-        self.retractcontroller = PIDController(0.1,0,0)
-        self.liftcontroller = PIDController(0.1,0,0)
+        self.retractcontroller = PIDController(0.1, 0, 0)
+        self.liftcontroller = PIDController(0.1, 0, 0)
         self.liftEncoder.setPosition(0)
         self.retractEncoder.setPosition(0)
         self.turretEncoder.setPosition(0)
@@ -258,35 +341,33 @@ class Flymer(wpilib.TimedRobot):
         self.selectedauto = self.chooser.getSelected()
         self.autospeed = .2
         self.balancespeed = .1
-        self.scoregoal = V2f(5,5)
-        self.defaultgoal = V2f(0,0)
+        self.scoregoal = V2f(5, 5)
+        self.defaultgoal = V2f(0, 0)
         stagelist = []
         scorelist = [autoStaging.approach, autoStaging.extend, autoStaging.score, autoStaging.retreat, autoStaging.turn]
-       
+
         if self.selectedauto == AUTO_BALANCE: #balance auto
             stagelist = scorelist + [autoStaging.balance]
         elif self.selectedauto == AUTO_EXIT_SCORE: #exit score auto
             stagelist = scorelist + [autoStaging.exit]
         elif self.selectedauto == AUTO_EXIT: #exit auto
             stagelist = [autoStaging.exit]
-        elif self.selectedauto == AUTO_NONE:#no auto :)
+        elif self.selectedauto == AUTO_NONE: #no auto :)
             pass
         else:
             pass
-        
+
         self.auto = autoStaging.Auto(stagelist, self.time.timeSinceInit)
 
     def autonomousPeriodic(self) -> None:
         self.auto.update(self)
-    
+
     def disabledPeriodic(self) -> None:
         self.driveUnif(0)
         self.liftMotor.set(0)
         self.retractMotor.set(0)
         self.turretMotor.set(0)
 
+
 if __name__ == "__main__":
     wpilib.run(Flymer)
-
-
-
