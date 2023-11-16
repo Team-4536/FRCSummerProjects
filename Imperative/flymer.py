@@ -41,7 +41,7 @@ class FlymerInputs():
         self.coneHigh = armCtrlr.getYButtonPressed()
         self.coneMid = armCtrlr.getXButtonPressed()
         self.homeArm = armCtrlr.getBButtonPressed()
-        self.calibrateRetract = armCtrlr.getLeftBumper()
+        self.calibrateRetract = not armCtrlr.getBackButton()
 
 
 AUTO_NONE = "none"
@@ -56,6 +56,10 @@ class Flymer(wpilib.TimedRobot):
 
         self.chooser.setDefaultOption(AUTO_NONE, AUTO_NONE)
         self.chooser.addOption(AUTO_BALANCE, AUTO_BALANCE)
+
+        self.retractcontroller = PIDController(0.1, 0, 0)
+        self.liftcontroller = PIDController(0.01, 0, 0)
+
         self.chooser.addOption(AUTO_EXIT, AUTO_EXIT)
         self.chooser.addOption(AUTO_EXIT_SCORE, AUTO_EXIT_SCORE)  # code code code
         wpilib.SmartDashboard.putData("autos", self.chooser)
@@ -163,6 +167,8 @@ class Flymer(wpilib.TimedRobot):
         self.retractBounded = True
         self.target = self.gyro.getYaw()
 
+        
+
     def teleopPeriodic(self) -> None:
         #get controller inputs
         self.input = FlymerInputs(self.driveCtrlr, self.armCtrlr)
@@ -192,7 +198,7 @@ class Flymer(wpilib.TimedRobot):
 
         #get wheel speeds
         if self.absoluteDrive:
-            self.driveSpeeds = mechController(self.leftStickVector.x * speedControl, self.leftStickVector.y * speedControl, self.turningAfterPID * self.turningScalar)
+            self.driveSpeeds = mechController(self.leftStickVector.x * speedControl, self.leftStickVector.y * speedControl, self.input.turning * self.turningScalar)
         else:
             self.driveSpeeds = mechController(self.input.driveX * speedControl, self.input.driveY * speedControl, self.input.turning * self.turningScalar)
 
@@ -207,7 +213,7 @@ class Flymer(wpilib.TimedRobot):
         if self.input.gyroReset:
             self.gyro.reset()
 
-        if self.armCtrlr.getLeftBumperPressed():
+        if self.armCtrlr.getLeftBumper():
             self.retractBounded = False
             self.retractEncoder.setPosition(0)
         else:
@@ -230,10 +236,10 @@ class Flymer(wpilib.TimedRobot):
         
         """--arm setpoints--"""
         if self.input.homeArm: self.armHoming = True 
-        elif self.input.coneHigh and self.liftUpperLimit: self.scoringHigh = True
-        elif self.input.coneMid and self.liftUpperLimit: self.scoringMid = True
+        elif self.input.coneHigh and self.liftUpperLimit.get(): self.scoringHigh = True
+        elif self.input.coneMid and self.liftUpperLimit.get(): self.scoringMid = True
 
-        if self.input.lift != 0 or self.input.retract != 0 or self.retractBounded: 
+        if self.input.lift != 0 or self.input.retract != 0 or self.retractBounded == False: 
             self.armHoming = False
             self.scoringHigh = False
             self.scoringMid = False
@@ -243,14 +249,17 @@ class Flymer(wpilib.TimedRobot):
             liftSpeed = -1
             retractError = -self.retractEncoder.getPosition()
 
-            retractSpeed = self.retractcontroller.tickErr(retractError, self.time.dt)
-            if abs(retractError) < 10 and self.liftUpperLimit: self.armHoming = False
-        else: self.armHoming = False
+            if  self.retractEncoder.getPosition() < 2500:
+                retractSpeed = -self.retractcontroller.tickErr(retractError, self.time.dt)
+            else: retractSpeed = 0
 
+            if abs(retractError) < 10 and self.liftUpperLimit.get(): self.armHoming = False
+        else: self.armHoming = False
+        """
         #score cone high
         if self.scoringHigh:
-            liftError = 593 - self.liftEncoder.getPosition()
-            retractError = 0 #would be (target) - self.retractEncoder.getPosition()
+            liftError = 592 - self.liftEncoder.getPosition()
+            retractError = 1505 - self.retractEncoder.getPosition()
 
             liftSpeed = self.liftcontroller.tickErr(liftError, self.time.dt)
             retractSpeed = self.retractcontroller.tickErr(retractError, self.time.dt)
@@ -263,8 +272,9 @@ class Flymer(wpilib.TimedRobot):
             retractError = 0
 
             liftSpeed = self.liftcontroller.tickErr(liftError, self.time.dt)
-            retractSpeed = self.retractcontroller.tickErr(retractError, self.time.dt)
-
+            #retractSpeed = self.retractcontroller.tickErr(retractError, self.time.dt)
+        else: self.scoringMid = False
+        """
 
         """motors and limits"""
         #lift motor
@@ -281,11 +291,16 @@ class Flymer(wpilib.TimedRobot):
         self.liftMotor.set(liftSpeed * liftScalar)
 
         #retract motor
-        if self.retractEncoder.getPosition() <= 0 and self.retractBounded:
+        if self.retractEncoder.getPosition() > 2500 and self.retractEncoder.getPosition() < 10000 and self.retractBounded and retractSpeed < 0:
+            retractSpeed = 0
+
+        if self.retractEncoder.getPosition() > 10000 and retractSpeed > 0 and self.retractBounded:
             retractSpeed = 0
 
         if retractSpeed > 1: retractSpeed = 1
         self.retractMotor.set(retractSpeed * retractScalar)
+
+        self.server.putUpdate("bounded", self.retractBounded)
 
         #turret motor
         if self.turretCWLimit.get() and turretSpeed > 0: turretSpeed = 0
