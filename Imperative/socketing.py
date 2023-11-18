@@ -37,6 +37,7 @@ class Server():
 
         self.telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
 
+        """
         self.servSock = socket.socket(socket.AddressFamily.AF_INET, socket.SOCK_STREAM)
         self.servSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if(not isReal): self.servSock.bind(("localhost", 7000))
@@ -53,12 +54,14 @@ class Server():
         self.tracked: dict[str, int|float|str|bool] = { }
         self.events: list[str] = [ ]
         self.recvBuf: bytes = b""
+        """
 
         Server.inst = self
 
 
     def update(self, curTime: float):
 
+        """
         self.events.clear()
 
         if self.cliSock == None:
@@ -133,6 +136,8 @@ class Server():
                     else:
                         print("[SOCKETS] something has gone terribly wrong")
                         assert(False)
+        """
+        pass
 
 
 
@@ -145,11 +150,17 @@ class Server():
 
         self.telemTable.putValue(name, value)
 
+        """
         self.sendMsgMap.update({ name : self.encodeMessage(MessageKind.UPDATE, name, value) })
+        """
 
     def putEvent(self, name: str):
+        """
         self.sendEventList.append(self.encodeMessage(MessageKind.EVENT, name, int(0)))
+        """
+        pass
 
+    """
     def encodeMessage(self, kind: MessageKind, name: str, value: float|int|str|bool) -> bytes:
 
         content = b""
@@ -243,12 +254,15 @@ class Server():
 
         m = Message(MessageKind(header[0]), name, data)
         return m, 4 + nameLen + dataSize
+    """
 
 
     def close(self):
+        """
         if self.cliSock != None:
             self.cliSock.close()
 
         self.servSock.close()
-
+        """
+        pass
 

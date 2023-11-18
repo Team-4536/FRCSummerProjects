@@ -52,18 +52,18 @@ AUTO_EXIT = "exit"
 class Flymer(wpilib.TimedRobot):
 
     def robotInit(self) -> None:
-        self.chooser = wpilib.SendableChooser()
 
+        self.chooser = wpilib.SendableChooser()
         self.chooser.setDefaultOption(AUTO_NONE, AUTO_NONE)
-        self.chooser.addOption(AUTO_BALANCE, AUTO_BALANCE)
+        # self.chooser.addOption(AUTO_BALANCE, AUTO_BALANCE)
+        self.chooser.addOption(AUTO_EXIT, AUTO_EXIT)
+        # self.chooser.addOption(AUTO_EXIT_SCORE, AUTO_EXIT_SCORE)  # code code code
+
+        wpilib.SmartDashboard.putData("autos", self.chooser)
+        self.server = socketing.Server(self.isReal())
 
         self.retractcontroller = PIDController(0.1, 0, 0)
         self.liftcontroller = PIDController(0.01, 0, 0)
-
-        self.chooser.addOption(AUTO_EXIT, AUTO_EXIT)
-        self.chooser.addOption(AUTO_EXIT_SCORE, AUTO_EXIT_SCORE)  # code code code
-        wpilib.SmartDashboard.putData("autos", self.chooser)
-        self.server = socketing.Server(self.isReal())
 
         # DRIVE MOTORS ==================================================
 
