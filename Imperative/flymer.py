@@ -77,8 +77,7 @@ class Flymer(wpilib.TimedRobot):
 
         self.absoluteDrive = True  # default is off, hit X to toggle
 
-        self.turningScalar = .2  # change for comp to about .3
-        self.anglePID = PIDController(0.1, 0, 0)
+        self.turningScalar = .3  # change for comp to about .3
 
         self.liftMotor = rev.CANSparkMax(7, brushedMotor)
         self.retractMotor = rev.CANSparkMax(6, brushedMotor)
@@ -185,7 +184,7 @@ class Flymer(wpilib.TimedRobot):
             self.absoluteDrive = not self.absoluteDrive
 
         #speed controller bounds
-        if speedControl > .8:
+        if speedControl > 1:
             speedControl = 1
 
         #get wheel speeds
@@ -222,7 +221,7 @@ class Flymer(wpilib.TimedRobot):
         retractSpeed = self.input.retract
 
         # (CW = power+, encoder+)
-        turretScalar = 0.08
+        turretScalar = 0.1
         turretSpeed = self.input.turret
 
         
