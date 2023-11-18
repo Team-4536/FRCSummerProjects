@@ -31,6 +31,7 @@ def extend(r: flymer.Flymer) -> bool: #EXTENDING--------------------------------
     return False
 
 def score(r: flymer.Flymer) -> bool: #SCORING-----------------------------------
+    
     r.driveArmGoal(r.scoregoal.y, r.scoregoal.x)
     r.grabber.set(wpilib.DoubleSolenoid.Value.kReverse)
     return True

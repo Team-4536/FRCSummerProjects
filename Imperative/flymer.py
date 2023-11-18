@@ -57,7 +57,7 @@ class Flymer(wpilib.TimedRobot):
         self.chooser.setDefaultOption(AUTO_NONE, AUTO_NONE)
         # self.chooser.addOption(AUTO_BALANCE, AUTO_BALANCE)
         self.chooser.addOption(AUTO_EXIT, AUTO_EXIT)
-        # self.chooser.addOption(AUTO_EXIT_SCORE, AUTO_EXIT_SCORE)  # code code code
+        self.chooser.addOption(AUTO_EXIT_SCORE, AUTO_EXIT_SCORE)  # code code code
 
         wpilib.SmartDashboard.putData("autos", self.chooser)
         self.server = socketing.Server(self.isReal())
@@ -318,7 +318,10 @@ class Flymer(wpilib.TimedRobot):
         return liftSpeed, retractSpeed
 
     def driveArmGoal(self, liftgoal: float, retractgoal: float) -> None:
-        retractspeed = - self.retractcontroller.tick(retractgoal, self.retractEncoder.getPosition(), self.time.dt)
+        if self.retractEncoder.getPosition() > 40000:
+            retractspeed = -0.5
+        else:
+            retractspeed = - self.retractcontroller.tick(retractgoal, self.retractEncoder.getPosition(), self.time.dt)
         liftspeed = self.liftcontroller.tick(liftgoal, self.liftEncoder.getPosition(), self.time.dt)
         self.retractMotor.set(retractspeed)
         self.liftMotor.set(liftspeed)
@@ -340,8 +343,8 @@ class Flymer(wpilib.TimedRobot):
         self.liftMotor.set(liftspeed)
 
     def autonomousInit(self) -> None:
-        self.retractcontroller = PIDController(0.1, 0, 0)
-        self.liftcontroller = PIDController(0.1, 0, 0)
+        self.retractcontroller = PIDController(0.001, 0, 0)
+        self.liftcontroller = PIDController(0.0002, 0, 0)
         self.liftEncoder.setPosition(0)
         self.retractEncoder.setPosition(0)
         self.turretEncoder.setPosition(0)
@@ -352,8 +355,9 @@ class Flymer(wpilib.TimedRobot):
         self.selectedauto = self.chooser.getSelected()
         self.autospeed = .2
         self.balancespeed = .1
-        self.scoregoal = V2f(5, 5)
+        self.scoregoal = V2f(1550, 600)
         self.defaultgoal = V2f(0, 0)
+
         stagelist = []
         scorelist = [autoStaging.approach, autoStaging.extend, autoStaging.score, autoStaging.retreat, autoStaging.turn]
 
