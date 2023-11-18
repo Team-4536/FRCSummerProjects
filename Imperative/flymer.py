@@ -55,15 +55,15 @@ class Flymer(wpilib.TimedRobot):
 
         self.chooser = wpilib.SendableChooser()
         self.chooser.setDefaultOption(AUTO_NONE, AUTO_NONE)
-        # self.chooser.addOption(AUTO_BALANCE, AUTO_BALANCE)
+        self.chooser.addOption(AUTO_BALANCE, AUTO_BALANCE)
         self.chooser.addOption(AUTO_EXIT, AUTO_EXIT)
         self.chooser.addOption(AUTO_EXIT_SCORE, AUTO_EXIT_SCORE)  # code code code
 
         wpilib.SmartDashboard.putData("autos", self.chooser)
         self.server = socketing.Server(self.isReal())
 
-        self.retractcontroller = PIDController(0.1, 0, 0)
-        self.liftcontroller = PIDController(0.01, 0, 0)
+        self.retractcontroller = PIDController(0.006, 0, 0)
+        self.liftcontroller = PIDController(0.004, 0, 0)
 
         # DRIVE MOTORS ==================================================
 
@@ -249,8 +249,8 @@ class Flymer(wpilib.TimedRobot):
         
         #score cone high
         if self.scoringHigh:
-            liftError = 592 - self.liftEncoder.getPosition()
-            retractError = 1505 - self.retractEncoder.getPosition()
+            liftError = 3.407 - self.liftEncoder.getPosition()
+            retractError = 2126 - self.retractEncoder.getPosition()
 
             liftSpeed = self.liftcontroller.tickErr(liftError, self.time.dt)
             retractSpeed = -self.retractcontroller.tickErr(retractError, self.time.dt)
@@ -342,8 +342,6 @@ class Flymer(wpilib.TimedRobot):
         self.liftMotor.set(liftspeed)
 
     def autonomousInit(self) -> None:
-        self.retractcontroller = PIDController(0.001, 0, 0)
-        self.liftcontroller = PIDController(0.0002, 0, 0)
         self.liftEncoder.setPosition(0)
         self.retractEncoder.setPosition(0)
         self.turretEncoder.setPosition(0)
@@ -354,11 +352,11 @@ class Flymer(wpilib.TimedRobot):
         self.selectedauto = self.chooser.getSelected()
         self.autospeed = .2
         self.balancespeed = .1
-        self.scoregoal = V2f(1550, 600)
+        self.scoregoal = V2f(1893, 700)
         self.defaultgoal = V2f(0, 0)
 
         stagelist = []
-        scorelist = [autoStaging.approach, autoStaging.extend, autoStaging.score, autoStaging.retreat, autoStaging.turn]
+        scorelist = [autoStaging.extend, autoStaging.score, autoStaging.retreat, autoStaging.turn] 
 
         if self.selectedauto == AUTO_BALANCE: #balance auto
             stagelist = scorelist + [autoStaging.balance]
