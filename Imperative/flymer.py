@@ -34,9 +34,9 @@ class FlymerInputs():
         self.absToggle = driveCtrlr.getXButtonPressed()
 
         #arm controller
-        self.lift = deadZone(armCtrlr.getLeftY())
-        self.turret = deadZone(armCtrlr.getLeftX())
-        self.retract = deadZone(armCtrlr.getRightY())
+        self.lift = deadZone(armCtrlr.getRightY())
+        self.turret = deadZone(armCtrlr.getRightX())
+        self.retract = deadZone(armCtrlr.getLeftY())
         self.grabToggle = armCtrlr.getAButtonPressed()
         self.coneHigh = armCtrlr.getYButtonPressed()
         self.coneMid = armCtrlr.getXButtonPressed()
