@@ -149,6 +149,15 @@ class FlymerHal():
         buf.gyroPitch = self.gyro.getPitch()
         buf.gyroRoll = self.gyro.getRoll()
 
+        """
+        used to be in driveArmGoal overriding retr speed
+        why
+        """
+        if self.retractEncoder.getPosition() > 40000:
+            retractspeed = -0.5
+        else:
+            # tick with PID
+            pass
 
 
 
@@ -235,131 +244,121 @@ class Flymer(wpilib.TimedRobot):
     def teleopPeriodic(self) -> None:
         self.input = FlymerInputs(self.driveCtrlr, self.armCtrlr)
 
-        self.leftStickVector = V2f(self.input.driveX, self.input.driveY).rotateDegrees(-self.hal.gyroYaw)
-        speedControl = self.input.speedControl
 
+        """ ===== DRIVE CONTROLS ==== """
         #absolute drive toggle button
         if self.input.absToggle:
             self.absoluteDrive = not self.absoluteDrive
 
         #speed controller bounds
+        speedControl = self.input.speedControl
         if speedControl > 1:
             speedControl = 1
-
         driveVec = V2f(self.input.driveX, self.input.driveY) * speedControl
         if self.absoluteDrive: driveVec = driveVec.rotateDegrees(self.hal.gyroYaw)
         self.hal.driveSpeeds = mechController(driveVec.x, driveVec.y, self.input.turning * self.turningScalar)
+
+
 
         if self.input.gyroReset: self.hal.gyroYaw = 0
 
         if self.input.leftBumper:
             self.retractBounded = False
-            self.retractEncoder.setPosition(0)
+            self.hal.retractPos = 0
         else:
             self.retractBounded = True
+        self.server.putUpdate("bounded", self.retractBounded)
 
 
-        """--arm scalars--"""
-        # (arm down = power+, encoder+)
-        liftScalar = 0.5
-        liftSpeed = self.input.lift
 
-        if self.hal.liftTopSidePressed and self.input.lift < 0:
-             liftScalar = 0.2
-        self.hal.liftSpeed = self.input.lift * liftScalar
 
-        # (arm in/retract = power+, encoder-)
-        retractScalar = 0.5
-        retractSpeed = self.input.retract
 
-        # (CW = power+, encoder+)
-        turretScalar = 0.1
-        turretSpeed = self.input.turret
-
-        
-        """----------arm setpoints----------"""
-        if self.input.homeArm: self.armHoming = True 
-        elif self.input.coneHigh and self.liftUpperLimit.get(): self.scoringHigh = True
+        if self.input.homeArm: self.armHoming = True
+        elif self.input.coneHigh and self.hal.liftTopPressed: self.scoringHigh = True
         #elif self.input.coneMid and self.liftUpperLimit.get(): self.scoringMid = True
 
-        if self.input.lift != 0 or self.input.retract != 0 or self.retractBounded == False: 
+        if self.input.lift != 0 or self.input.retract != 0 or self.retractBounded == False:
             self.armHoming = False
             self.scoringHigh = False
             self.scoringMid = False
 
-        #home
-        if self.armHoming:   
-            liftSpeed = -1
-            retractError = -self.retractEncoder.getPosition()
 
-            if  self.retractEncoder.getPosition() < 2500:
+        """----------arm setpoints----------"""
+        if self.armHoming or self.scoringHigh or self.scoringMid:
+            # SETPOINT CONTROLS
+            #home
+            if self.armHoming:
+                retractError = -self.hal.retractPos
+
+                if self.hal.retractPos < 2500:
+                    self.hal.retractSpeed = -self.retractcontroller.tickErr(retractError, self.time.dt)
+                else: self.hal.retractSpeed = 0
+                self.hal.liftSpeed = -1
+
+                if abs(retractError) < 10 and self.hal.liftTopPressed: self.armHoming = False
+
+            #score cone high
+            if self.scoringHigh:
+                liftError = 3.407 - self.hal.liftPos
+                retractError = 2126 - self.hal.retractPos
+
+                self.hal.liftSpeed = self.liftcontroller.tickErr(liftError, self.time.dt)
+                self.hal.retractSpeed = -self.retractcontroller.tickErr(retractError, self.time.dt)
+                if abs(liftError) < 50 and abs(retractError) < 10: self.scoringHigh = False
+
+            """
+            #score cone middle (DOES NOT WORK - DO NOT USE)
+            if self.scoringMid:
+                liftError = 0 #change to targets and stuff
+                retractError = 0
+
+                liftSpeed = self.liftcontroller.tickErr(liftError, self.time.dt)
                 retractSpeed = -self.retractcontroller.tickErr(retractError, self.time.dt)
-            else: retractSpeed = 0
+            else: self.scoringMid = False
+            """
 
-            if abs(retractError) < 10 and self.liftUpperLimit.get(): self.armHoming = False
-        else: self.armHoming = False
-        
-        #score cone high
-        if self.scoringHigh:
-            liftError = 3.407 - self.liftEncoder.getPosition()
-            retractError = 2126 - self.retractEncoder.getPosition()
+        ## REGULAR ARM CONTROLS
+        else:
+            # (arm down = power+, encoder+)
+            self.hal.liftSpeed = self.input.lift * 0.5
 
-            liftSpeed = self.liftcontroller.tickErr(liftError, self.time.dt)
-            retractSpeed = -self.retractcontroller.tickErr(retractError, self.time.dt)
-            if abs(liftError) < 50 and abs(retractError) < 10: self.scoringHigh = False
-        else: self.scoringHigh = False
+            if self.hal.liftTopPressed:
+                self.hal.liftPos = 0
 
-        """
-        #score cone middle (DOES NOT WORK - DO NOT USE)
-        if self.scoringMid:
-            liftError = 0 #change to targets and stuff
-            retractError = 0
+            # (arm in/retract = power+, encoder-)
+            self.hal.retractSpeed = self.input.retract * 0.5
 
-            liftSpeed = self.liftcontroller.tickErr(liftError, self.time.dt)
-            retractSpeed = -self.retractcontroller.tickErr(retractError, self.time.dt)
-        else: self.scoringMid = False
-        """
+            # (CW = power+, encoder+)
+            self.hal.turretSpeed = self.input.turret * 0.1
 
-        """--------motors and limits--------"""
-        #lift motor
-        if self.liftSideSwitch.get() and liftSpeed < 0: liftScalar = 0.2
 
-        if self.hal.liftTopPressed:
-            self.hal.liftPos = 0
-            if self.input.lift < 0:
-                self.hal.liftSpeed = 0
-
-        if self.liftLowerLimit.get() and liftSpeed > 0: liftSpeed = 0
-
-        if liftSpeed > 1: liftSpeed = 1
-        self.liftMotor.set(liftSpeed * liftScalar)
-
-        #retract motor
-        if self.retractEncoder.getPosition() > 2500 and self.retractEncoder.getPosition() < 10000 and self.retractBounded and retractSpeed < 0:
-            retractSpeed = 0
-
-        if self.retractEncoder.getPosition() > 10000 and retractSpeed > 0 and self.retractBounded:
-            retractSpeed = 0
-
-        if retractSpeed > 1: retractSpeed = 1
-        self.retractMotor.set(retractSpeed * retractScalar)
-
-        self.server.putUpdate("bounded", self.retractBounded)
-
-        #turret motor
-        if self.turretCWLimit.get() and turretSpeed > 0: turretSpeed = 0
-        if self.turretCCWLimit.get() and turretSpeed < 0: turretSpeed = 0
-
-        if turretSpeed > 1: turretSpeed = 1
-        self.turretMotor.set(turretSpeed * turretScalar)
 
         """---------pneumatics---------"""
-        #grabber
-        if self.input.grabToggle: self.grabber.toggle()
+        if self.input.grabToggle: self.hal.grabberOpen = not self.hal.grabberOpen
+        if self.input.brakeToggle: self.hal.brakesExtended = not self.hal.brakesExtended
 
-        #brakes
-        if self.input.brakeToggle: self.brakes.toggle()
+        self.sanitizeHal()
 
+    def sanitizeHal(self) -> None:
+        # (arm down = power+, encoder+)
+        if self.hal.liftTopSidePressed and self.hal.liftSpeed < 0: # clamp speed if in upper danger zone
+            self.hal.liftSpeed = 0.1
+        if self.hal.liftTopPressed: # clamp speed to be positive (down) in on top switch
+            self.hal.liftSpeed = max(self.hal.liftSpeed, 0)
+        if self.hal.liftBottomPressed: # clamp speed to be negative (up) if hitting bottom
+            self.hal.liftSpeed = min(self.hal.liftSpeed, 0)
+
+        # (arm in/retract = power+, encoder-)
+        if self.hal.retractPos > 2500 and self.hal.retractPos < 10000 and self.retractBounded and self.hal.retractSpeed < 0:
+            self.hal.retractSpeed = 0
+        if self.hal.retractPos > 10000 and self.hal.retractSpeed > 0 and self.retractBounded:
+            self.hal.retractSpeed = 0
+
+        # (CW = power+, encoder+)
+        if self.hal.rightLimitPressed and self.hal.turretSpeed > 0:
+            self.hal.turretSpeed = 0
+        if self.hal.leftLimitPressed and self.hal.turretSpeed < 0:
+            self.hal.turretSpeed = 0
 
 
 
@@ -369,16 +368,11 @@ class Flymer(wpilib.TimedRobot):
         return liftSpeed, retractSpeed
 
     def driveArmGoal(self, liftgoal: float, retractgoal: float) -> None:
-        if self.retractEncoder.getPosition() > 40000:
-            retractspeed = -0.5
-        else:
-            retractspeed = - self.retractcontroller.tick(retractgoal, self.retractEncoder.getPosition(), self.time.dt)
-        liftspeed = self.liftcontroller.tick(liftgoal, self.liftEncoder.getPosition(), self.time.dt)
-        self.retractMotor.set(retractspeed)
-        self.liftMotor.set(liftspeed)
+        retractspeed = -self.retractcontroller.tick(retractgoal, self.hal.retractPos, self.time.dt)
+        liftspeed = self.liftcontroller.tick(liftgoal, self.hal.liftPos, self.time.dt)
 
-        self.hal.retractSpeed = -self.retractcontroller.tick(retractgoal, self.hal.retractPos, self.time.dt)
-        self.hal.liftSpeed = self.liftcontroller.tick(liftgoal, self.hal.liftPos, self.time.dt)
+        self.hal.retractSpeed = retractspeed
+        self.hal.liftSpeed = liftspeed
 
     def driveUnif(self, speed: float) -> None:
         for i in range(4): self.hal.driveSpeeds[i] = speed
