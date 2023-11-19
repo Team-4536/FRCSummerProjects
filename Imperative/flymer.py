@@ -18,6 +18,8 @@ from typing_extensions import Self
 
 import copy
 
+
+
 class FlymerHalBuffer():
     def __init__(self) -> None:
         self.driveSpeeds: list[float] = [0, 0, 0, 0] # -1 to 1
@@ -52,7 +54,6 @@ class FlymerHalBuffer():
         self.retractPos = 0
         self.turretPos = 0
 
-
     def publish(self, server: socketing.Server, prefix: str):
         for k in self.__dict__:
             prop = self.__getattribute__(k)
@@ -79,6 +80,8 @@ class FlymerHal():
             rev.CANSparkMax(2, BRUSHLESS)
         ]
         self.driveEncoders = [x.getEncoder() for x in self.driveMotors]
+        self.driveMotors[1].setInverted(True)
+        self.driveMotors[3].setInverted(True)
 
         self.liftMotor = rev.CANSparkMax(7, BRUSHED)
         self.retractMotor = rev.CANSparkMax(6, BRUSHED)
@@ -98,12 +101,6 @@ class FlymerHal():
         self.brakes = self.pcm.makeDoubleSolenoid(4, 6)
 
         self.gyro = navx.AHRS(wpilib.SPI.Port.kMXP)
-
-
-
-        self.driveMotors[1].setInverted(True)
-        self.driveMotors[3].setInverted(True)
-
 
 
     def update(self, buf: FlymerHalBuffer) -> None:
@@ -162,9 +159,6 @@ class FlymerHal():
 
 
 
-
-
-
 class FlymerInputs():
     # TODO: switch keyboard/controller modes from sundial
     def __init__(self, driveCtrlr: wpilib.XboxController, armCtrlr: wpilib.XboxController) -> None:
@@ -191,6 +185,8 @@ class FlymerInputs():
         self.leftBumper = armCtrlr.getLeftBumper()
 
 
+
+
 AUTO_NONE = "none"
 AUTO_BALANCE = "balance"
 AUTO_EXIT_SCORE = "exit+score"
@@ -205,7 +201,6 @@ class Flymer(wpilib.TimedRobot):
         self.chooser.addOption(AUTO_BALANCE, AUTO_BALANCE)
         self.chooser.addOption(AUTO_EXIT, AUTO_EXIT)
         self.chooser.addOption(AUTO_EXIT_SCORE, AUTO_EXIT_SCORE)  # code code code
-
         wpilib.SmartDashboard.putData("autos", self.chooser)
 
         self.server = socketing.Server(self.isReal())
@@ -400,7 +395,7 @@ class Flymer(wpilib.TimedRobot):
         self.defaultgoal = V2f(0, 0)
 
         stagelist = []
-        scorelist = [autoStaging.extend, autoStaging.score, autoStaging.retreat, autoStaging.turn] 
+        scorelist = [autoStaging.extend, autoStaging.score, autoStaging.retreat, autoStaging.turn]
 
         if self.selectedauto == AUTO_BALANCE: #balance auto
             stagelist = scorelist + [autoStaging.balance]
