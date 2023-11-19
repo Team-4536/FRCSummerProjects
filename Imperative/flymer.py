@@ -337,7 +337,8 @@ class Flymer(wpilib.TimedRobot):
         if self.input.grabToggle: self.hal.grabberOpen = not self.hal.grabberOpen
         if self.input.brakeToggle: self.hal.brakesExtended = not self.hal.brakesExtended
 
-        self.sanitizeHal()
+        self.sanitizeHal() # ensure nothing on the robot is going to destoy itself
+        self.hardware.update(self.hal) # push speed values out to motors
 
     def sanitizeHal(self) -> None:
         # (arm down = power+, encoder+)
