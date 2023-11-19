@@ -54,6 +54,12 @@ class FlymerHalBuffer():
         self.retractPos = 0
         self.turretPos = 0
 
+    def stopMotors(self) -> None:
+        self.driveSpeeds = [ 0, 0, 0, 0 ]
+        self.liftSpeed = 0
+        self.retractSpeed = 0
+        self.turretSpeed = 0
+
     def publish(self, server: socketing.Server, prefix: str):
         for k in self.__dict__:
             prop = self.__getattribute__(k)
@@ -411,13 +417,13 @@ class Flymer(wpilib.TimedRobot):
         self.auto = autoStaging.Auto(stagelist, self.time.timeSinceInit)
 
     def autonomousPeriodic(self) -> None:
+        self.hal.stopMotors()
         self.auto.update(self)
+        self.hardware.update(self.hal)
 
     def disabledPeriodic(self) -> None:
-        self.driveUnif(0)
-        self.hal.liftSpeed = 0
-        self.hal.retractSpeed = 0
-        self.hal.turretSpeed = 0
+        self.hal.stopMotors()
+        self.hardware.update(self.hal)
 
 
 if __name__ == "__main__":
