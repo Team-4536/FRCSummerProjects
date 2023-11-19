@@ -138,7 +138,7 @@ class swerveTest(wpilib.TimedRobot):
 
 
         #make swerve move
-        self.swerveController.tick(driveStick.x, driveStick.y, turnSpeed, self.time.dt, brakes, brakeDefault, gyroReset, self.swerve, self.gyro)
+        self.swerveController.tick(driveStick.x, driveStick.y, turnSpeed, self.time.dt, brakes, brakeDefault, gyroReset, self.swerve, self.gyro, self.server)
 
     
     """--------------------------------------------------------------------------------"""
