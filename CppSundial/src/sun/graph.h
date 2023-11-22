@@ -119,17 +119,18 @@ void sun_graph2dBuild(sun_Graph2dInfo* info, gfx_Framebuffer* target) {
                 float timeOffset = fmodf(globs.curTime, 1);
 
                 for(int i = 0; i < 10; i++) {
-                    a = blu_areaMake(str_format(globs.scratch, STR("time label %i"), i),
-                        blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
+                    a = blu_areaMakeF(blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT,
+                        "time label %i", i);
                     a->offset =  { (1-((i+timeOffset) / GRAPH2D_SAMPLE_WINDOW)) * width - a->calculatedSizes[blu_axis_X] / 2, height - BLU_FONT_SIZE };
                     a->textScale = 0.7f;
-                    blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%i"), (int)(globs.curTime-i)));
+                    blu_areaAddDisplayStrF(a, "%i", (int)(globs.curTime-i));
                 }
                 if(inter.hovered) {
                     a = blu_areaMake("hoverLabel", blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
                     a->offset =  { inter.mousePos.x - a->calculatedSizes[blu_axis_X] / 2, height - BLU_FONT_SIZE };
                     a->textScale = 0.75f;
-                    blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%f"), globs.curTime - GRAPH2D_SAMPLE_WINDOW * (1-(inter.mousePos.x / width))));
+                    float val = globs.curTime - GRAPH2D_SAMPLE_WINDOW * (1-(inter.mousePos.x / width));
+                    blu_areaAddDisplayStrF(a, "%f", val);
                 }
             }
 
@@ -188,11 +189,12 @@ void sun_graph2dBuild(sun_Graph2dInfo* info, gfx_Framebuffer* target) {
                 {
                     for(int i = 0; i < lineCount; i++) {
                         int k = i - lineCount/2;
-                        a = blu_areaMake(str_format(globs.scratch, STR("value label %i"), i),
-                            blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
+                        a = blu_areaMakeF(blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT,
+                            "value label %i", i);
                         a->textScale = 0.7f;
                         float label = (k + centerIdx) * lineSpacing;
-                        blu_areaAddDisplayStrF(a, "%f", label);
+                        // blu_areaAddDisplayStrF(a, "Hi", label);
+                        blu_areaAddDisplayStrF(a, "%G", (double)label);
 
                         a->offset.x = width - a->calculatedSizes[blu_axis_X];
                         a->offset.y = height / 2 + (-k*lineSpacing + lineOffset) * spaceToPx;
@@ -252,8 +254,8 @@ void sun_graph2dBuild(sun_Graph2dInfo* info, gfx_Framebuffer* target) {
                 for(int i = 0; i < GRAPH2D_LINECOUNT; i++) {
                     if(!info->keys[i].chars) { continue; }
 
-                    a = blu_areaMake(str_format(globs.scratch, STR("thing %i"), i),
-                        blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DROP_EVENTS | blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM);
+                    a = blu_areaMakeF(blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_DROP_EVENTS | blu_areaFlags_CLICKABLE | blu_areaFlags_HOVER_ANIM,
+                        "thing %i", i);
                     inter = blu_interactionFromWidget(a);
 
                     bool fadeChildren = false;

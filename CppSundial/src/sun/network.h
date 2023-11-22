@@ -29,7 +29,7 @@ void sun_networkBuild(sun_NetInfo* info) {
 
                 str quotedName = str_format(globs.scratch, STR("\"%s\""), prop->name);
 
-                blu_Area* parent = blu_areaMake(str_format(globs.scratch, STR("%i"), i), blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE);
+                blu_Area* parent = blu_areaMakeF(blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE, "%i", i);
                 blu_style_style(&globs.borderStyle, &parent->style);
                 F32 t = parent->target_hoverAnim;
                 parent->dropType = dropMasks_NT_PROP;
@@ -71,13 +71,13 @@ void sun_networkBuild(sun_NetInfo* info) {
 
                         BumpAlloc* scratch = globs.scratch;
                         if(prop->type == net_propType_S32) {
-                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%i"), (prop->firstPt->s32))); }
+                            blu_areaAddDisplayStrF(a, "%i", prop->firstPt->s32); }
                         else if(prop->type == net_propType_F64) {
-                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%f"), (prop->firstPt->f64))); }
+                            blu_areaAddDisplayStrF(a, "%G", prop->firstPt->f64); }
                         else if(prop->type == net_propType_STR) {
-                            blu_areaAddDisplayStr(a, str_format(scratch, STR("\"%s\""), (prop->firstPt->str))); }
+                            blu_areaAddDisplayStrF(a, "\"%s\"", prop->firstPt->str); }
                         else if(prop->type == net_propType_BOOL) {
-                            blu_areaAddDisplayStr(a, str_format(scratch, STR("%b"), (prop->firstPt->boo)));
+                            blu_areaAddDisplayStrF(a, "%s", prop->firstPt->boo? "true" : "false");
                             a->style.backgroundColor = prop->firstPt->boo? col_green : col_red;
                             a->style.cornerRadius = 2;
                             a->style.textColor = col_darkBlue;

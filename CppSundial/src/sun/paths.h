@@ -155,11 +155,11 @@ void sun_pathsBuild(sun_PathInfo* info, gfx_Framebuffer* fb) {
     // PT RENDER AND DRAGGING AND REMOVAL =========================================================================
     for(int i = 0; i < info->pathPtCount; i++) {
         bool isControl = (i%4 == 1) || (i%4 == 2);
-        a = blu_areaMake(str_format(globs.scratch, STR("%i"), i),
-            blu_areaFlags_DRAW_BACKGROUND |
-            blu_areaFlags_FLOATING |
-            blu_areaFlags_CLICKABLE |
-            blu_areaFlags_HOVER_ANIM);
+        a = blu_areaMakeF(blu_areaFlags_DRAW_BACKGROUND |
+                          blu_areaFlags_FLOATING |
+                          blu_areaFlags_CLICKABLE |
+                          blu_areaFlags_HOVER_ANIM,
+                          "%i", i);
         inter = blu_interactionFromWidget(a);
         float size = lerp(10, 14, a->target_hoverAnim);
         a->style.sizes[blu_axis_X] = { blu_sizeKind_PX, size };
@@ -201,8 +201,7 @@ void sun_pathsBuild(sun_PathInfo* info, gfx_Framebuffer* fb) {
         blu_style_style(&globs.textSizeStyle, &a->style);
         a->textScale = 0.75;
         a->offset = mousePos + V2f { 15, 0 };
-        str s = str_format(globs.scratch, STR("%f, %f"), mp.x, mp.y);
-        blu_areaAddDisplayStr(a, s);
+        blu_areaAddDisplayStrF(a, "%f", "%f", mp.x, mp.y);
     }
 
     {

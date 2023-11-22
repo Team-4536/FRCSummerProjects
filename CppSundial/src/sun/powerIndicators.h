@@ -24,8 +24,9 @@ void sun_powerIndicatorsBuild(sun_PowerIndicatorInfo* info) {
                 }
                 bool fadeText = (!s || !net_getConnected(&globs.table));
 
-                str indexStr = str_format(globs.scratch, STR("%i"), i);
-                a = blu_areaMake(indexStr, blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE | blu_areaFlags_DROP_EVENTS);
+                a = blu_areaMakeF(blu_areaFlags_DRAW_BACKGROUND | blu_areaFlags_HOVER_ANIM | blu_areaFlags_CLICKABLE | blu_areaFlags_DROP_EVENTS,
+                    "%d", i
+                );
                 blu_style_style(&globs.borderStyle, &a->style);
                 blu_style_childLayoutAxis(blu_axis_X, &a->style);
                 blu_style_backgroundColor(col_darkBlue, &a->style);
@@ -93,7 +94,7 @@ void sun_powerIndicatorsBuild(sun_PowerIndicatorInfo* info) {
                     if(s) {
                         int val = (int)(s->f64 * 100);
                         a = blu_areaMake("value", blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT | blu_areaFlags_FLOATING);
-                        blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%i%%"), val));
+                        blu_areaAddDisplayStrF(a, "%i%%", val);
                         if(fadeText) { a->style.textColor *= col_disconnect; }
                     }
 

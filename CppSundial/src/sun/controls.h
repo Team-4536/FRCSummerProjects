@@ -190,7 +190,7 @@ void sun_controlsBuild(sun_ControlsInfo* info) {
                             globs.curTime += i.dragDelta.x * 0.01f;
                             globs.ctrlInfo.refreshTableFlag = true;
                         }
-                        blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%f"), globs.curTime));
+                        blu_areaAddDisplayStrF(a, "%G", globs.curTime);
                     }
                 }
             } // end right side

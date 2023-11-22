@@ -475,12 +475,12 @@ void _blu_hashRemove(U64 key) {
 
 
 str _blu_formatString(const char* fmt, va_list args, BumpAlloc* arena) {
-    int l = snprintf(nullptr, 0, fmt, args);
-    U8* chars = BUMP_PUSH_ARR(arena, l, U8);
+    int l = vsnprintf(nullptr, 0, fmt, args);
+    U8* chars = BUMP_PUSH_ARR(arena, l+1, U8);
     str s;
     s.chars = chars;
     s.length = l;
-    vsnprintf((char*)chars, l, fmt, args);
+    vsnprintf((char*)chars, l+1, fmt, args);
     return s;
 }
 
