@@ -32,13 +32,15 @@ def extend(r: flymer.Flymer) -> bool: #EXTENDING--------------------------------
 
 def score(r: flymer.Flymer) -> bool: #SCORING-----------------------------------
     r.driveArmGoal(r.scoregoal.y, r.scoregoal.x)
-    r.grabber.set(wpilib.DoubleSolenoid.Value.kReverse)
-    return True
+    r.grabber.set(wpilib.DoubleSolenoid.Value.kForward)
+    if(r.time.timeSinceInit - r.auto.stagestart > 1):
+        return True
+    return False
 
 def retreat(r: flymer.Flymer) -> bool: #RETREATING&RETRACTING-------------------
-    r.driveUnif(-r.approachspeed)
+    r.driveUnif(-r.autospeed)
     r.driveArmGoal(r.defaultgoal.y, r.defaultgoal.x)
-    if r.time.timeSinceInit - r.auto.stagestart > 1:  
+    if r.time.timeSinceInit - r.auto.stagestart > 5.5:  
         r.driveUnif(0)
         if r.retractEncoder.getPosition() <= (r.defaultgoal.x+.05):
             r.driveArmSpeed(0,0)
@@ -55,7 +57,7 @@ def turn(r: flymer.Flymer) -> bool: #TURNING------------------------------------
 
 def exit(r: flymer.Flymer) -> bool:
     r.driveUnif(r.autospeed)
-    if r.time.timeSinceInit - r.auto.stagestart > 6:  
+    if r.time.timeSinceInit - r.auto.stagestart > 5.5:  
         r.driveUnif(0)
         return True
     return False

@@ -142,9 +142,7 @@ class Server():
 
 
     def putUpdate(self, name: str, value: float|int|str):
-
         self.telemTable.putValue(name, value)
-
         self.sendMsgMap.update({ name : self.encodeMessage(MessageKind.UPDATE, name, value) })
 
     def putEvent(self, name: str):
@@ -250,5 +248,4 @@ class Server():
             self.cliSock.close()
 
         self.servSock.close()
-
 
