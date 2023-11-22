@@ -71,6 +71,29 @@ class FlymerHalBuffer():
             server.putUpdate(prefix + prefs[i] + "Speed", self.driveSpeeds[i])
             server.putUpdate(prefix + prefs[i] + "Pos", self.drivePositions[i])
 
+    def sanitize(self, boundRetract: bool) -> None:
+        # (arm down = power+, encoder+)
+        if self.liftTopSidePressed and self.liftSpeed < 0: # clamp speed if in upper danger zone
+            self.liftSpeed = 0.1
+        if self.liftTopPressed: # clamp speed to be positive (down) in on top switch
+            self.liftSpeed = max(self.liftSpeed, 0)
+        if self.liftBottomPressed: # clamp speed to be negative (up) if hitting bottom
+            self.liftSpeed = min(self.liftSpeed, 0)
+
+        # (arm in/retract = power+, encoder-)
+        if self.retractPos > 2500 and self.retractPos < 10000 and boundRetract and self.retractSpeed < 0:
+            selfretractSpeed = 0
+        if self.retractPos > 10000 and self.retractSpeed > 0 and boundRetract:
+            selfretractSpeed = 0
+
+        # (CW = power+, encoder+)
+        if self.rightLimitPressed and self.turretSpeed > 0:
+            self.turretSpeed = 0
+        if self.leftLimitPressed and self.turretSpeed < 0:
+            self.turretSpeed = 0
+
+
+
 # TODO: flymer sim hal
 
 class FlymerHal():
@@ -110,6 +133,7 @@ class FlymerHal():
 
 
     def update(self, buf: FlymerHalBuffer) -> None:
+
         prev = self.prev
         self.prev = copy.deepcopy(buf)
 
@@ -151,17 +175,6 @@ class FlymerHal():
         buf.gyroYaw = self.gyro.getYaw()
         buf.gyroPitch = self.gyro.getPitch()
         buf.gyroRoll = self.gyro.getRoll()
-
-        """
-        used to be in driveArmGoal overriding retr speed
-        why
-        """
-        if self.retractEncoder.getPosition() > 40000:
-            retractspeed = -0.5
-        else:
-            # tick with PID
-            pass
-
 
 
 
@@ -338,29 +351,8 @@ class Flymer(wpilib.TimedRobot):
         if self.input.grabToggle: self.hal.grabberOpen = not self.hal.grabberOpen
         if self.input.brakeToggle: self.hal.brakesExtended = not self.hal.brakesExtended
 
-        self.sanitizeHal() # ensure nothing on the robot is going to destoy itself
+        self.hal.sanitize(self.retractBounded)  # ensure nothing on the robot is going to destoy itself
         self.hardware.update(self.hal) # push speed values out to motors
-
-    def sanitizeHal(self) -> None:
-        # (arm down = power+, encoder+)
-        if self.hal.liftTopSidePressed and self.hal.liftSpeed < 0: # clamp speed if in upper danger zone
-            self.hal.liftSpeed = 0.1
-        if self.hal.liftTopPressed: # clamp speed to be positive (down) in on top switch
-            self.hal.liftSpeed = max(self.hal.liftSpeed, 0)
-        if self.hal.liftBottomPressed: # clamp speed to be negative (up) if hitting bottom
-            self.hal.liftSpeed = min(self.hal.liftSpeed, 0)
-
-        # (arm in/retract = power+, encoder-)
-        if self.hal.retractPos > 2500 and self.hal.retractPos < 10000 and self.retractBounded and self.hal.retractSpeed < 0:
-            self.hal.retractSpeed = 0
-        if self.hal.retractPos > 10000 and self.hal.retractSpeed > 0 and self.retractBounded:
-            self.hal.retractSpeed = 0
-
-        # (CW = power+, encoder+)
-        if self.hal.rightLimitPressed and self.hal.turretSpeed > 0:
-            self.hal.turretSpeed = 0
-        if self.hal.leftLimitPressed and self.hal.turretSpeed < 0:
-            self.hal.turretSpeed = 0
 
 
 
@@ -419,6 +411,7 @@ class Flymer(wpilib.TimedRobot):
     def autonomousPeriodic(self) -> None:
         self.hal.stopMotors()
         self.auto.update(self)
+        self.hal.sanitize(True)
         self.hardware.update(self.hal)
 
     def disabledPeriodic(self) -> None:
