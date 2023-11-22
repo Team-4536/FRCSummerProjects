@@ -6,6 +6,8 @@
 #include "base/geometry.h"
 #include "graphics.h"
 
+#include <stdarg.h> 
+
 
 
 /*
@@ -251,13 +253,16 @@ void blu_makeDrawCalls(gfx_Pass* normalPass);
 
 blu_Area* blu_areaMake(str s, U32 flags);
 blu_Area* blu_areaMake(const char* string, U32 flags);
+blu_Area* blu_areaMakeF(U32 flags, const char* string, ...);
 void blu_pushParent(blu_Area* parent);
 void blu_popParent();
 
 blu_Area* blu_getCursorParent();
 
-void blu_areaAddDisplayStr(blu_Area* area, str s); // CLEANUP: inconsistent, ctor functions or no
+// CLEANUP: inconsistent, ctor functions or no
 void blu_areaAddDisplayStr(blu_Area* area, const char* s);
+void blu_areaAddDisplayStr(blu_Area* area, str s);
+void blu_areaAddDisplayStrF(blu_Area* area, const char* fmtStr, ...);
 
 void blu_pushStyle(blu_Style s);
 void blu_popStyle();
@@ -469,6 +474,17 @@ void _blu_hashRemove(U64 key) {
 
 
 
+str _blu_formatString(const char* fmt, va_list args, BumpAlloc* arena) {
+    int l = snprintf(nullptr, 0, fmt, args);
+    U8* chars = BUMP_PUSH_ARR(arena, l, U8);
+    str s;
+    s.chars = chars;
+    s.length = l;
+    vsnprintf((char*)chars, l, fmt, args);
+    return s;
+}
+
+
 
 
 void _blu_areaReset(blu_Area* a) {
@@ -487,6 +503,13 @@ void _blu_areaReset(blu_Area* a) {
 
 
 
+blu_Area* blu_areaMakeF(U32 flags, const char* string, ...) {
+    va_list argp;
+    va_start(argp, string);
+    str s = _blu_formatString(string, argp, &globs.frameArena);
+    va_end(argp);
+    return blu_areaMake(s, flags);
+}
 blu_Area* blu_areaMake(const char* string, U32 flags) {
     return blu_areaMake(str_make(string), flags);
 }
@@ -546,14 +569,20 @@ blu_Area* blu_areaMake(str string, U32 flags) {
     return area;
 }
 
-void blu_areaAddDisplayStr(blu_Area* area, const char* s) {
-    blu_areaAddDisplayStr(area, str_make(s));
-}
 void blu_areaAddDisplayStr(blu_Area* area, str s) {
-    str nstr = str_copy(s, &globs.frameArena);
-    area->displayString = nstr;
+    area->displayString = s;
+}
+void blu_areaAddDisplayStr(blu_Area* area, const char* s) {
+    area->displayString = str_make(s);
 }
 
+
+void blu_areaAddDisplayStrF(blu_Area* area, const char* fmtStr, ...) {
+    va_list varargs;
+    va_start(varargs, fmtStr);
+    area->displayString = _blu_formatString(fmtStr, varargs, &globs.frameArena);
+    va_end(varargs);
+}
 
 
 void blu_pushParent(blu_Area* parent) {

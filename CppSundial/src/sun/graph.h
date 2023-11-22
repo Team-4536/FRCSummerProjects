@@ -192,7 +192,7 @@ void sun_graph2dBuild(sun_Graph2dInfo* info, gfx_Framebuffer* target) {
                             blu_areaFlags_FLOATING | blu_areaFlags_DRAW_TEXT | blu_areaFlags_CENTER_TEXT);
                         a->textScale = 0.7f;
                         float label = (k + centerIdx) * lineSpacing;
-                        blu_areaAddDisplayStr(a, str_format(globs.scratch, STR("%f"), label));
+                        blu_areaAddDisplayStrF(a, "%f", label);
 
                         a->offset.x = width - a->calculatedSizes[blu_axis_X];
                         a->offset.y = height / 2 + (-k*lineSpacing + lineOffset) * spaceToPx;
