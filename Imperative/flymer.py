@@ -68,8 +68,8 @@ class FlymerHalBuffer():
 
         prefs = [ "FL", "FR", "BL", "BR" ]
         for i in range(0, 4):
-            server.putUpdate(prefix + prefs[i] + "Speed", self.driveSpeeds[i])
-            server.putUpdate(prefix + prefs[i] + "Pos", self.drivePositions[i])
+            server.putUpdate(prefix + prefs[i] + "Speed", float(self.driveSpeeds[i]))
+            server.putUpdate(prefix + prefs[i] + "Pos", float(self.drivePositions[i]))
 
     def sanitize(self, boundRetract: bool) -> None:
         # (arm down = power+, encoder+)
