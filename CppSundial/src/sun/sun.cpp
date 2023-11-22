@@ -5,7 +5,6 @@
 
 #include "sun/graph.h"
 #include "sun/controls.h"
-#include "sun/paths.h"
 #include "sun/field.h"
 #include "sun/network.h"
 #include "sun/swerve.h"
