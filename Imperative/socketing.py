@@ -9,8 +9,6 @@ from typing_extensions import Self
 # in seconds
 SEND_INTERVAL = 1/50
 
-
-
 class MessageKind(IntEnum):
     UPDATE = 0
     EVENT = 1
@@ -21,7 +19,6 @@ class PropType(IntEnum):
     STR = 2
     BOOL = 3
 
-
 class Message:
     def __init__(self, kind: MessageKind, name: str, data: int|float|str|bool) -> None:
         self.kind = kind
@@ -29,40 +26,50 @@ class Message:
         self.data = data
 
 
+"""
+wrapper class over custom dashboard networking and networktables
+any calls to putUpdate() get routed to both systems
+"""
 class Server():
-
-    inst: Self = None #type: ignore
 
     def __init__(self, isReal: bool) -> None:
 
         self.telemTable = ntcore.NetworkTableInstance.getDefault().getTable("telemetry")
 
-        self.servSock = socket.socket(socket.AddressFamily.AF_INET, socket.SOCK_STREAM)
-        self.servSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        if(not isReal): self.servSock.bind(("localhost", 7000))
-        else: self.servSock.bind(("10.45.36.2", 7000))
-        self.servSock.listen(1) # client backlog
-        self.servSock.setblocking(False)
+        self.servSock: socket.socket | None = None
+        try:
+            # Server socket creation is only attempted once
+            # custom networking is disabled if it fails
+            self.servSock = socket.socket(socket.AddressFamily.AF_INET, socket.SOCK_STREAM)
+            self.servSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            if(not isReal): self.servSock.bind(("localhost", 7000))
+            else: self.servSock.bind(("10.45.36.2", 7000))
+            self.servSock.listen(1) # client backlog
+            self.servSock.setblocking(False)
+        except OSError as error:
+            if self.servSock:
+                self.servSock.close()
+                self.servSock = None
+            print(f"[SOCKETS] creating server socket failed: {repr(error)}")
+            self.telemTable.putValue("error", f"sundial server creation failed, {repr(error)}")
 
         self.sendMsgMap: dict[str, bytes] = { }
         self.sendEventList: list[bytes] = [ ]
         self.cliSock = None
         self.lastSendTime = 0
 
-
         self.tracked: dict[str, int|float|str|bool] = { }
         self.events: list[str] = [ ]
         self.recvBuf: bytes = b""
 
-        Server.inst = self
-
 
     def update(self, curTime: float):
-
         self.events.clear()
+        if self.servSock == None: return
 
+
+        ## attempt non blocking connection if not connected
         if self.cliSock == None:
-
             rlist, wlist, elist = select.select([self.servSock], [], [], 0)
             if(len(rlist) == 0): return
 
@@ -73,7 +80,6 @@ class Server():
 
 
         if(curTime - self.lastSendTime > SEND_INTERVAL):
-
             content = b""
             for p in self.sendMsgMap.items():
                 self.lastSendTime = curTime
@@ -84,7 +90,6 @@ class Server():
                 content += self.sendEventList.pop(0)
 
             while len(content) > 0:
-
                 try:
                     res = self.cliSock.send(content)
                 except Exception as e:
@@ -92,12 +97,10 @@ class Server():
                     self.cliSock = None
                     print(f"[SOCKETS] Client ended with exception {repr(e)}")
                     break
-
                 content = content[res:]
 
-
-
         if self.cliSock != None:
+            # poll for updates to read in
             while True:
                 rlist, wlist, elist = select.select([self.cliSock], [], [], 0)
                 if(len(rlist) != 0):
@@ -120,6 +123,7 @@ class Server():
                 else:
                     break
 
+            # loop through recieved messages, decode, apply to tracked map
             while True:
                 msg, consumed = self.decodeMessage(self.recvBuf)
                 if consumed == 0: break
@@ -144,9 +148,6 @@ class Server():
     def putUpdate(self, name: str, value: float|int|str):
         self.telemTable.putValue(name, value)
         self.sendMsgMap.update({ name : self.encodeMessage(MessageKind.UPDATE, name, value) })
-
-    def putEvent(self, name: str):
-        self.sendEventList.append(self.encodeMessage(MessageKind.EVENT, name, int(0)))
 
     def encodeMessage(self, kind: MessageKind, name: str, value: float|int|str|bool) -> bytes:
 
@@ -175,7 +176,7 @@ class Server():
 
 
         else:
-            print(f"Invalid type in message: {type(value)}")
+            print(f"[SOCKETS] Invalid type in message: {type(value)}")
             assert(False)
 
 
@@ -202,7 +203,6 @@ class Server():
         buffer = buffer[4:]
 
 
-
         if(header[0] != MessageKind.UPDATE.value
            and header[0] != MessageKind.EVENT.value):
             return (None, 1)
@@ -219,17 +219,12 @@ class Server():
 
 
 
-
-
         if(len(buffer) < (nameLen + dataSize)):
             return None, 0
-
 
         name = buffer[:nameLen].decode()
         buffer = buffer[nameLen:]
         dataBytes = buffer[:dataSize]
-
-
 
         dataType = PropType(header[2])
         if(dataType == PropType.S32): data = int(struct.unpack("!l", dataBytes)[0])
@@ -237,7 +232,6 @@ class Server():
         elif(dataType == PropType.STR): data = dataBytes.decode()
         elif(dataType == PropType.BOOL): data = True if dataBytes[0] != 0 else False
         else: assert(False)
-
 
         m = Message(MessageKind(header[0]), name, data)
         return m, 4 + nameLen + dataSize
@@ -247,5 +241,6 @@ class Server():
         if self.cliSock != None:
             self.cliSock.close()
 
-        self.servSock.close()
+        if self.servSock != None:
+            self.servSock.close()
 
