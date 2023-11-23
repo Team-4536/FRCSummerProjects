@@ -61,7 +61,21 @@ TESTING CHECKLIST:
 */
 
 
-enum blu_Axis{
+/*
+Overall structure for the UI library
+- everything is prefixed with blu_
+
+
+
+
+*/
+
+
+
+
+
+
+enum blu_Axis {
     blu_axis_X,
     blu_axis_Y,
     blu_axis_COUNT
@@ -241,14 +255,28 @@ struct blu_WidgetInteraction {
     U32 dropType = 0;
 };
 
-// TODO: documentation
 
+// initialize library globals (arenas etc.)
+// required before any other blu functions are called
 void blu_init(gfx_Texture* solidTex);
+
+// take a path to a .ttf file and load that as the libraries font
+// only one rendered size is supported right now, which is set by the BLU_FONT_SIZE constant
 void blu_loadFont(const char* path);
+
+// required before the start of a frame
 void blu_beginFrame(); // cull, reset globals
+
 // build code goes here
+
+// Fills in the layout pass data inside all areas in the current tree based on the areas style as well as parents and children
 void blu_layout(V2f scSize); // calculate layout shit
+
+// Generate interaction data for every area in the tree
 void blu_input(V2f npos, bool lmbState, bool rmbState, float scrollDelta, blu_Cursor* outCursor);  // set current and update prev input // CLEANUP: merge with begin?
+
+// take area calculated sizes and positions and create draw calls
+// calls allocated into gfx buffers, not blue buffers
 void blu_makeDrawCalls(gfx_Pass* normalPass);
 
 blu_Area* blu_areaMake(str s, U32 flags);
