@@ -4,8 +4,8 @@ import wpimath.system.plant as plant
 import rev
 import navx
 import wpimath
-import wpimath.kinematics
-import wpimath.geometry
+from wpimath import kinematics
+from wpimath import geometry
 import timing
 from real import V2f
 from subsystems.mech import mechController
@@ -54,17 +54,26 @@ class Flymer(wpilib.TimedRobot):
         self.armMotor = rev.CANSparkMax(0, rev.CANSparkMax.MotorType.kBrushless)
         self.liftMotor = rev.CANSparkMax(0, rev.CANSparkMax.MotorType.kBrushless)
         self.time = timing.TimeData(None)
-        #wipmath.geometry.Translation
-        self.kinematics = wpimath.kinematics.MecanumDriveKinematics(wpimath.geometry.Translation2d(-1, 1), wpimath.geometry.Translation2d(1, 1), wpimath.geometry.Translation2d(-1, -1), wpimath.geometry.Translation2d(1, -1))
-        self.gyroAngle = wpimath.geometry.Rotation2d(0)
-        self.wheelPositions = wpimath.kinematics.MecanumDriveWheelPositions()
-        self.wheelPositions.frontLeft = (0, 0)
-        self.wheelPositions.frontRight = (0, 0)
-        self.wheelPositions.rearLeft= (0, 0)
-        self.wheelPositions.rearRight = (0, 0)
-       
-        wpimath.kinematics.MecanumDriveOdometry(self.kinematics, self.gyroAngle, self.wheelPositions)
-  
+        self.frontLeftWheel = rev.CANSparkMax(0, rev.CANSparkMax.MotorType.kBrushless)
+        self.frontRightWheel = rev.CANSparkMax(0, rev.CANSparkMax.MotorType.kBrushless)
+        self.rearLeftWheel = rev.CANSparkMax(0, rev.CANSparkMax.MotorType.kBrushless)
+        self.rearRightWheel = rev.CANSparkMax(0, rev.CANSparkMax.MotorType.kBrushless)
+        #wipmath.geometry.Tra
+        self.initialPose = geometry._geometry.Pose2d(geometry.Translation2d(0, 0), geometry.Rotation2d(0))
+        
+        self.pose = geometry._geometry.Pose2d
+
+        self.kinematics = kinematics.MecanumDriveKinematics(frontLeftWheel = geometry.Translation2d(-1, 1), frontRightWheel = geometry.Translation2d(1, 1), rearLeftWheel = geometry.Translation2d(-1, -1), rearRightWheel = geometry.Translation2d(1, -1))
+        self.gyroAngle = self.gyro.getRotation2d()
+        self.wheelPositions = kinematics.MecanumDriveWheelPositions()
+        self.wheelPositions.frontLeft = 0
+        self.wheelPositions.frontRight = 0
+        self.wheelPositions.rearLeft = 0
+        self.wheelPositions.rearRight = 0
+
+        self.flymerPos = kinematics.MecanumDriveOdometry(self.kinematics, self.gyroAngle, self.wheelPositions, self.initialPose)
+
+    
     def robotPeriodic(self) -> None:
 
         self.time = timing.TimeData(self.time)
@@ -72,12 +81,13 @@ class Flymer(wpilib.TimedRobot):
         self.server = socketing.Server(self.isReal())
         self.server.update(self.time.timeSinceInit)
 
+        self.flymerPos.update(self.gyroAngle, self.wheelPositions)
+
     def teleopPeriodic(self) -> None:
 
         self.input = FlymerInputs(self.driveCtrlr, self.armCtrlr)
         self.armMotor.set(self.input.turret * 0.01)
         self.liftMotor.set(self.input.lift*0.05)
-    
 
 
     def disabledPeriodic(self) -> None: 
