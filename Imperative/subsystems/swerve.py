@@ -186,7 +186,7 @@ class SwerveController:
     # forward = forward/back
     # right = Left/Right
     # turning is CW+
-    def tick(self, forward: float, right: float, turn: float, dt: float, brakeButtonPressed: bool, startButtonPressed: bool, gyroReset: bool, swerve: SwerveState, gyro) -> None:
+    def tick(self, forward: float, right: float, turn: float, dt: float, brakeButtonPressed: bool, startButtonPressed: bool, gyroReset: bool, swerve: SwerveState, gyro, server: Server) -> None:
         #brake input toggle
         if brakeButtonPressed == True:
             self.brakes = not self.brakes
@@ -242,13 +242,13 @@ class SwerveController:
         BRTarget = BRVector.getAngle()
 
         #telemetry
-        Server.inst.putUpdate("FLTarget", FLTarget)
-        Server.inst.putUpdate("FRTarget", FRTarget)
-        Server.inst.putUpdate("BLTarget", BLTarget)
-        Server.inst.putUpdate("BRTarget", BRTarget)
+        server.putUpdate("FLTarget", FLTarget)
+        server.putUpdate("FRTarget", FRTarget)
+        server.putUpdate("BLTarget", BLTarget)
+        server.putUpdate("BRTarget", BRTarget)
 
-        Server.inst.putUpdate("GyroYaw", inputGyro)
-        Server.inst.putUpdate("Brakes", self.brakes)
+        server.putUpdate("GyroYaw", inputGyro)
+        server.putUpdate("Brakes", self.brakes)
 
         #getLength returns power value from 0 to 1
         FLPower = FLVector.getLength()
@@ -294,10 +294,10 @@ class SwerveController:
         BLSteeringError, BLPower = getSteeringError(BLTarget, BLPosAngle, BLPower)
         BRSteeringError, BRPower = getSteeringError(BRTarget, BRPosAngle, BRPower)
 
-        Server.inst.putUpdate("FLSteeringError", FLSteeringError)
-        Server.inst.putUpdate("FRSteeringError", FRSteeringError)
-        Server.inst.putUpdate("BLSteeringError", BLSteeringError)
-        Server.inst.putUpdate("BRSteeringError", BRSteeringError)
+        server.putUpdate("FLSteeringError", FLSteeringError)
+        server.putUpdate("FRSteeringError", FRSteeringError)
+        server.putUpdate("BLSteeringError", BLSteeringError)
+        server.putUpdate("BRSteeringError", BRSteeringError)
 
         #hold position if no input is given
         if self.brakeDefault == False:
