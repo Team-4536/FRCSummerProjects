@@ -14,22 +14,6 @@ from PIDController import PIDController
 from real import angleWrap
 from collections.abc import Callable
 
-def drive(self) ->bool:
-    return False
-
-
-def extend(r: flymer.Flymer) -> bool: #EXTENDING--------------------------------
-    r.driveArmGoal(r.scoregoal.y, r.scoregoal.x)
-    if r.hal.retractPos >= (r.scoregoal.x-.05):
-        return True
-    return False
-
-def score(r: flymer.Flymer) -> bool: #SCORING-----------------------------------
-    r.driveArmGoal(r.scoregoal.y, r.scoregoal.x)
-    r.hal.grabberOpen = True
-    if(r.time.timeSinceInit - r.auto.stagestart > 1):
-        return True
-    return False
 
 def retreat(r: flymer.Flymer) -> bool: #RETREATING&RETRACTING-------------------
     r.driveUnif(-r.autospeed)
@@ -41,20 +25,6 @@ def retreat(r: flymer.Flymer) -> bool: #RETREATING&RETRACTING-------------------
             return True
     return False
 
-def turn(r: flymer.Flymer) -> bool: #TURNING------------------------------------
-    angle = angleWrap(180 - r.hal.gyroYaw)
-    turnspeed = angle*.005
-    r.driveTurn(turnspeed)
-    if abs(angle) <= 180:
-        return True
-    return False
-
-def exit(r: flymer.Flymer) -> bool:
-    r.driveUnif(r.autospeed)
-    if r.time.timeSinceInit - r.auto.stagestart > 5.5:
-        r.driveUnif(0)
-        return True
-    return False
 
 def balance(r: flymer.Flymer) -> bool:
     if r.ontop == False:
@@ -76,7 +46,7 @@ def balance(r: flymer.Flymer) -> bool:
     return False
 
 def makeDriveStage(time, speed):
-    def function(r: flymer.Flymer):
+    def function(r: flymer.Flymer) -> bool:
         if r.time.timeSinceInit - r.auto.stagestart < time:
             r.driveUnif(speed)
             return False
@@ -86,15 +56,38 @@ def makeDriveStage(time, speed):
     return function
 
 def makeArmStage(goalx, goaly):
-    def function(r: flymer.Flymer):
+    def function(r: flymer.Flymer) -> bool:
         r.driveArmGoal(goaly, goalx)
-        if r.hal.retractPos >= (r.scoregoal.x-.05):
+        if abs(r.hal.retractPos - (r.scoregoal.x)) <= .05:
             return True
-    return False
+        return False
+    return function
+
+def makeGrabberStage(state): #grabber state true/false
+    def function(r: flymer.Flymer) -> bool:
+            r.hal.grabberOpen = state
+            if r.time.timeSinceInit - r.auto.stagestart < .5:
+                return True
+            return False
+    return function
+
+def makeTurnStage(goalAngle, direction): #clockwise = true counterclockwise = false
+    def function(r: flymer.Flymer) -> bool:
+        angle = (goalAngle - r.hal.gyroYaw)
+        if direction and angle < 0:
+            angle += 360
+        elif not direction and angle > 0:
+            angle -= 360
+        turnspeed = angle*.005
+        r.driveTurn(turnspeed)
+        if abs(angleWrap(angle)) <= 2:
+            return True
+        return False
+    return function
+        
+              
 
 
-
-    pass
 
 
 

@@ -374,6 +374,7 @@ class Flymer(wpilib.TimedRobot):
     def driveTurn(self, speed:float) -> None:
         self.hal.driveSpeeds = [ speed, -speed, speed, -speed ]
 
+
     def driveArmSpeed(self, retractspeed: float, liftspeed: float) -> None:
         self.hal.retractSpeed = retractspeed
         self.hal.liftSpeed = liftspeed
