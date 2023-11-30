@@ -3,12 +3,15 @@ import wpilib
 import wpimath.system.plant as plant
 import rev
 import navx
-
+import wpimath
+import wpimath.kinematics
+import wpimath.geometry
 import timing
 from real import V2f
 from subsystems.mech import mechController
 import socketing
 from inputs import deadZone
+
 
 
 
@@ -51,7 +54,17 @@ class Flymer(wpilib.TimedRobot):
         self.armMotor = rev.CANSparkMax(0, rev.CANSparkMax.MotorType.kBrushless)
         self.liftMotor = rev.CANSparkMax(0, rev.CANSparkMax.MotorType.kBrushless)
         self.time = timing.TimeData(None)
-
+        #wipmath.geometry.Translation
+        self.kinematics = wpimath.kinematics.MecanumDriveKinematics(wpimath.geometry.Translation2d(-1, 1), wpimath.geometry.Translation2d(1, 1), wpimath.geometry.Translation2d(-1, -1), wpimath.geometry.Translation2d(1, -1))
+        self.gyroAngle = wpimath.geometry.Rotation2d(0)
+        self.wheelPositions = wpimath.kinematics.MecanumDriveWheelPositions()
+        self.wheelPositions.frontLeft = (0, 0)
+        self.wheelPositions.frontRight = (0, 0)
+        self.wheelPositions.rearLeft= (0, 0)
+        self.wheelPositions.rearRight = (0, 0)
+       
+        wpimath.kinematics.MecanumDriveOdometry(self.kinematics, self.gyroAngle, self.wheelPositions)
+  
     def robotPeriodic(self) -> None:
 
         self.time = timing.TimeData(self.time)
