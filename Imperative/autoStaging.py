@@ -17,12 +17,6 @@ from collections.abc import Callable
 def drive(self) ->bool:
     return False
 
-def approach(r: flymer.Flymer) -> bool: #APPROACHING----------------------------
-    r.driveUnif(r.approachspeed)
-    if r.time.timeSinceInit - r.auto.stagestart > .5:
-        r.driveUnif(0)
-        return True
-    return False
 
 def extend(r: flymer.Flymer) -> bool: #EXTENDING--------------------------------
     r.driveArmGoal(r.scoregoal.y, r.scoregoal.x)
@@ -32,15 +26,17 @@ def extend(r: flymer.Flymer) -> bool: #EXTENDING--------------------------------
 
 def score(r: flymer.Flymer) -> bool: #SCORING-----------------------------------
     r.driveArmGoal(r.scoregoal.y, r.scoregoal.x)
-    r.grabber.set(wpilib.DoubleSolenoid.Value.kReverse)
-    return True
+    r.hal.grabberOpen = True
+    if(r.time.timeSinceInit - r.auto.stagestart > 1):
+        return True
+    return False
 
 def retreat(r: flymer.Flymer) -> bool: #RETREATING&RETRACTING-------------------
-    r.driveUnif(-r.approachspeed)
+    r.driveUnif(-r.autospeed)
     r.driveArmGoal(r.defaultgoal.y, r.defaultgoal.x)
-    if r.time.timeSinceInit - r.auto.stagestart > 1:  
+    if r.time.timeSinceInit - r.auto.stagestart > 5.5:
         r.driveUnif(0)
-        if r.retractEncoder.getPosition() <= (r.defaultgoal.x+.05):
+        if r.hal.retractPos <= (r.defaultgoal.x+.05):
             r.driveArmSpeed(0,0)
             return True
     return False
@@ -55,7 +51,7 @@ def turn(r: flymer.Flymer) -> bool: #TURNING------------------------------------
 
 def exit(r: flymer.Flymer) -> bool:
     r.driveUnif(r.autospeed)
-    if r.time.timeSinceInit - r.auto.stagestart > 6:  
+    if r.time.timeSinceInit - r.auto.stagestart > 5.5:
         r.driveUnif(0)
         return True
     return False
@@ -78,6 +74,29 @@ def balance(r: flymer.Flymer) -> bool:
         if r.ontop == True and r.gyro.getPitch() < 10:
             r.driveUnif(r.balancespeed)
     return False
+
+def makeDriveStage(time, speed):
+    def function(r: flymer.Flymer):
+        if r.time.timeSinceInit - r.auto.stagestart < time:
+            r.driveUnif(speed)
+            return False
+        else:
+            r.driveUnif(0)
+            return True
+    return function
+
+def makeArmStage(goalx, goaly):
+    def function(r: flymer.Flymer):
+        r.driveArmGoal(goaly, goalx)
+        if r.hal.retractPos >= (r.scoregoal.x-.05):
+            return True
+    return False
+
+
+
+    pass
+
+
 
 class Auto():
     def __init__(self, stagelist: list[Callable[[flymer.Flymer], bool]], time:float) -> None:
