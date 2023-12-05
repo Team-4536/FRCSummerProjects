@@ -15,16 +15,15 @@ from real import angleWrap
 from collections.abc import Callable
 
 
-def retreat(r: flymer.Flymer) -> bool: #RETREATING&RETRACTING-------------------
-    r.driveUnif(-r.autospeed)
-    r.driveArmGoal(r.defaultgoal.y, r.defaultgoal.x)
-    if r.time.timeSinceInit - r.auto.stagestart > 5.5:
-        r.driveUnif(0)
-        if r.hal.retractPos <= (r.defaultgoal.x+.05):
-            r.driveArmSpeed(0,0)
-            return True
-    return False
 
+def makeComposedStage(funclist: list[Callable[[flymer.Flymer], bool]]) -> Callable[[flymer.Flymer], bool]:
+    def function(r: flymer.Flymer) -> bool:
+        status = True
+        for x in funclist:
+            if not x(r):
+                status = False
+        return status 
+    return function
 
 def balance(r: flymer.Flymer) -> bool:
     if r.ontop == False:
@@ -84,12 +83,6 @@ def makeTurnStage(goalAngle, direction): #clockwise = true counterclockwise = fa
             return True
         return False
     return function
-        
-              
-
-
-
-
 
 class Auto():
     def __init__(self, stagelist: list[Callable[[flymer.Flymer], bool]], time:float) -> None:

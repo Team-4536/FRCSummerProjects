@@ -394,14 +394,20 @@ class Flymer(wpilib.TimedRobot):
         self.defaultgoal = V2f(0, 0)
 
         stagelist = []
-        scorelist = [autoStaging.extend, autoStaging.score, autoStaging.retreat, autoStaging.turn]
+        scorelist = [autoStaging.makeDriveStage(.5, .1), 
+                     autoStaging.makeArmStage(1893, 700), 
+                     autoStaging.makeGrabberStage(True), 
+                     autoStaging.makeArmStage(0, 0), 
+                     autoStaging.makeDriveStage(.1, -.1), 
+                     autoStaging.makeTurnStage(180, True)]
+
 
         if self.selectedauto == AUTO_BALANCE: #balance auto
             stagelist = scorelist + [autoStaging.balance]
         elif self.selectedauto == AUTO_EXIT_SCORE: #exit score auto
-            stagelist = scorelist + [autoStaging.exit]
+            stagelist = scorelist + [autoStaging.makeDriveStage(6, .2)]
         elif self.selectedauto == AUTO_EXIT: #exit auto
-            stagelist = [autoStaging.exit]
+            stagelist = [autoStaging.makeDriveStage(6, .2)]
         elif self.selectedauto == AUTO_NONE: #no auto :)
             pass
         else:
