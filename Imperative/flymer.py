@@ -394,12 +394,14 @@ class Flymer(wpilib.TimedRobot):
         self.defaultgoal = V2f(0, 0)
 
         stagelist = []
-        scorelist = [autoStaging.makeDriveStage(.5, .1), 
-                     autoStaging.makeArmStage(1893, 700), 
-                     autoStaging.makeGrabberStage(True), 
-                     autoStaging.makeArmStage(0, 0), 
-                     autoStaging.makeDriveStage(.1, -.1), 
-                     autoStaging.makeTurnStage(180, True)]
+        scorelist = [autoStaging.makeComposedStage([
+                    autoStaging.makeDriveStage(.5, .1),
+                    autoStaging.makeArmStage(1893, 700)]),
+                    autoStaging.makeGrabberStage(True), 
+                    autoStaging.makeComposedStage([
+                    autoStaging.makeArmStage(0, 0), 
+                    autoStaging.makeDriveStage(.1, -.1)]),
+                    autoStaging.makeTurnStage(180, True)]
 
 
         if self.selectedauto == AUTO_BALANCE: #balance auto
