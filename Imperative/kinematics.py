@@ -41,4 +41,7 @@ def getCartesianCoords(liftPos, turretPos, retractPos):
 
     return [manipulatorX, manipulatorY, manipulatorZ]
 
-def
+def cartesianToSpherical(manipulatorX, manipulatorY, manipulatorZ):
+    theta = manipulatorX
+    phi = 
+    r = 
