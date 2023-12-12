@@ -5,7 +5,7 @@
 
 
 
-// hashing functions are not expected to return an index within the tables range
+// returns a hash value for the given string
 U64 hash_hashStr(str x);
 
 

@@ -122,8 +122,7 @@ void sun_fieldBuild(sun_FieldInfo* info, gfx_Framebuffer* fb) {
 
             a = blu_areaMake(STR("FPS"), blu_areaFlags_DRAW_TEXT | blu_areaFlags_FLOATING);
             a->offset = V2f(5, fb->texture->height - BLU_FONT_SIZE - 5);
-            str n = str_format(globs.scratch, STR("FPS: %f"), 1/globs.dt);
-            blu_areaAddDisplayStr(a, n);
+            blu_areaAddDisplayStrF(a, "FPS: %f", 1/globs.dt);
         }
     }
 

@@ -2,9 +2,8 @@
 #include "typedefs.h"
 
 
-// uses malloc and free on allocate and free
-// fixed size
-// zeroes memory on allocation, not on release (and not on construction)
+// struct to represent a contiguous buffer, and an end pointer
+// memory is reserved by moving the end pointer and returning the space that was there before
 struct BumpAlloc {
     void* start;
     void* end;
@@ -12,15 +11,21 @@ struct BumpAlloc {
 };
 
 
+// basic ctor that fills in an arena based on a prexisting buffer
+// don't use bump_free if bump_allocate was not used to reserve the buffer
 BumpAlloc* bump_init(BumpAlloc* a, U64 size, void* memory);
 
+// use malloc to reserve [size] amount of bytes for the arena
 BumpAlloc* bump_allocate(BumpAlloc* a, U64 size);
+// use free to release reserved buffer (start)
 void bump_free(BumpAlloc* a);
 
-// asserts on failure
+// move end pointer in arena forward by size and return previous end
+// asserts failure if end pointer moves outside of the reserved buffer
 void* bump_push(BumpAlloc* a, U64 size);
 
 // asserts on failure
+// reduces used memory in arena by size bytes
 void bump_pop(BumpAlloc* a, U64 size);
 
 void bump_clear(BumpAlloc* a);
@@ -30,7 +35,8 @@ void bump_clear(BumpAlloc* a);
 #define BUMP_PUSH_NEW(bump, type) &(*(static_cast<type*>(bump_push(bump, sizeof(type)))) = type())
 
 // push arr pushes space for count objects of type, does not initialize memory beyond zeroing
-// [bump] is expected to be a pointer
+// [bump] is expected to be a pointer to a BumpAlloc
+// [count] is a number
 #define BUMP_PUSH_ARR(bump, count, type) static_cast<type*>(bump_push(bump, sizeof(type) * (count)))
 
 

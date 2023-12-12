@@ -6,6 +6,8 @@
 #include "base/geometry.h"
 #include "graphics.h"
 
+#include <stdarg.h> 
+
 
 
 /*
@@ -59,7 +61,21 @@ TESTING CHECKLIST:
 */
 
 
-enum blu_Axis{
+/*
+Overall structure for the UI library
+- everything is prefixed with blu_
+
+
+
+
+*/
+
+
+
+
+
+
+enum blu_Axis {
     blu_axis_X,
     blu_axis_Y,
     blu_axis_COUNT
@@ -239,25 +255,42 @@ struct blu_WidgetInteraction {
     U32 dropType = 0;
 };
 
-// TODO: documentation
 
+// initialize library globals (arenas etc.)
+// required before any other blu functions are called
 void blu_init(gfx_Texture* solidTex);
+
+// take a path to a .ttf file and load that as the libraries font
+// only one rendered size is supported right now, which is set by the BLU_FONT_SIZE constant
 void blu_loadFont(const char* path);
+
+// required before the start of a frame
 void blu_beginFrame(); // cull, reset globals
+
 // build code goes here
+
+// Fills in the layout pass data inside all areas in the current tree based on the areas style as well as parents and children
 void blu_layout(V2f scSize); // calculate layout shit
+
+// Generate interaction data for every area in the tree
 void blu_input(V2f npos, bool lmbState, bool rmbState, float scrollDelta, blu_Cursor* outCursor);  // set current and update prev input // CLEANUP: merge with begin?
+
+// take area calculated sizes and positions and create draw calls
+// calls allocated into gfx buffers, not blue buffers
 void blu_makeDrawCalls(gfx_Pass* normalPass);
 
 blu_Area* blu_areaMake(str s, U32 flags);
 blu_Area* blu_areaMake(const char* string, U32 flags);
+blu_Area* blu_areaMakeF(U32 flags, const char* string, ...);
 void blu_pushParent(blu_Area* parent);
 void blu_popParent();
 
 blu_Area* blu_getCursorParent();
 
-void blu_areaAddDisplayStr(blu_Area* area, str s); // CLEANUP: inconsistent, ctor functions or no
+// CLEANUP: inconsistent, ctor functions or no
 void blu_areaAddDisplayStr(blu_Area* area, const char* s);
+void blu_areaAddDisplayStr(blu_Area* area, str s);
+void blu_areaAddDisplayStrF(blu_Area* area, const char* fmtStr, ...);
 
 void blu_pushStyle(blu_Style s);
 void blu_popStyle();
@@ -469,6 +502,17 @@ void _blu_hashRemove(U64 key) {
 
 
 
+str _blu_formatString(const char* fmt, va_list args, BumpAlloc* arena) {
+    int l = vsnprintf(nullptr, 0, fmt, args);
+    U8* chars = BUMP_PUSH_ARR(arena, l+1, U8);
+    str s;
+    s.chars = chars;
+    s.length = l;
+    vsnprintf((char*)chars, l+1, fmt, args);
+    return s;
+}
+
+
 
 
 void _blu_areaReset(blu_Area* a) {
@@ -487,6 +531,13 @@ void _blu_areaReset(blu_Area* a) {
 
 
 
+blu_Area* blu_areaMakeF(U32 flags, const char* string, ...) {
+    va_list argp;
+    va_start(argp, string);
+    str s = _blu_formatString(string, argp, &globs.frameArena);
+    va_end(argp);
+    return blu_areaMake(s, flags);
+}
 blu_Area* blu_areaMake(const char* string, U32 flags) {
     return blu_areaMake(str_make(string), flags);
 }
@@ -546,14 +597,20 @@ blu_Area* blu_areaMake(str string, U32 flags) {
     return area;
 }
 
-void blu_areaAddDisplayStr(blu_Area* area, const char* s) {
-    blu_areaAddDisplayStr(area, str_make(s));
-}
 void blu_areaAddDisplayStr(blu_Area* area, str s) {
-    str nstr = str_copy(s, &globs.frameArena);
-    area->displayString = nstr;
+    area->displayString = s;
+}
+void blu_areaAddDisplayStr(blu_Area* area, const char* s) {
+    area->displayString = str_make(s);
 }
 
+
+void blu_areaAddDisplayStrF(blu_Area* area, const char* fmtStr, ...) {
+    va_list varargs;
+    va_start(varargs, fmtStr);
+    area->displayString = _blu_formatString(fmtStr, varargs, &globs.frameArena);
+    va_end(varargs);
+}
 
 
 void blu_pushParent(blu_Area* parent) {

@@ -7,10 +7,13 @@ struct BumpAlloc;
 
 
 
+// length based string representation struct
+// length does not need to include a null terminator, and the char* is not expected to be null terminated
 struct str {
     const U8* chars;
     U64 length;
 };
+
 struct StrNode {
     str s = { nullptr, 0 };
     StrNode* next = nullptr;

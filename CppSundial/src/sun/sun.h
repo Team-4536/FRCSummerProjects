@@ -246,7 +246,6 @@ void sun_update(BumpAlloc* scratch, GLFWwindow* window, float dt, float curTime)
                 makeViewSrc("NT", globs.solidTex, viewType_net);
                 makeViewSrc("Power", globs.powerTex, viewType_powerIndicators);
                 makeViewSrc("Ctrls", globs.controlTex, viewType_controls);
-                makeViewSrc("Paths", globs.solidTex, viewType_paths);
             }
         }
 

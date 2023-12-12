@@ -55,24 +55,6 @@ struct sun_NetInfo {
 void sun_networkBuild(sun_NetInfo* info);
 
 
-struct sun_PathInfo {
-    BumpAlloc resArena;
-    gfx_SSBO* pathSSBO = nullptr;
-    gfx_SSBO* connectSSBO = nullptr;
-    V2f camPos = { 0, 0 };
-    float camHeight = 4;
-
-    bool pathDirty = true;
-    V2f* path = nullptr;
-    U32 pathPtCount = 0; // number of points, including tangents and anchors
-};
-
-#define PATH_BEZIERSUBDIVCOUNT 40
-void sun_pathsInit(sun_PathInfo* info);
-void sun_pathsDeinit(sun_PathInfo* info);
-void sun_pathsBuild(sun_PathInfo* info, gfx_Framebuffer* fb);
-
-
 // TODO: add bool boxes
 #define POWER_INDICATOR_COUNT 30
 struct sun_PowerIndicatorInfo {
@@ -99,7 +81,6 @@ enum ViewType {
     viewType_swerveDrive,
     viewType_powerIndicators,
     viewType_controls,
-    viewType_paths,
 };
 
 union ViewUnion {
@@ -108,7 +89,6 @@ union ViewUnion {
     sun_NetInfo netInfo;
     sun_SwerveInfo swerveInfo;
     sun_PowerIndicatorInfo powerIndicatorInfo;
-    sun_PathInfo pathInfo;
 
     ViewUnion() {  };
 };
@@ -143,7 +123,6 @@ void initView(View* v) {
     else if(v->type == viewType_net) { v->data.netInfo = sun_NetInfo(); }
     else if(v->type == viewType_powerIndicators) { v->data.powerIndicatorInfo = sun_PowerIndicatorInfo(); }
     else if(v->type == viewType_controls) { }
-    else if(v->type == viewType_paths) { sun_pathsInit(&v->data.pathInfo); }
     else { ASSERT(false); };
 }
 
@@ -154,7 +133,6 @@ void updateView(View* v) {
     else if(v->type == viewType_net) { sun_networkBuild(&v->data.netInfo); }
     else if(v->type == viewType_powerIndicators) { sun_powerIndicatorsBuild(&v->data.powerIndicatorInfo); }
     else if(v->type == viewType_controls) { sun_controlsBuild(&globs.ctrlInfo); }
-    else if(v->type == viewType_paths) { sun_pathsBuild(&v->data.pathInfo, v->target); }
     else { ASSERT(false); };
 }
 
@@ -194,9 +172,6 @@ void makeView(const char* name, View* v) {
         // CLEANUP: ew
         if(v->type == viewType_graph2d) {
             sun_graph2dDeinit(&v->data.graph2dInfo);
-        }
-        else if(v->type == viewType_paths) {
-            sun_pathsDeinit(&v->data.pathInfo);
         }
 
         v->type = (ViewType)(U64)inter.dropVal; // sorry
