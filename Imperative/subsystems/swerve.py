@@ -15,6 +15,8 @@ import wpimath.kinematics
 from wpimath.kinematics import SwerveModulePosition;
 from wpimath.geometry import Translation2d, Pose2d, Rotation2d
 import ctre.sensors
+from ctre.led import CANdle
+import ctre.led
 
 class SwerveState:
     def __init__(self, maxSpeed: float, wheelOffsets: list[V2f], wheelRadius: float, driveMotors, steerMotors, driveEncoders, steerEncoders) -> None:
@@ -186,15 +188,10 @@ class SwerveController:
     # forward = forward/back
     # right = Left/Right
     # turning is CW+
-    def tick(self, forward: float, right: float, turn: float, dt: float, brakeButtonPressed: bool, startButtonPressed: bool, gyroReset: bool, swerve: SwerveState, gyro, server: Server) -> None:
+    def tick(self, forward: float, right: float, turn: float, dt: float, brakeButtonPressed: bool, brakeDefault: bool, gyroReset: bool, swerve: SwerveState, gyro, optCANdle, server: Server) -> None:
         #brake input toggle
         if brakeButtonPressed == True:
             self.brakes = not self.brakes
-
-        if startButtonPressed == True:
-            self.brakeDefault = not self.brakeDefault
-            if self.brakeDefault == False:
-                self.brakes = False
 
         if gyroReset == True:
             gyro.reset()
@@ -266,6 +263,12 @@ class SwerveController:
             FRPower = 0
             BLPower = 0
             BRPower = 0
+
+        if optCANdle == CANdle:
+            if self.brakes:
+                optCANdle.setLEDs(255, 0, 0, 0, 0, 7)
+            else:
+                optCANdle.setLEDs(0, 0, 0, 0, 0, 7)
 
         """---------------------------------------"""
 
@@ -387,4 +390,11 @@ class SwerveController:
         swerve.steerMotors[1].set(-FRSteeringPower)
         swerve.steerMotors[2].set(-BLSteeringPower)
         swerve.steerMotors[3].set(-BRSteeringPower)
+
+        """========"""
+
+        #LEDs on brake
+
+        if self.brakes: 
+            pass
         
