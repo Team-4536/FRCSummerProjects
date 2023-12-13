@@ -69,13 +69,13 @@ class SwerveState:
 class SwerveSim:
     def __init__(self) -> None:
         self.driveSims: list[EncoderSim] = [
-            EncoderSim(plant.DCMotor.NEO(1), 0.005, 6.12) for i in range(4)
+            EncoderSim(plant.DCMotor.NEO(1), 0.005, 6.12, False) for i in range(4)
             ]
 
         # TODO: get real inertia vals
         # TODO: is this the corect gearing?
         self.steerSims: list[EncoderSim] = [
-            EncoderSim(plant.DCMotor.NEO(1), 0.001, 1) for i in range(4)
+            EncoderSim(plant.DCMotor.NEO(1), 0.001, 1, False) for i in range(4)
             ]
 
         self.position = V2f(0, 0)
