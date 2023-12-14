@@ -6,7 +6,11 @@ class TestInputs():
         self.motorSwitch = mainCtrlr.getYButtonPressed()
         self.leftMainX = mainCtrlr.getLeftX()
         self.leftMainY = mainCtrlr.getLeftY()
-
+        self.rightMainX = mainCtrlr.getRightX()
+        self.rightMainY = mainCtrlr.getRightY()
+        self.xButtonPressed = mainCtrlr.getXButtonPressed()
+        self.aButtonPressed = mainCtrlr.getAButtonPressed()
+        self.bButtonPressed = mainCtrlr.getBButtonPressed()
         pass
 
 
