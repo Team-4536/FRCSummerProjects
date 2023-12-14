@@ -102,7 +102,7 @@ class swerveTest(wpilib.TimedRobot):
         self.server.update(self.time.timeSinceInit)
 
         """---leds---"""
-
+        """
         frontStartIdx, frontLength, frontLength2, backStartIdx, backLength, backLength2 = self.makeLEDsFollowGyro(76, 13, 87, 4, 4, self.gyro.getYaw(), 90)
 
         self.ledController.setLEDs(0, 0, 0, 0, 0, 88)
@@ -112,7 +112,7 @@ class swerveTest(wpilib.TimedRobot):
 
         self.ledController.setLEDs(255, 0, 0, 0, backStartIdx, backLength)
         self.ledController.setLEDs(255, 0, 0, 0, 13, backLength2)
-
+        """
 
     """----------------------------------------------------------"""
 
@@ -126,6 +126,8 @@ class swerveTest(wpilib.TimedRobot):
 
         self.pid = PIDController(kp, ki, kd)
         self.target = angleWrap(self.gyro.getYaw())
+
+        self.ledController.setLEDs(0, 0, 0, 0, 0, 100)
 
 
 
@@ -151,17 +153,13 @@ class swerveTest(wpilib.TimedRobot):
         startButton = self.controller.getStartButtonPressed()
         gyroReset = self.controller.getYButtonPressed()
 
-        if startButton:
-            self.brakeDefault = not self.brakeDefault
-            brakes = True #make sure this doesn't break anything
-
         #angle pid
         angle = angleWrap(self.gyro.getYaw())
         error = angleWrap(self.target-angle)
         # turnSpeed = self.pid.tickErr(error, self.time.dt) * turnScalar
 
         #make swerve move
-        self.swerveController.tick(driveStick.x, driveStick.y, turnSpeed, self.time.dt, brakes, self.brakeDefault, gyroReset, self.swerve, self.gyro, self.ledController, self.server)
+        self.swerveController.tick(driveStick.x, driveStick.y, turnSpeed, self.time.dt, brakes, startButton, gyroReset, self.swerve, self.gyro, self.ledController, self.server)
 
 
         """------LEDs------"""
@@ -189,20 +187,20 @@ class swerveTest(wpilib.TimedRobot):
         lineThickness = 4
         gyroOffset = 90
 
-        """
-        frontStartIdx, frontLength, frontLength2, backStartIdx, backLength, backLength2 = self.makeLEDsFollowGyro(ledLength, ledStartIdx, ledEndIdx - 1, 4, 4, self.gyro.getYaw(), gyroOffset)
+        
+        frontStartIdx, frontLength, frontLength2, backStartIdx, backLength, backLength2 = self.makeLEDsFollowGyro(76, 13, 87, 4, 4, self.gyro.getYaw(), gyroOffset)
 
-        self.ledController.setLEDs(0, 0, 0, 0, 0, 88)
+        self.ledController.setLEDs(0, 0, 0, 0, 0, 100)
 
         self.ledController.setLEDs(0, 255, 0, 0, frontStartIdx, frontLength)
         self.ledController.setLEDs(0, 255, 0, 0, ledStartIdx, frontLength2)
 
         self.ledController.setLEDs(255, 0, 0, 0, backStartIdx, backLength)
         self.ledController.setLEDs(255, 0, 0, 0, ledStartIdx, backLength2)
-
         
-        ledGyro = round((((self.gyro.getYaw() + gyroOffset) %360) / 4.8))
-        ledGyroInverted = round((((self.gyro.getYaw() + gyroOffset + 180) %360) / 4.8))
+        
+        ledGyro = round((((-self.gyro.getYaw() + gyroOffset) %360) / 4.8))
+        ledGyroInverted = round((((-self.gyro.getYaw() + gyroOffset + 180) %360) / 4.8))
 
         outLength = 4
         outLength2 = 0
@@ -211,7 +209,7 @@ class swerveTest(wpilib.TimedRobot):
         outLengthBack = 4
         outLength2Back = 0
         outStartIdxBack = ledGyroInverted - 1 + 12
-
+        """
         for i in range(3):
             if outStartIdx + i >= 88:
                 outLength = i
@@ -223,28 +221,28 @@ class swerveTest(wpilib.TimedRobot):
                 outLength2Back = 4-i
         
 
-        self.ledController.setLEDs(0, 0, 0, 0, 0, 88)
+        self.ledController.setLEDs(0, 0, 0, 0, 0, 89)
 
         self.ledController.setLEDs(0, 255, 0, 0, outStartIdx, outLength)
         self.ledController.setLEDs(0, 255, 0, 0, 13, outLength2)
 
         self.ledController.setLEDs(255, 0, 0, 0, outStartIdxBack, outLengthBack)
-        self.ledController.setLEDs(255, 0, 0, 0, 13, outLength2Back)"""
-
+        self.ledController.setLEDs(255, 0, 0, 0, 13, outLength2Back)
+        """
 
     def makeLEDsFollowGyro(self, length: int, firstLed: int, lastLed: int, frontWidth: int, rearWidth: int, gyroAngle: float, gyroOffset: int):
-        degreesPerLight = 360 - length
+        degreesPerLight = 360 / length
 
-        ledGyro = round((((gyroAngle + gyroOffset) %360) / degreesPerLight))
-        ledGyroInverted = round((((gyroAngle + gyroOffset + 180) %360) / degreesPerLight))
+        ledGyro = round((((-gyroAngle + gyroOffset) %360) / degreesPerLight))
+        ledGyroInverted = round((((-gyroAngle + gyroOffset + 180) %360) / degreesPerLight))
 
         outLength = frontWidth
         outLength2 = 0
-        outStartIdx = ledGyro - frontWidth/2 + firstLed + 1
+        outStartIdx = ledGyro - frontWidth/2 + firstLed - 1
 
         outLengthBack = rearWidth
         outLength2Back = 0
-        outStartIdxBack = ledGyroInverted - rearWidth/2 + firstLed + 1
+        outStartIdxBack = ledGyroInverted - rearWidth/2 + firstLed - 1
 
         for i in range(frontWidth - 1):
             if outStartIdx + i > lastLed:
@@ -262,6 +260,9 @@ class swerveTest(wpilib.TimedRobot):
         backStartIdx = int(outStartIdxBack)
         backLength = int(outLengthBack)
         backLength2 = int(outLength2Back)
+
+        self.server.putUpdate("ledGyro", ledGyro)
+        self.server.putUpdate("startIdx", outStartIdx)
 
         return frontStartIdx, frontLength, frontLength2, backStartIdx, backLength, backLength2
     

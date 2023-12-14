@@ -132,7 +132,7 @@ class SwerveController:
         self.brakes = False
 
         #choose between brake or hold position when no input is given (if false brakes will be a toggle on button "B")
-        self.brakeDefault = True
+        self.brakeDefault = False
 
         kp = 2.5
         ki = 0
@@ -190,6 +190,11 @@ class SwerveController:
     # turning is CW+
     def tick(self, forward: float, right: float, turn: float, dt: float, brakeButtonPressed: bool, brakeDefault: bool, gyroReset: bool, swerve: SwerveState, gyro, optCANdle, server: Server) -> None:
         #brake input toggle
+
+        if brakeDefault:
+            self.brakeDefault = not self.brakeDefault
+            self.brakes = False
+
         if brakeButtonPressed == True:
             self.brakes = not self.brakes
 
