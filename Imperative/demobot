@@ -1,0 +1,77 @@
+import wpilib
+import rev
+
+class TestInputs():
+    def __init__(self, mainCtrlr: wpilib.XboxController) -> None:
+        
+        self.leftMainX = mainCtrlr.getLeftX()
+        self.leftMainY = mainCtrlr.getLeftY()
+        self.rightMainX = mainCtrlr.getRightX()
+        self.rightMainY = mainCtrlr.getRightY()
+        pass
+
+
+class TestBox(wpilib.TimedRobot):
+    def robotInit(self) -> None:
+        #motors======================================================
+        BRUSHLESS = rev.CANSparkMax.MotorType.kBrushless
+        BRUSHED = rev.CANSparkMax.MotorType.kBrushed
+        self.shooterLeft = rev.CANSparkMax(1,BRUSHED)
+        self.shooterRight = rev.CANSparkMax(2,BRUSHED)
+        self.flMotor = rev.CANSparkMax(3,BRUSHED)
+        self.blMotor = rev.CANSparkMax(4,BRUSHED)
+        self.frMotor = rev.CANSparkMax(5,BRUSHED)
+        self.brMotor = rev.CANSparkMax(6,BRUSHED)
+        
+        #controllers=================================================
+        self.mainCtrlr = wpilib.XboxController(0)
+
+        #variables===================================================
+        
+
+
+
+
+
+
+
+    def robotPeriodic(self) -> None:
+        self.input = TestInputs(self.mainCtrlr)
+        
+        return super().robotPeriodic()
+    
+    
+    def teleopPeriodic(self) -> None:
+        #variables for driving
+        self.Forward = self.input.rightMainY
+        self.Turn = self.input.rightMainY
+        
+
+        #controlling the motors
+        
+        self.shooterLeft.set(self.input.leftMainY * 0.01)
+        self.shooterRight.set(self.input.leftMainY * -0.01)
+        #go forward
+        if self.Turn < 0.5 and self.Turn > -0.5:
+            self.leftMovement = self.Forward*0.01
+            self.rightMovement = self.Forward*0.01
+        #go left
+        if self.Turn < -0.5:
+            self.leftMovement = self.Forward*-0.01
+            self.rightMovement = self.Forward*0.01
+        #go right
+        if self.Turn > 0.5:
+            self.leftMovement = self.Forward*0.01
+            self.rightMovement = self.Forward*-0.01
+
+       #driving     
+        self.flMotor.set(self.leftMovement)
+        self.blMotor.set(self.leftMovement)
+        self.frMotor.set(self.rightMovement)
+        self.brMotor.set(self.rightMovement)    
+
+        #return super().teleopPeriodic()
+    
+    
+    def disabledPeriodic(self) -> None:
+        return super().disabledPeriodic()
