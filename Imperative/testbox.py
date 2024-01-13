@@ -13,8 +13,8 @@ class TestInputs():
 class TestBox(wpilib.TimedRobot):
     def robotInit(self) -> None:
         # motors======================================================
-        # BRUSHLESS = rev.CANSparkMax.MotorType.kBrushless
-        BRUSHED = rev.CANSparkMax.MotorType.kBrushed
+        BRUSHLESS = rev.CANSparkMax.MotorType.kBrushless
+        # BRUSHED = rev.CANSparkMax.MotorType.kBrushed
 
         # demobot shooter code (untested)=============================
         # self.shooterLeft = rev.CANSparkMax(1,BRUSHED)
@@ -22,7 +22,7 @@ class TestBox(wpilib.TimedRobot):
 
         self.motors: list[rev.CANSparkMax] = []
         for i in range(8):
-            self.motors.append(rev.CANSparkMax(i, BRUSHED))
+            self.motors.append(rev.CANSparkMax(i, BRUSHLESS))
 
         # controllers=================================================
         self.mainCtrlr = wpilib.XboxController(0)
